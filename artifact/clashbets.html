@@ -188,7 +188,7 @@ tr.mine td { background: var(--panel-2); }
 
 <main>
   <div id="localBanner" class="banner" hidden>You're not signed in, so this is a practice copy that only saves on this device. Sign in to claude.ai and open the link again to join the real book.</div>
-  <div id="readonlyBanner" class="banner" hidden>Your account can browse but can't save. Ask the admin to invite you as an Editor so you can log matches and bet.</div>
+  <div id="readonlyBanner" class="banner" hidden>You're in view-only mode, so you can see the odds but can't pick a player, bet or log matches. Ask the admin to invite your email as an Editor, then open the link from that invite.</div>
   <div id="noIdBanner" class="banner" hidden>This view doesn't know who you are, so you can browse the odds but can't pick a player or bet.</div>
 
   <!-- JOIN: pick your player -->
@@ -764,7 +764,11 @@ async function connect() {
   }
   db = api; mode = 'shared';
   try { userApi = await window.claude.use('user'); } catch { userApi = null; }
-  if (userApi) { me.uid = await userApi.id(); me.admin = await userApi.isOwner(); }
+  if (userApi) {
+    me.uid = await userApi.id(); me.admin = await userApi.isOwner();
+    // false = this account can only view (e.g. opened through a public link); null = not told, let a save decide
+    if (!me.admin && (await userApi.can('data.write')) === false) { readOnly = true; $('#readonlyBanner').hidden = false; }
+  }
   try { me.skippedJoin = me.admin && sessionStorage.getItem('clashbets-skip') === '1'; } catch { /* ignore */ }
   const pending = new Set(['players', 'matches', 'claims', 'bets']);
   const onErr = () => { $('#syncState').textContent = 'Lost connection. Reload to retry.'; };
@@ -846,7 +850,7 @@ function showTab(id) {
 $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('[role="tab"]'); if (b) showTab(b.id); });
 
 // The join screen shows when a signed-in account hasn't linked a player yet
-const needsJoin = () => mode !== 'connecting' && store.ready && !!me.uid && !myPlayer() && !me.skippedJoin;
+const needsJoin = () => mode !== 'connecting' && store.ready && !!me.uid && !readOnly && !myPlayer() && !me.skippedJoin;
 
 function renderAll() {
   const st = $('#syncState');
@@ -950,6 +954,7 @@ $('#markets').addEventListener('click', (e) => {
 function betBlock(a, b) {
   const pid = myPlayer();
   if (mode === 'shared' && !me.uid) return 'Sign in to bet.';
+  if (readOnly) return 'You\'re view-only. Ask the admin to invite your email as an Editor to bet.';
   if (!pid) return me.admin ? 'Link yourself to a player (reload and pick one) to bet.' : 'Pick your player first.';
   if (!store.settings.ownMatchBets && (pid === a || pid === b)) return 'You\'re playing in this one, so no betting on it. Match fixing is frowned upon.';
   return '';
@@ -1171,7 +1176,7 @@ $('#sides').addEventListener('click', (e) => {
 });
 
 let editingId = null;
-const canLog = () => me.admin || !!myPlayer();
+const canLog = () => !readOnly && (me.admin || !!myPlayer());
 const canChange = (m) => me.admin || (!!me.uid && m.loggedBy === me.uid);
 function resetForm() {
   editingId = null; $('#matchForm').reset(); buildSides(); renderAll();

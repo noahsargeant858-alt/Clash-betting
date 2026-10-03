@@ -469,10 +469,14 @@ function model(a, b, matches) {
 //  it, so linked picks ("Nizz wins" + "Nizz 3-crown win") are priced as
 //  linked instead of multiplied like strangers.
 //
-//  Each extra variable depends on the scoreline (a 3-crown always wakes the
-//  King; a tower taken in regulation always means 1,000+ damage before OT;
-//  the winner usually takes the first tower) and is then calibrated so its
-//  overall chance matches the per-player estimate from model().
+//  Each extra variable follows the game's own rules first, then is
+//  calibrated so its overall chance matches the per-player estimate:
+//  - Overtime is sudden death: the first tower ends it. So an OT game ends
+//    level (draw/tiebreaker), by one tower, or by a King kill from 0-0/1-1
+//    (3-0, 3-1). A 2-0 can never be an OT result.
+//  - Losing any tower wakes your King Tower.
+//  - Crowns held at the end of regulation mean 1,000+ damage before OT.
+//  - The winner usually takes the first tower.
 // ----------------------------------------------------------------------
 // Returns base -> calibrated probability, shifting every base by the same
 // logit amount so that sum(w * p) hits the target (clamped to what's possible).
@@ -486,39 +490,44 @@ function fitShift(items, target) {
   const k = (lo + hi) / 2;
   return (base) => logistic(logit(base) + k);
 }
-const KING_BASE = [0.25, 0.55, 0.75];      // chance your King wakes, by crowns conceded (3 = destroyed, always)
 const DMG_BASE_SCORED = 0.85, DMG_BASE_BLANK = 0.5;
+const OT_BASE_ONE = 0.5, OT_BASE_KING_KILL = 0.08;   // decisive OT: one-tower win vs a King kill from level
+// Can this decisive scoreline be an overtime result? (one tower, or a King kill from 0-0 / 1-1)
+const otPossible = (a, b) => Math.abs(a - b) === 1 || (Math.max(a, b) === 3 && Math.min(a, b) <= 1);
+// Crowns each side held when regulation ended (in a decisive OT game the winner's last tower came in OT)
+const regCrowns = (a, b, ot) => (ot ? [Math.min(a, b), Math.min(a, b)] : [a, b]);
 
 function jointModel(m, hp) {
   const S = m.scores.filter((s) => s.p > 1e-12);
   const mass = (fn) => S.filter(fn).reduce((t, s) => t + s.p, 0);
   const pLevel = mass((s) => s.a === s.b);
-  // Overtime: level games always go to OT; decisive ones share the rest
-  const qOT = 1 - pLevel > 1e-9 ? clamp((m.pOT - pLevel) / (1 - pLevel), 0.01, 0.99) : 0.5;
+  // Overtime: level games always went to OT; decisive ones only if the scoreline allows it
+  const otBase = (s) => (Math.abs(s.a - s.b) === 1 ? OT_BASE_ONE : OT_BASE_KING_KILL);
+  const otCal = fitShift(S.filter((s) => s.a !== s.b && otPossible(s.a, s.b)).map((s) => ({ w: s.p, base: otBase(s) })), m.pOT - pLevel);
   const sOT = [];
   for (const s of S) {
     if (s.a === s.b) sOT.push({ s, ot: true, p: s.p });
-    else { sOT.push({ s, ot: true, p: s.p * qOT }); sOT.push({ s, ot: false, p: s.p * (1 - qOT) }); }
+    else if (!otPossible(s.a, s.b)) sOT.push({ s, ot: false, p: s.p });
+    else { const q = otCal(otBase(s)); sOT.push({ s, ot: true, p: s.p * q }); sOT.push({ s, ot: false, p: s.p * (1 - q) }); }
   }
   // First tower: forced when only one side scored; otherwise the winner usually got there first
   const r = clamp(m.comebackRate, 0.02, 0.98);
   const firstBase = (s) => (s.winner === 'D' ? 0.5 : s.winner === 'A' ? 1 - r : r);
   const firstCal = fitShift(S.filter((s) => s.a > 0 && s.b > 0).map((s) => ({ w: s.p, base: firstBase(s) })),
     (1 - m.pNoCrowns) * m.qFirst - mass((s) => s.a > 0 && s.b === 0));
-  // 1,000+ damage before OT: forced if you took a tower and the game never reached OT
+  // 1,000+ damage before OT: forced if you held a crown when regulation ended
   const dmgCal = {};
   for (const side of ['A', 'B']) {
     const cr = (x) => (side === 'A' ? x.s.a : x.s.b);
-    const forced = (x) => !x.ot && cr(x) >= 1;
+    const forced = (x) => regCrowns(x.s.a, x.s.b, x.ot)[side === 'A' ? 0 : 1] >= 1;
     dmgCal[side] = fitShift(sOT.filter((x) => !forced(x)).map((x) => ({ w: x.p, base: cr(x) >= 1 ? DMG_BASE_SCORED : DMG_BASE_BLANK })),
       m['pDmg' + side] - sOT.filter(forced).reduce((t, x) => t + x.p, 0));
   }
-  // King Tower activated: forced if it was destroyed; likelier the more crowns you conceded
-  const kingCal = {};
+  // King Tower activated: forced once you lose any tower; otherwise one calibrated chance
+  const kingQ = {};
   for (const side of ['A', 'B']) {
-    const against = (s) => (side === 'A' ? s.b : s.a);
-    kingCal[side] = fitShift(S.filter((s) => against(s) < 3).map((s) => ({ w: s.p, base: KING_BASE[against(s)] })),
-      m['pKing' + side] - mass((s) => against(s) === 3));
+    const against = (s) => (side === 'A' ? s.b : s.a), clean = mass((s) => against(s) === 0);
+    kingQ[side] = clean > 1e-9 ? clamp((m['pKing' + side] - (1 - clean)) / clean, 0.01, 0.99) : 0.5;
   }
   const bin = (forcedTrue, q) => (forcedTrue ? [[true, 1]] : [[true, q], [false, 1 - q]]);
   const states = [];
@@ -526,10 +535,11 @@ function jointModel(m, hp) {
     const s = x.s;
     const firsts = s.a + s.b === 0 ? [['none', 1]] : s.b === 0 ? [['A', 1]] : s.a === 0 ? [['B', 1]]
       : (() => { const f = firstCal(firstBase(s)); return [['A', f], ['B', 1 - f]]; })();
-    const dA = bin(!x.ot && s.a >= 1, dmgCal.A(s.a >= 1 ? DMG_BASE_SCORED : DMG_BASE_BLANK));
-    const dB = bin(!x.ot && s.b >= 1, dmgCal.B(s.b >= 1 ? DMG_BASE_SCORED : DMG_BASE_BLANK));
-    const kA = bin(s.b === 3, s.b === 3 ? 1 : kingCal.A(KING_BASE[s.b]));
-    const kB = bin(s.a === 3, s.a === 3 ? 1 : kingCal.B(KING_BASE[s.a]));
+    const [regA, regB] = regCrowns(s.a, s.b, x.ot);
+    const dA = bin(regA >= 1, dmgCal.A(s.a >= 1 ? DMG_BASE_SCORED : DMG_BASE_BLANK));
+    const dB = bin(regB >= 1, dmgCal.B(s.b >= 1 ? DMG_BASE_SCORED : DMG_BASE_BLANK));
+    const kA = bin(s.b >= 1, kingQ.A);
+    const kB = bin(s.a >= 1, kingQ.B);
     for (const [first, pf] of firsts) for (const [dmgA, pa] of dA) for (const [dmgB, pb] of dB) for (const [kingA, pka] of kA) for (const [kingB, pkb] of kB) {
       const p = x.p * pf * pa * pb * pka * pkb;
       if (p > 1e-12) states.push({ p, o: { a: s.a, b: s.b, winner: s.winner, overtime: x.ot, firstCrown: first, dmgA, dmgB, kingA, kingB } });
@@ -547,13 +557,18 @@ function jointModel(m, hp) {
   return { states, dealt, hp };
 }
 
-// P(this player's damage dealt >= line | their crowns)
-function dealtOver(J, side, crowns, line) {
-  const d = J.dealt[side], floor = crowns === 3 ? J.hp.king : crowns * J.hp.princess;
+// P(this player's total damage dealt >= line | the rest of the state).
+// Crowns set a floor; 1,000+ before OT lifts it to 1,000; a game with no OT
+// and under 1,000 before OT caps the whole game under 1,000.
+function dealtOver(J, side, o, line) {
+  const d = J.dealt[side], crowns = side === 'A' ? o.a : o.b, dmg = side === 'A' ? o.dmgA : o.dmgB;
+  const floor = Math.max(crowns === 3 ? J.hp.king : crowns * J.hp.princess, dmg ? 1000 : 0);
+  const cap = !o.overtime && !dmg ? 1000 : Infinity;
   if (line <= floor) return 1;
-  const mu = d.mu + d.slope * (crowns - d.ea);
-  const tailFloor = 1 - phi((floor - mu) / d.sd);
-  return tailFloor < 1e-9 ? 0 : clamp((1 - phi((line - mu) / d.sd)) / tailFloor, 0, 1);
+  if (line >= cap) return 0;
+  const mu = d.mu + d.slope * (crowns - d.ea), tail = (x) => (x === Infinity ? 0 : 1 - phi((x - mu) / d.sd));
+  const span = tail(floor) - tail(cap);
+  return span < 1e-12 ? (line - floor < cap - line ? 1 : 0) : clamp((tail(line) - tail(cap)) / span, 0, 1);
 }
 
 // Probability that every leg lands, summed over the joint table
@@ -564,7 +579,7 @@ function jointProb(J, legs) {
     for (const leg of legs) {
       if (leg.market.startsWith('dealt')) {
         const side = leg.market.slice(5), [dir, line] = leg.selection.split(':');
-        const over = dealtOver(J, side, side === 'A' ? st.o.a : st.o.b, +line);
+        const over = dealtOver(J, side, st.o, +line);
         p *= dir === 'over' ? over : 1 - over;
       } else if (settleSelection(leg.market, leg.selection, st.o) !== true) p = 0;
       if (p === 0) break;
@@ -626,12 +641,18 @@ function marketDefs(nA, nB) {
   return defs;
 }
 
-const LADDER = ['1/100','1/50','1/33','1/25','1/20','1/16','1/14','1/12','1/10','1/9','1/8','1/7','1/6','1/5','2/9','1/4','2/7','3/10','1/3','4/11','2/5','4/9','1/2','8/15','4/7','8/13','4/6','8/11','4/5','5/6','10/11','1/1','11/10','6/5','5/4','11/8','6/4','13/8','7/4','15/8','2/1','9/4','5/2','11/4','3/1','10/3','7/2','4/1','9/2','5/1','11/2','6/1','13/2','7/1','15/2','8/1','17/2','9/1','10/1','11/1','12/1','14/1','16/1','18/1','20/1','25/1','33/1','40/1','50/1','66/1','80/1','100/1','150/1','200/1','250/1','500/1']
+// UK fractional ladder (extra rungs above 100/1 keep long Bet Builders from big jumps)
+const LADDER = ['1/100','1/50','1/33','1/25','1/20','1/16','1/14','1/12','1/10','1/9','1/8','1/7','1/6','1/5','2/9','1/4','2/7','3/10','1/3','4/11','2/5','4/9','1/2','8/15','4/7','8/13','4/6','8/11','4/5','5/6','10/11','1/1','11/10','6/5','5/4','11/8','6/4','13/8','7/4','15/8','2/1','9/4','5/2','11/4','3/1','10/3','7/2','4/1','9/2','5/1','11/2','6/1','13/2','7/1','15/2','8/1','17/2','9/1','10/1','11/1','12/1','14/1','16/1','18/1','20/1','25/1','33/1','40/1','50/1','66/1','80/1','100/1','125/1','150/1','175/1','200/1','250/1','300/1','400/1','500/1']
   .map((f) => { const [n, d] = f.split('/').map(Number); return { f, x: n / d }; });
-function price(p, margin) {
-  const x = Math.max(1.01, 1 / (clamp(p, 0.002, 0.99) * (1 + margin / 100))) - 1; // fractional odds before snapping
+// Snap to the nearest ladder rung, but never past a price that keeps at
+// least `keep` of the margin (singles keep half; Bet Builders keep all of it,
+// so rounding can never hand a long combo a better-than-fair price).
+function price(p, margin, keep = 0.5) {
+  const pc = clamp(p, 0.002, 0.99), x = Math.max(1.01, 1 / (pc * (1 + margin / 100))) - 1;
+  const limit = 1 / (pc * (1 + (margin * keep) / 100)) - 1;
   let best = LADDER[0];
   for (const r of LADDER) if (Math.abs(Math.log(r.x / x)) < Math.abs(Math.log(best.x / x))) best = r;
+  if (best.x > limit) best = [...LADDER].reverse().find((r) => r.x <= limit) || LADDER[0];
   return { p, decimal: Math.round((1 + best.x) * 100) / 100, fractional: best.f };
 }
 
@@ -952,7 +973,7 @@ function builderQuote() {
   const p = jointProb(currentBook.J, legs);
   if (p < 0.0005) return { impossible: true };
   const acca = legs.reduce((t, l) => t * l.decimal, 1);
-  return { p, acca, ...price(p, store.settings.builderMargin) };
+  return { p, acca, ...price(p, store.settings.builderMargin, 1) };
 }
 function modeSwitch() {
   return `<div class="seg mode" role="group" aria-label="Bet type">
@@ -1099,15 +1120,20 @@ function readForm() {
   const winner = crownsA > crownsB ? 'A' : crownsB > crownsA ? 'B' : radio('winner') || 'draw';
   let overtime = radio('overtime') === '' ? null : radio('overtime') === 'yes';
   if (overtime == null && crownsA === crownsB) overtime = true; // draws and tiebreakers only happen after OT
+  if (overtime === false && crownsA === crownsB) throw new Error('Crowns were level, so it must have gone to overtime. Set overtime to Yes.');
+  if (overtime === true && crownsA !== crownsB && !otPossible(crownsA, crownsB)) throw new Error(`A ${Math.max(crownsA, crownsB)}–${Math.min(crownsA, crownsB)} can't finish in overtime, because the first tower in OT ends the game. Check the towers or set overtime to No.`);
   const tri = (n) => (radio(n) === '' ? null : radio(n) === 'yes');
   let dmgA = tri('dmgA'), dmgB = tri('dmgB'), kingA = tri('kingA'), kingB = tri('kingB');
   if (overtime === false) { // the whole game was regulation time
     if (dmgA == null && (crownsA > 0 || dealtA != null)) dmgA = crownsA > 0 || dealtA >= 1000;
     if (dmgB == null && (crownsB > 0 || dealtB != null)) dmgB = crownsB > 0 || dealtB >= 1000;
+  } else if (overtime === true) { // crowns held when regulation ended mean 1,000+ before OT
+    const [rA, rB] = regCrowns(crownsA, crownsB, true);
+    if (rA >= 1) dmgA = true; if (rB >= 1) dmgB = true;
   }
   if (kingA == null && towersA && towersA.king < maxHp('king')) kingA = true;
   if (kingB == null && towersB && towersB.king < maxHp('king')) kingB = true;
-  if (crownsB === 3) kingA = true; if (crownsA === 3) kingB = true;
+  if (crownsB >= 1) kingA = true; if (crownsA >= 1) kingB = true; // losing any tower wakes your King
   let firstCrown = radio('first') || null;
   if (crownsA + crownsB === 0) firstCrown = 'none';
   else if (!firstCrown && crownsA === 0) firstCrown = 'B';

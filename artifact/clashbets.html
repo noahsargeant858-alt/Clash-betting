@@ -29,7 +29,7 @@ nav { display: flex; gap: 2px; overflow-x: auto; max-width: 1100px; margin: 6px 
 nav button { background: none; border: 0; padding: 10px 14px; font-weight: 700; color: var(--muted); border-radius: 10px 10px 0 0; cursor: pointer; white-space: nowrap; }
 nav button[aria-selected="true"] { background: var(--bg); color: var(--gold); }
 
-main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 14px; }
 section[role="tabpanel"] { display: grid; gap: 14px; }
 h2 { font-family: var(--display); font-weight: 400; font-size: 22px; margin: 0; text-wrap: balance; letter-spacing: .3px; }
 h3 { margin: 0; font-size: 15px; font-weight: 700; }
@@ -124,6 +124,22 @@ td.c, th.c { text-align: center; }
 .chip { display: inline-block; background: var(--panel-2); border: 1px solid var(--line); border-radius: 99px; padding: 2px 9px; margin: 2px; font-size: 13px; }
 .empty { text-align: center; color: var(--muted); padding: 24px 12px; }
 
+/* ---------- accounts ---------- */
+.me-chip { display: inline-flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 99px; padding: 3px 4px 3px 12px; font-size: 13px; font-weight: 700; }
+.me-chip .coins { color: var(--gold); }
+.me-chip .pill { background: var(--bg); }
+.pill.admin { color: var(--gold); border-color: var(--gold); }
+.join { max-width: 720px; margin: 0 auto; width: 100%; }
+.join-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.join-grid button { display: grid; gap: 4px; padding: 16px 10px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); font-family: var(--display); font-size: 21px; cursor: pointer; }
+.join-grid button:hover:not(:disabled), .join-grid button[aria-pressed="true"] { border-color: var(--gold); }
+.join-grid button[aria-pressed="true"] { background: var(--bg); }
+.join-grid button:disabled { opacity: .45; cursor: not-allowed; }
+.join-grid small { font-family: var(--body); font-size: 12px; color: var(--muted); }
+tr.mine td { background: var(--panel-2); }
+.inline-num { width: 90px; padding: 5px 8px; }
+.note { font-size: 13px; color: var(--muted); margin: 0; }
+
 #toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 140%); background: var(--panel-2); border: 1px solid var(--gold); padding: 10px 16px; border-radius: 12px; max-width: calc(100% - 32px); transition: transform .25s; z-index: 10; }
 #toast.show { transform: translate(-50%, 0); }
 #toast.bad { border-color: var(--red); }
@@ -142,6 +158,7 @@ td.c, th.c { text-align: center; }
     <span class="brand">Clash<b>Bets</b></span>
     <span class="sub">Triple Draft sportsbook · coins only</span>
     <span id="syncState">Connecting…</span>
+    <span id="meChip" class="me-chip" hidden></span>
   </div>
   <nav role="tablist" id="tabs">
     <button role="tab" id="tab-odds" aria-controls="p-odds" aria-selected="true">Odds</button>
@@ -149,13 +166,27 @@ td.c, th.c { text-align: center; }
     <button role="tab" id="tab-history" aria-controls="p-history" aria-selected="false">History</button>
     <button role="tab" id="tab-bets" aria-controls="p-bets" aria-selected="false">Bets</button>
     <button role="tab" id="tab-stats" aria-controls="p-stats" aria-selected="false">Stats</button>
-    <button role="tab" id="tab-squad" aria-controls="p-squad" aria-selected="false">Squad</button>
+    <button role="tab" id="tab-admin" aria-controls="p-admin" aria-selected="false" hidden>Admin</button>
   </nav>
 </header>
 
 <main>
-  <div id="localBanner" class="banner" hidden>Shared saving isn't available in this view, so anything you log stays on this device only.</div>
-  <div id="readonlyBanner" class="banner" hidden>You can see the odds but can't save. Ask the page owner to invite you as an Editor so you can log matches and bet.</div>
+  <div id="localBanner" class="banner" hidden>You're not signed in, so this is a practice copy that only saves on this device. Sign in to claude.ai and open the link again to join the real book.</div>
+  <div id="readonlyBanner" class="banner" hidden>Your account can browse but can't save. Ask the admin to invite you as an Editor so you can log matches and bet.</div>
+  <div id="noIdBanner" class="banner" hidden>This view doesn't know who you are, so you can browse the odds but can't pick a player or bet.</div>
+
+  <!-- JOIN: pick your player -->
+  <section id="join" class="panel stack join" hidden>
+    <h2>Who are you?</h2>
+    <p class="note">Pick your player. Your account gets linked to them, so your bets and coins are yours. Only the admin can change it afterwards, so pick carefully.</p>
+    <p id="joinMsg" class="banner" hidden></p>
+    <div class="join-grid" id="joinGrid"></div>
+    <div class="row" id="joinConfirm" hidden>
+      <button class="btn gold" type="button" id="joinYes"></button>
+      <button class="btn" type="button" id="joinBack">Back</button>
+    </div>
+    <div class="row" id="joinAdminSkip" hidden><button class="btn" type="button" id="joinSkip">Skip for now (admin)</button></div>
+  </section>
 
   <!-- ODDS -->
   <section role="tabpanel" id="p-odds" aria-labelledby="tab-odds">
@@ -207,7 +238,8 @@ td.c, th.c { text-align: center; }
   <!-- BETS -->
   <section role="tabpanel" id="p-bets" aria-labelledby="tab-bets" hidden>
     <div class="panel stack"><h2>Coin leaderboard</h2><div class="scroll" id="leaderboard"></div></div>
-    <div class="panel stack"><h2>Bets</h2><div class="scroll" id="betList"></div></div>
+    <div class="panel stack" id="myBetsPanel" hidden><h2>My bets</h2><div class="scroll" id="myBets"></div></div>
+    <div class="panel stack"><h2>Everyone's bets</h2><div class="scroll" id="betList"></div></div>
   </section>
 
   <!-- STATS -->
@@ -222,10 +254,11 @@ td.c, th.c { text-align: center; }
     <div class="panel stack"><h2>Drafted cards</h2><div class="scroll" id="cards"></div></div>
   </section>
 
-  <!-- SQUAD -->
-  <section role="tabpanel" id="p-squad" aria-labelledby="tab-squad" hidden>
+  <!-- ADMIN (owner only) -->
+  <section role="tabpanel" id="p-admin" aria-labelledby="tab-admin" hidden>
     <div class="panel stack">
-      <h2>Squad</h2>
+      <h2>Squad and accounts</h2>
+      <p class="note">See who has linked their account to each player. Release a link if someone picked the wrong player, and give or take coins with a positive or negative number.</p>
       <form id="addPlayer" class="row">
         <input type="text" id="newName" placeholder="Name" maxlength="30" aria-label="New player name">
         <button class="btn gold" type="submit">Add player</button>
@@ -241,6 +274,7 @@ td.c, th.c { text-align: center; }
           <label class="field">Princess Tower max HP<input type="number" id="setPrincess" min="100" step="1"></label>
           <label class="field">King Tower max HP<input type="number" id="setKing" min="100" step="1"></label>
         </div>
+        <label class="check"><input type="checkbox" id="setOwnBets"> Let players bet on matches they're playing in</label>
         <p class="small muted" style="margin:0">Tower HP defaults to level 11 (3,052 Princess and 4,824 King). Check a fresh tower in your next draft and change these if they don't match. Margin is the house edge: at 5%, every market's chances add up to about 105%.</p>
         <div><button class="btn" type="submit">Save settings</button></div>
       </form>
@@ -505,41 +539,49 @@ function settleSelection(market, sel, o) {
 }
 
 // ======================================================================
-//  Data: shared store (db capability) with an on-device fallback
+//  Data. Shared store (db capability), with an on-device practice copy as
+//  fallback. Paths:
+//    players/<id>, config/settings   admin (page owner) writes
+//    matches/<id>                     anyone with edit access writes
+//    claims/<account>                 { playerId, at }: which player you are
+//    bets/<account>                   { list: [...] }: your bets, only you write
 // ======================================================================
-const DEFAULT_SETTINGS = { margin: 5, startingCoins: 1000, princessHp: 3052, kingHp: 4824 };
-const store = { players: [], matches: [], bets: [], settings: { ...DEFAULT_SETTINGS }, ready: false };
-let db = null, mode = 'connecting', readOnly = false;
-const LOCAL_KEY = 'clashbets-local';
+const DEFAULT_SETTINGS = { margin: 5, startingCoins: 1000, princessHp: 3052, kingHp: 4824, ownMatchBets: false };
+const store = { players: [], matches: [], claims: [], betDocs: [], settings: { ...DEFAULT_SETTINGS }, ready: false };
+const me = { uid: null, admin: false, skippedJoin: false };
+let db = null, userApi = null, mode = 'connecting', readOnly = false;
+const LOCAL_KEY = 'clashbets-local-v2';
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const listKey = (coll) => (coll === 'bets' ? 'betDocs' : coll);
 
 function loadLocal() {
   try { return JSON.parse(localStorage.getItem(LOCAL_KEY)) || {}; } catch { return {}; }
 }
 function saveLocal() {
-  try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ players: store.players, matches: store.matches, bets: store.bets, settings: store.settings })); } catch { /* storage blocked */ }
+  try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ players: store.players, matches: store.matches, claims: store.claims, betDocs: store.betDocs, settings: store.settings })); } catch { /* storage blocked */ }
 }
 
 async function put(coll, id, data) {
-  if (readOnly) { toast('You can view but not save. Ask the owner for Editor access.', true); throw new Error('read only'); }
+  if (readOnly) { toast('Your account can\'t save here. Ask the admin for Editor access.', true); throw new Error('read only'); }
   if (db) {
     try { await db.collection(coll).doc(id).set(data); }
     catch (e) {
-      if (e && e.code === 'invalid_argument' && coll !== 'config') { readOnly = true; document.getElementById('readonlyBanner').hidden = false; toast('You can view but not save. Ask the owner for Editor access.', true); }
-      else if (e && e.code === 'quota_exceeded') toast('Storage is full. Delete some old matches or bets.', true);
+      if (e && e.code === 'invalid_argument' && ['matches', 'claims', 'bets'].includes(coll)) {
+        readOnly = true; $('#readonlyBanner').hidden = false; toast('Your account can\'t save here. Ask the admin for Editor access.', true);
+      } else if (e && e.code === 'invalid_argument') toast('Only the admin can change that.', true);
+      else if (e && e.code === 'quota_exceeded') toast('Storage is full. The admin needs to delete some old matches.', true);
       else toast('Couldn\'t save. Check your connection and try again.', true);
       throw e;
     }
     return;
   }
-  const list = coll === 'config' ? null : store[coll];
   if (coll === 'config') store.settings = { ...DEFAULT_SETTINGS, ...data };
-  else { const i = list.findIndex((x) => x.id === id); const doc = { id, ...data }; if (i >= 0) list[i] = doc; else list.push(doc); }
+  else { const list = store[listKey(coll)]; const i = list.findIndex((x) => x.id === id); const doc = { id, ...data }; if (i >= 0) list[i] = doc; else list.push(doc); }
   sortMatches(); saveLocal(); renderAll();
 }
 async function remove(coll, id) {
   if (db) { await db.collection(coll).doc(id).delete(); return; }
-  store[coll] = store[coll].filter((x) => x.id !== id); saveLocal(); renderAll();
+  store[listKey(coll)] = store[listKey(coll)].filter((x) => x.id !== id); saveLocal(); renderAll();
 }
 const sortMatches = () => store.matches.sort((x, y) => (x.date || '').localeCompare(y.date || ''));
 
@@ -547,20 +589,23 @@ async function connect() {
   let api = null;
   try { api = window.claude && window.claude.use ? await window.claude.use('db') : null; } catch { api = null; }
   if (!api) {
-    mode = 'local';
+    mode = 'local'; me.uid = 'local'; me.admin = true;
     const l = loadLocal();
-    Object.assign(store, { players: l.players || [], matches: l.matches || [], bets: l.bets || [], settings: { ...DEFAULT_SETTINGS, ...(l.settings || {}) }, ready: true });
-    if (!store.players.length) store.players = ['Nizz', 'triqqi', 'zac', 'jamie', 'sek', 'caleb', 'rishi', 'rocky', 'ethan', 'johnny'].map((name) => ({ id: newId(), name, addedAt: new Date().toISOString() }));
+    Object.assign(store, { players: l.players || [], matches: l.matches || [], claims: l.claims || [], betDocs: l.betDocs || [], settings: { ...DEFAULT_SETTINGS, ...(l.settings || {}) }, ready: true });
+    if (!store.players.length) store.players = ['Nizz', 'triqqi', 'zac', 'jamie', 'sek', 'caleb', 'rishi', 'rocky', 'ethan', 'johnny'].map((name, i) => ({ id: newId() + i, name, addedAt: new Date(Date.now() + i).toISOString() }));
     sortMatches();
-    document.getElementById('localBanner').hidden = false;
+    $('#localBanner').hidden = false;
     renderAll(); return;
   }
   db = api; mode = 'shared';
-  const pending = new Set(['players', 'matches', 'bets']);
-  const onErr = () => { document.getElementById('syncState').textContent = 'Lost connection. Reload to retry.'; };
-  for (const coll of pending) {
+  try { userApi = await window.claude.use('user'); } catch { userApi = null; }
+  if (userApi) { me.uid = await userApi.id(); me.admin = await userApi.isOwner(); }
+  try { me.skippedJoin = me.admin && sessionStorage.getItem('clashbets-skip') === '1'; } catch { /* ignore */ }
+  const pending = new Set(['players', 'matches', 'claims', 'bets']);
+  const onErr = () => { $('#syncState').textContent = 'Lost connection. Reload to retry.'; };
+  for (const coll of [...pending]) {
     db.collection(coll).onSnapshot((snap) => {
-      store[coll] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      store[listKey(coll)] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       if (coll === 'matches') sortMatches();
       if (coll === 'players') store.players.sort((x, y) => (x.addedAt || '').localeCompare(y.addedAt || ''));
       pending.delete(coll); store.ready = pending.size === 0;
@@ -571,12 +616,25 @@ async function connect() {
 }
 
 // ======================================================================
-//  Derived state: bet settlement and coin balances are computed, never stored,
-//  so two people saving at once can't corrupt anyone's balance.
+//  Derived state. Who-is-who, bet results and coin balances are computed
+//  from the stored records, never stored themselves, so two people saving
+//  at once can't corrupt anyone's balance.
 // ======================================================================
 const playerById = (id) => store.players.find((p) => p.id === id);
 const nameOf = (id) => (playerById(id) || {}).name || 'Removed player';
 const samePair = (m, a, b) => (m.playerA === a && m.playerB === b) || (m.playerA === b && m.playerB === a);
+
+// First account to claim a player keeps them; later claims on the same player don't count
+function claimMaps() {
+  const byPlayer = {}, byUid = {};
+  for (const c of [...store.claims].sort((x, y) => (x.at || '').localeCompare(y.at || ''))) {
+    if (!playerById(c.playerId) || byPlayer[c.playerId] || byUid[c.id]) continue;
+    byPlayer[c.playerId] = c.id; byUid[c.id] = c.playerId;
+  }
+  return { byPlayer, byUid };
+}
+const myPlayer = () => (me.uid ? claimMaps().byUid[me.uid] || null : null);
+const allBets = () => store.betDocs.flatMap((d) => (Array.isArray(d.list) ? d.list : []).map((b) => ({ ...b, uid: d.id })));
 
 function betState(bet) {
   if (bet.voided) return { status: 'void', payout: bet.stake };
@@ -587,8 +645,8 @@ function betState(bet) {
   return r ? { status: 'won', payout: Math.round(bet.stake * bet.odds), matchId: m.id } : { status: 'lost', payout: 0, matchId: m.id };
 }
 function coinsOf(id) {
-  let c = store.settings.startingCoins;
-  for (const b of store.bets) if (b.bettor === id) { c -= b.stake; c += betState(b).payout; }
+  let c = store.settings.startingCoins + ((playerById(id) || {}).adjust || 0);
+  for (const b of allBets()) if (b.bettor === id) { c -= b.stake; c += betState(b).payout; }
   return c;
 }
 
@@ -615,18 +673,27 @@ function fillPlayers(sel, fallbackIndex) {
 // tabs
 const tabs = [...document.querySelectorAll('[role="tab"]')];
 function showTab(id) {
-  for (const t of tabs) {
-    const on = t.id === id; t.setAttribute('aria-selected', on);
-    document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
-  }
+  for (const t of tabs) t.setAttribute('aria-selected', t.id === id);
   try { localStorage.setItem('clashbets-tab', id); } catch { /* ignore */ }
   renderAll();
 }
 $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('[role="tab"]'); if (b) showTab(b.id); });
 
+// The join screen shows when a signed-in account hasn't linked a player yet
+const needsJoin = () => mode !== 'connecting' && store.ready && !!me.uid && !myPlayer() && !me.skippedJoin;
+
 function renderAll() {
   const st = $('#syncState');
-  st.textContent = mode === 'shared' ? (store.ready ? `Live · ${store.matches.length} matches logged` : 'Loading…') : mode === 'local' ? 'This device only' : 'Connecting…';
+  st.textContent = mode === 'shared' ? (store.ready ? `Live · ${store.matches.length} matches logged` : 'Loading…') : mode === 'local' ? 'Practice copy' : 'Connecting…';
+  renderMe();
+  const joining = needsJoin();
+  $('#join').hidden = !joining; $('#tabs').hidden = joining;
+  $('#noIdBanner').hidden = !(mode === 'shared' && store.ready && !me.uid);
+  $('#tab-admin').hidden = !me.admin;
+  for (const t of tabs) document.getElementById(t.getAttribute('aria-controls')).hidden = joining || t.getAttribute('aria-selected') !== 'true';
+  if (joining) { renderJoin(); return; }
+  if (mode !== 'connecting' && !me.admin && $('#tab-admin').getAttribute('aria-selected') === 'true') { showTab('tab-odds'); return; }
+
   for (const [a, b] of [['#oddsA', '#oddsB'], ['#muA', '#muB']]) { fillPlayers($(a), 0); fillPlayers($(b), 1); }
   fillPlayers($('#whoA'), 0); fillPlayers($('#whoB'), 1);
   const cards = new Set(BASE_CARDS); store.matches.forEach((m) => [...(m.cardsA || []), ...(m.cardsB || [])].forEach((c) => cards.add(c)));
@@ -636,14 +703,55 @@ function renderAll() {
   if (sel === 'tab-history') renderHistory();
   if (sel === 'tab-bets') renderBets();
   if (sel === 'tab-stats') renderStats();
-  if (sel === 'tab-squad') renderSquad();
+  if (sel === 'tab-admin') renderAdmin();
   if (sel === 'tab-log') updateLive();
 }
+
+function renderMe() {
+  const chip = $('#meChip'), pid = myPlayer();
+  if (!pid && !me.admin) { chip.hidden = true; return; }
+  chip.hidden = false;
+  chip.innerHTML = `${pid ? `<span>${esc(nameOf(pid))}</span><span class="coins num">${fmtN(coinsOf(pid))} coins</span>` : '<span>No player linked</span>'}${me.admin ? '<span class="pill admin">Admin</span>' : ''}`;
+}
+
+// ======================================================================
+//  Join: link your account to a player
+// ======================================================================
+let joinPick = null, joinTried = null;
+function renderJoin() {
+  const { byPlayer } = claimMaps();
+  const msg = $('#joinMsg');
+  msg.hidden = !joinTried;
+  if (joinTried) msg.textContent = `Someone else grabbed ${nameOf(joinTried)} first. If that's wrong, tell the admin.`;
+  if (joinPick && byPlayer[joinPick]) joinPick = null;
+  $('#joinGrid').innerHTML = store.players.map((p) => {
+    const taken = !!byPlayer[p.id];
+    return `<button type="button" data-join="${esc(p.id)}" ${taken ? 'disabled' : ''} aria-pressed="${joinPick === p.id}">${esc(p.name)}<small>${taken ? 'Taken' : 'Available'}</small></button>`;
+  }).join('') || '<div class="empty">The admin hasn\'t added any players yet.</div>';
+  $('#joinConfirm').hidden = !joinPick;
+  if (joinPick) $('#joinYes').textContent = `Yes, I'm ${nameOf(joinPick)}`;
+  $('#joinAdminSkip').hidden = !me.admin;
+}
+$('#joinGrid').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-join]'); if (!b || b.disabled) return;
+  joinPick = b.dataset.join; renderJoin();
+});
+$('#joinBack').onclick = () => { joinPick = null; renderJoin(); };
+$('#joinSkip').onclick = () => { me.skippedJoin = true; try { sessionStorage.setItem('clashbets-skip', '1'); } catch { /* ignore */ } renderAll(); };
+$('#joinYes').onclick = async () => {
+  const pid = joinPick; if (!pid || !me.uid) return;
+  try {
+    await put('claims', me.uid, { playerId: pid, at: new Date().toISOString() });
+    joinTried = pid; joinPick = null;
+    toast(`Welcome, ${nameOf(pid)}. You start with ${fmtN(coinsOf(pid))} coins.`);
+    renderAll();
+  } catch { /* toast shown */ }
+};
 
 // ======================================================================
 //  Odds board + bet slip
 // ======================================================================
-let slip = null, slipStake = 50, slipBettor = '';
+let slip = null, slipStake = 50;
 function renderOdds() {
   const a = $('#oddsA').value, b = $('#oddsB').value, box = $('#markets');
   if (store.players.length < 2) { box.innerHTML = '<div class="panel empty">Add at least two players on the Squad tab and the book opens.</div>'; $('#oddsMeta').textContent = ''; renderSlip(); return; }
@@ -665,32 +773,48 @@ $('#markets').addEventListener('click', (e) => {
   slip = { a: $('#oddsA').value, b: $('#oddsB').value, market: b.dataset.m, marketName: b.dataset.mn, selection: b.dataset.s, label: b.dataset.l, decimal: +b.dataset.d, fractional: b.dataset.f };
   renderOdds();
 });
+// Why the viewer can't bet on the slip's match, or '' if they can
+function betBlock(a, b) {
+  const pid = myPlayer();
+  if (mode === 'shared' && !me.uid) return 'Sign in to bet.';
+  if (!pid) return me.admin ? 'Link yourself to a player (reload and pick one) to bet.' : 'Pick your player first.';
+  if (!store.settings.ownMatchBets && (pid === a || pid === b)) return 'You\'re playing in this one, so no betting on it. Match fixing is frowned upon.';
+  return '';
+}
+let betBusy = false;
 function renderSlip() {
   const el = $('#slip');
   if (!slip) { el.innerHTML = '<h3>Bet slip</h3><p class="muted small" style="margin:0">Tap any price to add it here. Bets settle on the next logged match between those two players.</p>'; return; }
-  if (!playerById(slipBettor)) slipBettor = (store.players[0] || {}).id || '';
+  const pid = myPlayer(), block = betBlock(slip.a, slip.b);
   el.innerHTML = `<h3>Bet slip</h3>
     <div><div class="pick">${esc(slip.label)}</div><div class="small muted">${esc(nameOf(slip.a))} v ${esc(nameOf(slip.b))} · ${esc(slip.marketName)}</div></div>
     <div class="big-odd num">${slip.fractional} <span class="small muted">${slip.decimal.toFixed(2)}</span></div>
-    <label class="field">Who's betting<select id="slipBettor">${store.players.map((p) => `<option value="${esc(p.id)}" ${p.id === slipBettor ? 'selected' : ''}>${esc(p.name)} · ${fmtN(coinsOf(p.id))} coins</option>`).join('')}</select></label>
-    <label class="field">Stake (coins)<input type="number" id="slipStake" min="1" step="10" value="${slipStake}"></label>
-    <div class="small muted num" id="slipReturn"></div>
-    <div class="row"><button class="btn gold" type="button" id="slipPlace">Place bet</button><button class="btn" type="button" id="slipClear">Clear</button></div>`;
+    ${pid ? `<div class="small">Betting as <b>${esc(nameOf(pid))}</b> · <span class="num">${fmtN(coinsOf(pid))}</span> coins</div>` : ''}
+    ${block ? `<p class="note">${esc(block)}</p>` : `<label class="field">Stake (coins)<input type="number" id="slipStake" min="1" step="10" value="${slipStake}"></label>
+    <div class="small muted num" id="slipReturn"></div>`}
+    <div class="row">${block ? '' : `<button class="btn gold" type="button" id="slipPlace" ${betBusy ? 'disabled' : ''}>Place bet</button>`}<button class="btn" type="button" id="slipClear">Clear</button></div>`;
+  $('#slipClear').onclick = () => { slip = null; renderOdds(); };
+  if (block) return;
   const upd = () => { $('#slipReturn').textContent = `Returns ${fmtN((+$('#slipStake').value || 0) * slip.decimal)} coins if it lands`; };
   $('#slipStake').addEventListener('input', (e) => { slipStake = +e.target.value || 0; upd(); }); upd();
-  $('#slipBettor').addEventListener('change', (e) => { slipBettor = e.target.value; });
-  $('#slipClear').onclick = () => { slip = null; renderOdds(); };
   $('#slipPlace').onclick = placeBet;
 }
 async function placeBet() {
-  const stake = Math.floor(slipStake), who = playerById(slipBettor);
-  if (!who) return toast('Pick who is betting.', true);
+  if (betBusy) return;
+  const stake = Math.floor(slipStake), pid = myPlayer();
+  const block = betBlock(slip.a, slip.b); if (block) return toast(block, true);
   if (!(stake > 0)) return toast('Stake has to be at least 1 coin.', true);
-  if (stake > coinsOf(who.id)) return toast(`${who.name} only has ${fmtN(coinsOf(who.id))} coins.`, true);
-  const bet = { bettor: who.id, a: slip.a, b: slip.b, market: slip.market, selection: slip.selection,
+  if (stake > coinsOf(pid)) return toast(`You only have ${fmtN(coinsOf(pid))} coins.`, true);
+  const bet = { id: newId(), bettor: pid, a: slip.a, b: slip.b, market: slip.market, selection: slip.selection,
     label: `${nameOf(slip.a)} v ${nameOf(slip.b)}: ${slip.marketName}, ${slip.label}`, odds: slip.decimal, fractional: slip.fractional,
     stake, placedAt: new Date().toISOString(), voided: false };
-  try { await put('bets', newId(), bet); toast(`Bet placed: ${stake} coins at ${slip.fractional}.`); slip = null; renderOdds(); } catch { /* toast shown */ }
+  const mine = store.betDocs.find((d) => d.id === me.uid);
+  betBusy = true; renderSlip();
+  try {
+    await put('bets', me.uid, { list: [...((mine && mine.list) || []), bet] });
+    toast(`Bet placed: ${stake} coins at ${slip.fractional}.`); slip = null;
+  } catch { /* toast shown */ }
+  betBusy = false; renderOdds();
 }
 
 // ======================================================================
@@ -800,6 +924,8 @@ $('#sides').addEventListener('click', (e) => {
 });
 
 let editingId = null;
+const canLog = () => me.admin || !!myPlayer();
+const canChange = (m) => me.admin || (!!me.uid && m.loggedBy === me.uid);
 function resetForm() {
   editingId = null; $('#matchForm').reset(); buildSides(); renderAll();
   $('#formTitle').textContent = 'Log a triple draft'; $('#saveMatch').textContent = 'Log match'; $('#cancelEdit').hidden = true;
@@ -808,9 +934,15 @@ function resetForm() {
 $('#cancelEdit').onclick = resetForm;
 $('#matchForm').addEventListener('submit', async (e) => {
   e.preventDefault();
+  if (!canLog()) return toast('Pick your player first, then you can log matches.', true);
   let m; try { m = readForm(); } catch (err) { return toast(err.message, true); }
   const id = editingId || newId();
-  if (editingId) { const old = store.matches.find((x) => x.id === editingId); if (old && !$('#when').value) m.date = old.date; }
+  m.loggedBy = me.uid;
+  if (editingId) {
+    const old = store.matches.find((x) => x.id === editingId);
+    if (old && !$('#when').value) m.date = old.date;
+    if (old && old.loggedBy) m.loggedBy = old.loggedBy;
+  }
   try {
     await put('matches', id, m);
     toast(editingId ? 'Match updated.' : 'Match logged. Any open bets on it are now settled.');
@@ -842,20 +974,28 @@ function editMatch(id) {
 // ======================================================================
 const missing = (m) => m.overtime == null || m.dmgA == null || m.dmgB == null || m.firstCrown == null || m.kingA == null || m.kingB == null;
 let confirmDelete = null;
+function loggerName(m) {
+  if (!m.loggedBy) return '<span class="na">–</span>';
+  const pid = claimMaps().byUid[m.loggedBy];
+  return pid ? esc(nameOf(pid)) : '<span class="na">Unlinked account</span>';
+}
 function renderHistory() {
   const list = [...store.matches].reverse();
-  $('#history').innerHTML = list.length ? `<table><thead><tr><th>When</th><th>Match</th><th class="c">OT</th><th class="c">1k before OT</th><th class="c">King woke</th><th class="c">Damage</th><th>First tower</th><th></th></tr></thead><tbody>${list.map((m) => `
+  $('#history').innerHTML = list.length ? `<table><thead><tr><th>When</th><th>Match</th><th class="c">OT</th><th class="c">1k before OT</th><th class="c">King woke</th><th class="c">Damage</th><th>First tower</th><th>Logged by</th><th></th></tr></thead><tbody>${list.map((m) => `
     <tr><td class="small">${fmtDate(m.date)}${missing(m) ? '<br><span class="pill warn">missing info</span>' : ''}</td>
     <td><span class="${m.winner === 'A' ? 'wa' : ''}">${esc(nameOf(m.playerA))}</span> <b class="num">${m.crownsA}–${m.crownsB}</b> <span class="${m.winner === 'B' ? 'wb' : ''}">${esc(nameOf(m.playerB))}</span>
       ${m.winner === 'draw' ? ' <span class="pill">Draw</span>' : m.crownsA === m.crownsB ? ' <span class="pill">Tiebreaker</span>' : ''}${m.notes ? `<div class="small muted">${esc(m.notes)}</div>` : ''}</td>
     <td class="c">${yn(m.overtime)}</td><td class="c">${yn(m.dmgA)} / ${yn(m.dmgB)}</td><td class="c">${yn(m.kingA)} / ${yn(m.kingB)}</td>
     <td class="c num small">${m.dealtA != null ? `${fmtN(m.dealtA)} / ${fmtN(m.dealtB)}` : '<span class="na">?</span>'}</td>
     <td>${m.firstCrown == null ? '<span class="na">?</span>' : m.firstCrown === 'none' ? 'Nobody' : esc(nameOf(m.firstCrown === 'A' ? m.playerA : m.playerB))}</td>
-    <td style="white-space:nowrap"><button class="btn tiny" data-edit="${m.id}">Edit</button> <button class="btn tiny warn" data-del="${m.id}">${confirmDelete === m.id ? 'Confirm delete' : 'Delete'}</button></td></tr>`).join('')}</tbody></table>`
+    <td class="small">${loggerName(m)}</td>
+    <td style="white-space:nowrap">${canChange(m) ? `<button class="btn tiny" data-edit="${m.id}">Edit</button> <button class="btn tiny warn" data-del="${m.id}">${confirmDelete === m.id ? 'Confirm delete' : 'Delete'}</button>` : ''}</td></tr>`).join('')}</tbody></table>`
     : '<div class="empty">No matches yet. Play a triple draft, then fill in the scorecard on Log match.</div>';
 }
 $('#history').addEventListener('click', async (e) => {
   const { edit, del } = e.target.dataset;
+  const m = store.matches.find((x) => x.id === (edit || del));
+  if (!m || !canChange(m)) return;
   if (edit) editMatch(edit);
   if (del) {
     if (confirmDelete !== del) { confirmDelete = del; renderHistory(); return; }
@@ -867,23 +1007,29 @@ $('#history').addEventListener('click', async (e) => {
 // ======================================================================
 //  Bets + leaderboard
 // ======================================================================
-function renderBets() {
-  const ranked = store.players.map((p) => ({ ...p, coins: coinsOf(p.id), open: store.bets.filter((b) => b.bettor === p.id && betState(b).status === 'open').length })).sort((x, y) => y.coins - x.coins);
-  $('#leaderboard').innerHTML = ranked.length ? `<table><thead><tr><th>#</th><th>Player</th><th>Coins</th><th>Open bets</th></tr></thead><tbody>${ranked.map((p, i) => `
-    <tr><td>${i + 1}</td><td><b>${esc(p.name)}</b></td><td class="num">${fmtN(p.coins)}</td><td class="num">${p.open}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">No players yet.</div>';
-  const bets = [...store.bets].sort((x, y) => y.placedAt.localeCompare(x.placedAt));
-  $('#betList').innerHTML = bets.length ? `<table><thead><tr><th>Bettor</th><th>Bet</th><th>Price</th><th>Stake</th><th>Result</th><th></th></tr></thead><tbody>${bets.map((b) => {
+function betRows(bets, showBettor) {
+  return `<table><thead><tr>${showBettor ? '<th>Bettor</th>' : ''}<th>Bet</th><th>Price</th><th>Stake</th><th>Result</th>${me.admin ? '<th></th>' : ''}</tr></thead><tbody>${bets.map((b) => {
     const st = betState(b);
-    return `<tr><td>${esc(nameOf(b.bettor))}</td><td>${esc(b.label)}<div class="small muted">${fmtDate(b.placedAt)}</div></td><td class="num">${esc(b.fractional)}</td><td class="num">${fmtN(b.stake)}</td>
+    return `<tr>${showBettor ? `<td>${esc(nameOf(b.bettor))}</td>` : ''}<td>${esc(b.label)}<div class="small muted">${fmtDate(b.placedAt)}</div></td><td class="num">${esc(b.fractional)}</td><td class="num">${fmtN(b.stake)}</td>
       <td><span class="pill ${st.status}">${st.status}</span>${st.status === 'won' ? ` <span class="num up">+${fmtN(st.payout)}</span>` : ''}</td>
-      <td>${st.status === 'open' ? `<button class="btn tiny" data-void="${b.id}">Void</button>` : ''}</td></tr>`;
-  }).join('')}</tbody></table>` : '<div class="empty">No bets yet. Head to Odds and tap a price.</div>';
+      ${me.admin ? `<td>${st.status === 'open' ? `<button class="btn tiny" data-void="${esc(b.id)}" data-uid="${esc(b.uid)}">Void</button>` : ''}</td>` : ''}</tr>`;
+  }).join('')}</tbody></table>`;
 }
-$('#betList').addEventListener('click', async (e) => {
-  const id = e.target.dataset.void; if (!id) return;
-  const b = store.bets.find((x) => x.id === id); if (!b) return;
-  const { id: _omit, ...body } = b;
-  try { await put('bets', id, { ...body, voided: true }); toast('Bet voided and stake refunded.'); } catch { /* toast shown */ }
+function renderBets() {
+  const bets = allBets().sort((x, y) => y.placedAt.localeCompare(x.placedAt)), pid = myPlayer();
+  const ranked = store.players.map((p) => ({ ...p, coins: coinsOf(p.id), open: bets.filter((b) => b.bettor === p.id && betState(b).status === 'open').length })).sort((x, y) => y.coins - x.coins);
+  $('#leaderboard').innerHTML = ranked.length ? `<table><thead><tr><th>#</th><th>Player</th><th>Coins</th><th>Open bets</th></tr></thead><tbody>${ranked.map((p, i) => `
+    <tr class="${p.id === pid ? 'mine' : ''}"><td>${i + 1}</td><td><b>${esc(p.name)}</b>${p.id === pid ? ' <span class="small muted">(you)</span>' : ''}</td><td class="num">${fmtN(p.coins)}</td><td class="num">${p.open}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">No players yet.</div>';
+  const mine = bets.filter((b) => b.bettor === pid);
+  $('#myBetsPanel').hidden = !pid;
+  if (pid) $('#myBets').innerHTML = mine.length ? betRows(mine, false) : '<div class="empty">You haven\'t bet yet. Head to Odds and tap a price.</div>';
+  $('#betList').innerHTML = bets.length ? betRows(bets, true) : '<div class="empty">No bets yet. Head to Odds and tap a price.</div>';
+}
+$('#p-bets').addEventListener('click', async (e) => {
+  const { void: id, uid } = e.target.dataset; if (!id || !me.admin) return;
+  const doc = store.betDocs.find((d) => d.id === uid); if (!doc) return;
+  const list = doc.list.map((b) => (b.id === id ? { ...b, voided: true } : b));
+  try { await put('bets', uid, { list }); toast('Bet voided and stake refunded.'); } catch { /* toast shown */ }
 });
 
 // ======================================================================
@@ -944,17 +1090,65 @@ $('#muA').addEventListener('change', renderMatchup);
 $('#muB').addEventListener('change', renderMatchup);
 
 // ======================================================================
-//  Squad + settings
+//  Admin: squad, account links, coins, settings (page owner only)
 // ======================================================================
-let confirmRemove = null;
-function renderSquad() {
-  $('#squad').innerHTML = store.players.length ? `<table><thead><tr><th>Player</th><th>Matches</th><th>Coins</th><th></th></tr></thead><tbody>${store.players.map((p) => `
-    <tr><td><b>${esc(p.name)}</b></td><td class="num">${summarise(p.id, store.matches).games}</td><td class="num">${fmtN(coinsOf(p.id))}</td>
-    <td><button class="btn tiny warn" data-remove="${p.id}">${confirmRemove === p.id ? 'Confirm remove' : 'Remove'}</button></td></tr>`).join('')}</tbody></table>`
-    : '<div class="empty">No players yet. Add the squad above.</div>';
+let confirmRemove = null, confirmRelease = null, renaming = null;
+async function renderAdmin() {
+  const { byPlayer } = claimMaps();
+  const uids = Object.values(byPlayer);
+  $('#squad').innerHTML = store.players.length ? `<table><thead><tr><th>Player</th><th>Linked account</th><th>Matches</th><th>Coins</th><th>Give or take coins</th><th></th></tr></thead><tbody>${store.players.map((p) => {
+    const uid = byPlayer[p.id];
+    return `<tr><td>${renaming === p.id ? `<form class="row" data-rename-form="${esc(p.id)}"><input type="text" id="rename-${esc(p.id)}" value="${esc(p.name)}" maxlength="30" aria-label="New name"><button class="btn tiny" type="submit">Save</button></form>` : `<b>${esc(p.name)}</b>`}</td>
+      <td>${uid ? `<span data-uid-name="${esc(uid)}">Linked</span>${uid === me.uid ? ' (you)' : ''}` : '<span class="na">Nobody yet</span>'}</td>
+      <td class="num">${summarise(p.id, store.matches).games}</td><td class="num">${fmtN(coinsOf(p.id))}</td>
+      <td><form class="row" data-coins-form="${esc(p.id)}"><input class="inline-num" type="number" step="10" id="coins-${esc(p.id)}" placeholder="+100" aria-label="Coins to add or remove"><button class="btn tiny" type="submit">Apply</button></form></td>
+      <td style="white-space:nowrap"><button class="btn tiny" data-rename="${esc(p.id)}">Rename</button>
+        ${uid ? `<button class="btn tiny" data-release="${esc(uid)}">${confirmRelease === uid ? 'Confirm unlink' : 'Unlink'}</button>` : ''}
+        <button class="btn tiny warn" data-remove="${esc(p.id)}">${confirmRemove === p.id ? 'Confirm remove' : 'Remove'}</button></td></tr>`;
+  }).join('')}</tbody></table>` : '<div class="empty">No players yet. Add the squad above.</div>';
   const f = { setMargin: 'margin', setCoins: 'startingCoins', setPrincess: 'princessHp', setKing: 'kingHp' };
   for (const [id, k] of Object.entries(f)) if (document.activeElement !== $('#' + id)) $('#' + id).value = store.settings[k];
+  $('#setOwnBets').checked = !!store.settings.ownMatchBets;
+  // Account names are resolved fresh each render and never stored
+  if (userApi && uids.length) {
+    const ps = await userApi.profiles(uids);
+    for (const el of document.querySelectorAll('[data-uid-name]')) {
+      const pr = ps[el.dataset.uidName];
+      el.textContent = (pr && pr.name) || 'Linked (name hidden)';
+    }
+  }
 }
+const playerDoc = (p, extra) => { const { id: _id, ...rest } = p; return { ...rest, ...extra }; };
+$('#squad').addEventListener('click', async (e) => {
+  const { remove: rid, release, rename } = e.target.dataset;
+  if (rename) { renaming = rename; renderAdmin(); return; }
+  if (release) {
+    if (confirmRelease !== release) { confirmRelease = release; renderAdmin(); return; }
+    confirmRelease = null;
+    try { await remove('claims', release); toast('Account unlinked. They can pick a player again.'); } catch { toast('Couldn\'t unlink that account.', true); }
+    return;
+  }
+  if (rid) {
+    if (confirmRemove !== rid) { confirmRemove = rid; renderAdmin(); return; }
+    confirmRemove = null;
+    try { await remove('players', rid); toast('Player removed. Their old matches stay in the history.'); } catch { toast('Couldn\'t remove that player.', true); }
+  }
+});
+$('#squad').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const cf = e.target.dataset.coinsForm, rf = e.target.dataset.renameForm;
+  if (cf) {
+    const p = playerById(cf), delta = Math.round(+$('#coins-' + cf).value || 0);
+    if (!p || !delta) return toast('Type a number of coins, like 100 or -50.', true);
+    try { await put('players', p.id, playerDoc(p, { adjust: (p.adjust || 0) + delta })); toast(`${delta > 0 ? 'Gave' : 'Took'} ${fmtN(Math.abs(delta))} coins ${delta > 0 ? 'to' : 'from'} ${p.name}.`); } catch { /* toast shown */ }
+  }
+  if (rf) {
+    const p = playerById(rf), name = $('#rename-' + rf).value.trim();
+    if (!p || !name) return toast('Type a name.', true);
+    renaming = null;
+    try { await put('players', p.id, playerDoc(p, { name })); toast(`Renamed to ${name}.`); } catch { /* toast shown */ }
+  }
+});
 $('#addPlayer').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = $('#newName').value.trim();
@@ -962,16 +1156,11 @@ $('#addPlayer').addEventListener('submit', async (e) => {
   if (store.players.some((p) => p.name.toLowerCase() === name.toLowerCase())) return toast(`${name} is already in the squad.`, true);
   try { await put('players', newId(), { name, addedAt: new Date().toISOString() }); $('#newName').value = ''; toast(`${name} added to the squad.`); } catch { /* toast shown */ }
 });
-$('#squad').addEventListener('click', async (e) => {
-  const id = e.target.dataset.remove; if (!id) return;
-  if (confirmRemove !== id) { confirmRemove = id; renderSquad(); return; }
-  confirmRemove = null;
-  try { await remove('players', id); toast('Player removed. Their old matches stay in the history.'); } catch { toast('Couldn\'t remove that player.', true); }
-});
 $('#settingsForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const s = { margin: clamp(+$('#setMargin').value || 0, 0, 40), startingCoins: Math.max(0, Math.floor(+$('#setCoins').value || 0)),
-    princessHp: Math.max(100, Math.floor(+$('#setPrincess').value || DEFAULT_SETTINGS.princessHp)), kingHp: Math.max(100, Math.floor(+$('#setKing').value || DEFAULT_SETTINGS.kingHp)) };
+    princessHp: Math.max(100, Math.floor(+$('#setPrincess').value || DEFAULT_SETTINGS.princessHp)), kingHp: Math.max(100, Math.floor(+$('#setKing').value || DEFAULT_SETTINGS.kingHp)),
+    ownMatchBets: $('#setOwnBets').checked };
   try { await put('config', 'settings', s); toast('Settings saved.'); } catch { /* toast shown */ }
 });
 

@@ -319,6 +319,10 @@ function loadSquad(file = path.join(__dirname, 'squad.json')) {
   if (!fs.existsSync(file)) return 0;
   let added = 0;
   for (const { tag, name } of JSON.parse(fs.readFileSync(file, 'utf8'))) {
+    if (!tag) { // name-only player: add once, matched by name
+      if (db.data.players.some((p) => p.name.toLowerCase() === String(name).toLowerCase())) continue;
+      addPlayer({ name }); added++; continue;
+    }
     const id = clash.normaliseTag(tag);
     if (!id) { console.warn(`squad.json: skipping bad tag ${tag}`); continue; }
     if (playerById(id)) continue;

@@ -550,7 +550,7 @@ async function connect() {
     mode = 'local';
     const l = loadLocal();
     Object.assign(store, { players: l.players || [], matches: l.matches || [], bets: l.bets || [], settings: { ...DEFAULT_SETTINGS, ...(l.settings || {}) }, ready: true });
-    if (!store.players.length) store.players = ['Noah', 'sek', 'zac', 'Jamie', 'Nixon'].map((name) => ({ id: newId(), name, addedAt: new Date().toISOString() }));
+    if (!store.players.length) store.players = ['Nizz', 'triqqi', 'zac', 'jamie', 'sek', 'caleb', 'rishi', 'rocky', 'ethan', 'johnny'].map((name) => ({ id: newId(), name, addedAt: new Date().toISOString() }));
     sortMatches();
     document.getElementById('localBanner').hidden = false;
     renderAll(); return;

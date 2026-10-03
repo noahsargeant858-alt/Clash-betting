@@ -61,5 +61,6 @@ test('squad.json tags are all valid and load once', () => {
   assert.strictEqual(loadSquad(), squad.length);
   assert.strictEqual(loadSquad(), 0);
   assert.strictEqual(db.data.players.length, before + squad.length);
-  assert.ok(db.data.players.some((p) => p.id === '#ULG0PY8UP' && p.name === 'Noah'));
+  assert.ok(db.data.players.some((p) => p.id === '#9Q0L20PL2' && p.name === 'sek'));
+  assert.ok(db.data.players.some((p) => p.name === 'Nizz'));
 });

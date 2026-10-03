@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clash Bets</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">👑 Clash<span>Bets</span> <small>Triple Draft Sportsbook</small></div>
+    <nav id="tabs">
+      <button data-tab="odds" class="active">Odds Board</button>
+      <button data-tab="bets">Bets &amp; Leaderboard</button>
+      <button data-tab="log">Log Match</button>
+      <button data-tab="players">Players</button>
+      <button data-tab="insights">Insights</button>
+      <button data-tab="settings">Settings</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ODDS -->
+    <section id="tab-odds" class="tab active">
+      <div class="card matchup-picker">
+        <select id="oddsA"></select>
+        <span class="vs">VS</span>
+        <select id="oddsB"></select>
+      </div>
+      <div id="oddsMeta" class="muted"></div>
+      <div class="odds-layout">
+        <div id="markets" class="markets"></div>
+        <aside id="slip" class="card slip">
+          <h3>Bet Slip</h3>
+          <div id="slipBody" class="muted">Tap any price to add it here.</div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- BETS -->
+    <section id="tab-bets" class="tab">
+      <div class="grid2">
+        <div class="card"><h3>Coin Leaderboard</h3><div id="leaderboard"></div></div>
+        <div class="card"><h3>Bets</h3><div id="betList"></div></div>
+      </div>
+    </section>
+
+    <!-- LOG MATCH -->
+    <section id="tab-log" class="tab">
+      <div class="card">
+        <h3 id="logTitle">Log a Triple Draft Battle</h3>
+        <form id="matchForm" class="form">
+          <input type="hidden" name="matchId">
+          <div class="row">
+            <label>Player A<select name="playerA" class="playerSelect"></select></label>
+            <label>Crowns A<select name="crownsA"><option>0</option><option>1</option><option>2</option><option>3</option></select></label>
+            <label>Crowns B<select name="crownsB"><option>0</option><option>1</option><option>2</option><option>3</option></select></label>
+            <label>Player B<select name="playerB" class="playerSelect"></select></label>
+          </div>
+          <div class="row">
+            <label>Winner<select name="winner">
+              <option value="">Work it out from crowns</option>
+              <option value="A">Player A (tiebreaker)</option>
+              <option value="B">Player B (tiebreaker)</option>
+              <option value="draw">Draw</option>
+            </select></label>
+            <label>Went to overtime?<select name="overtime"><option value="">Unknown</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+            <label>First tower taken by<select name="firstCrown"><option value="">Unknown / auto</option><option value="A">Player A</option><option value="B">Player B</option><option value="none">Nobody</option></select></label>
+            <label>When (leave blank = just now)<input type="datetime-local" name="date"></label>
+          </div>
+          <div class="row">
+            <label>A did 1000+ tower dmg before OT?<select name="dmgA"><option value="">Unknown</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+            <label>B did 1000+ tower dmg before OT?<select name="dmgB"><option value="">Unknown</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+          </div>
+          <div class="row">
+            <label class="wide">A's drafted deck (comma separated)<input name="cardsA" list="cardList" placeholder="Hog Rider, Fireball, Musketeer..."></label>
+            <label class="wide">B's drafted deck<input name="cardsB" placeholder="Golem, Night Witch, Lightning..."></label>
+          </div>
+          <label class="wide">Notes / how it happened<textarea name="notes" rows="2" placeholder="Tom forgot Mega Knight exists. Again."></textarea></label>
+          <div class="row">
+            <button type="submit" class="primary" id="logSubmit">Log Match</button>
+            <button type="button" id="logCancel" class="hidden">Cancel edit</button>
+          </div>
+        </form>
+      </div>
+      <div class="card">
+        <h3>Match History</h3>
+        <p class="muted">Matches marked <span class="tag warn">needs details</span> came from the Clash API, which doesn't record overtime / damage / first tower. Click Edit to fill them in — it makes those markets sharper.</p>
+        <div id="matchList"></div>
+      </div>
+    </section>
+
+    <!-- PLAYERS -->
+    <section id="tab-players" class="tab">
+      <div class="card">
+        <h3>Add a Player</h3>
+        <form id="playerForm" class="row">
+          <label>Player tag<input name="tag" placeholder="#2PP0YLQ"></label>
+          <label>Name (optional if tagged)<input name="name" placeholder="Big Dave"></label>
+          <button class="primary">Add</button>
+          <button type="button" id="syncAll">⟳ Sync everyone from Clash API</button>
+        </form>
+        <p id="apiStatus" class="muted"></p>
+      </div>
+      <div class="card"><div id="playerList"></div></div>
+    </section>
+
+    <!-- INSIGHTS -->
+    <section id="tab-insights" class="tab">
+      <div class="card"><h3>Player Stats</h3><div id="statTable" class="scroll"></div></div>
+      <div class="card">
+        <h3>Matchup Explorer</h3>
+        <div class="matchup-picker small"><select id="muA"></select><span class="vs">VS</span><select id="muB"></select></div>
+        <div id="matchupOut"></div>
+      </div>
+      <div class="card"><h3>Head-to-Head Grid <small class="muted">(row player's W-L-D vs column)</small></h3><div id="h2hGrid" class="scroll"></div></div>
+      <div class="card"><h3>Card Stats <small class="muted">(from drafted decks)</small></h3><div id="cardTable" class="scroll"></div></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="tab-settings" class="tab">
+      <div class="card">
+        <h3>Settings</h3>
+        <form id="settingsForm" class="form">
+          <div class="row">
+            <label>Bookie margin %<input type="number" name="margin" step="0.5" min="0" max="50"></label>
+            <label>Starting coins for new players<input type="number" name="startingCoins" min="0"></label>
+          </div>
+          <div class="row">
+            <label class="wide">Game mode filter (regex on battlelog gameMode.name)<input name="modeRegex"></label>
+            <label class="wide">Battle type filter (regex on battle type)<input name="typeRegex"></label>
+          </div>
+          <button class="primary">Save</button>
+        </form>
+        <p class="muted">Margin is the house edge: at 5% the implied probabilities on a market add up to ~105%. Set it to 0 for "fair" odds.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast"></div>
+  <datalist id="cardList"></datalist>
+  <script src="app.js"></script>
+</body>
+</html>

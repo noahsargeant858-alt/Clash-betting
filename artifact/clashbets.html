@@ -124,6 +124,22 @@ td.c, th.c { text-align: center; }
 .chip { display: inline-block; background: var(--panel-2); border: 1px solid var(--line); border-radius: 99px; padding: 2px 9px; margin: 2px; font-size: 13px; }
 .empty { text-align: center; color: var(--muted); padding: 24px 12px; }
 
+/* ---------- bet builder ---------- */
+.seg.mode button { background: none; border: 0; padding: 5px 10px; font-weight: 700; font-size: 13px; cursor: pointer; color: var(--muted); }
+.seg.mode button + button { border-left: 1px solid var(--line); }
+.seg.mode button[aria-pressed="true"] { background: var(--gold); color: var(--gold-ink); }
+ol.legs { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+ol.legs li { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; }
+ul.leg-list { margin: 4px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+
+.slip-bar { display: none; }
+@media (max-width: 820px) {
+  .slip-bar:not([hidden]) { display: flex; justify-content: space-between; align-items: center; gap: 10px; position: fixed; left: 12px; right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 6; background: var(--gold); color: var(--gold-ink); border: 0; border-radius: 12px;
+    padding: 12px 16px; font-family: var(--display); font-size: 17px; box-shadow: 0 6px 20px rgb(0 0 0 / .4); cursor: pointer; }
+  #p-odds { padding-bottom: 64px; }
+}
+
 /* ---------- accounts ---------- */
 .me-chip { display: inline-flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 99px; padding: 3px 4px 3px 12px; font-size: 13px; font-weight: 700; }
 .me-chip .coins { color: var(--gold); }
@@ -270,17 +286,19 @@ tr.mine td { background: var(--panel-2); }
       <form id="settingsForm" class="stack">
         <div class="shared">
           <label class="field">Bookie margin (%)<input type="number" id="setMargin" min="0" max="40" step="0.5"></label>
+          <label class="field">Bet Builder margin (%)<input type="number" id="setBuilderMargin" min="0" max="50" step="0.5"></label>
           <label class="field">Starting coins<input type="number" id="setCoins" min="0" step="50"></label>
           <label class="field">Princess Tower max HP<input type="number" id="setPrincess" min="100" step="1"></label>
           <label class="field">King Tower max HP<input type="number" id="setKing" min="100" step="1"></label>
         </div>
         <label class="check"><input type="checkbox" id="setOwnBets"> Let players bet on matches they're playing in</label>
-        <p class="small muted" style="margin:0">Tower HP defaults to level 11 (3,052 Princess and 4,824 King). Check a fresh tower in your next draft and change these if they don't match. Margin is the house edge: at 5%, every market's chances add up to about 105%.</p>
+        <p class="small muted" style="margin:0">Tower HP defaults to level 11 (3,052 Princess and 4,824 King). Check a fresh tower in your next draft and change these if they don't match. Margin is the house edge: at 5%, every market's chances add up to about 105%. Bet Builders carry their own, higher margin because combos are harder to price.</p>
         <div><button class="btn" type="submit">Save settings</button></div>
       </form>
     </div>
   </section>
 </main>
+<button type="button" id="slipBar" class="slip-bar" hidden></button>
 <div id="toast" role="status"></div>
 <datalist id="cardNames"></datalist>
 
@@ -441,7 +459,119 @@ function model(a, b, matches) {
   const pComeback = sum((s) => s.winner !== 'D' && (s.winner === 'A' ? s.b : s.a) >= 1) * g.comeback;
   const dealtA = damageModel(sa.dealt, sb.conceded, h.dealt, g), dealtB = damageModel(sb.dealt, sa.conceded, h.conceded, g);
   return { pA, pB, pDraw, pWin, scores, pOT, pDmgA, pDmgB, pKingA, pKingB, qFirst, pNoCrowns, pComeback, dealtA, dealtB,
-    sample: { a: sa.games, b: sb.games, h2h: h.games }, h2h: { a: h.wins, b: h.losses, d: h.draws } };
+    comebackRate: g.comeback, sample: { a: sa.games, b: sb.games, h2h: h.games }, h2h: { a: h.wins, b: h.losses, d: h.draws } };
+}
+
+// ----------------------------------------------------------------------
+//  Joint model: every way a match can finish (scoreline x overtime x first
+//  tower x 1,000+ damage x King Tower), each with a probability. Single
+//  prices are marginals of this table and Bet Builder prices are sums over
+//  it, so linked picks ("Nizz wins" + "Nizz 3-crown win") are priced as
+//  linked instead of multiplied like strangers.
+//
+//  Each extra variable depends on the scoreline (a 3-crown always wakes the
+//  King; a tower taken in regulation always means 1,000+ damage before OT;
+//  the winner usually takes the first tower) and is then calibrated so its
+//  overall chance matches the per-player estimate from model().
+// ----------------------------------------------------------------------
+// Returns base -> calibrated probability, shifting every base by the same
+// logit amount so that sum(w * p) hits the target (clamped to what's possible).
+function fitShift(items, target) {
+  const total = items.reduce((t, x) => t + x.w, 0);
+  if (total < 1e-12) return () => 0.5;
+  const tgt = clamp(target, total * 0.002, total * 0.998);
+  const at = (k) => items.reduce((t, x) => t + x.w * logistic(logit(x.base) + k), 0);
+  let lo = -15, hi = 15;
+  for (let i = 0; i < 60; i++) { const mid = (lo + hi) / 2; if (at(mid) < tgt) lo = mid; else hi = mid; }
+  const k = (lo + hi) / 2;
+  return (base) => logistic(logit(base) + k);
+}
+const KING_BASE = [0.25, 0.55, 0.75];      // chance your King wakes, by crowns conceded (3 = destroyed, always)
+const DMG_BASE_SCORED = 0.85, DMG_BASE_BLANK = 0.5;
+
+function jointModel(m, hp) {
+  const S = m.scores.filter((s) => s.p > 1e-12);
+  const mass = (fn) => S.filter(fn).reduce((t, s) => t + s.p, 0);
+  const pLevel = mass((s) => s.a === s.b);
+  // Overtime: level games always go to OT; decisive ones share the rest
+  const qOT = 1 - pLevel > 1e-9 ? clamp((m.pOT - pLevel) / (1 - pLevel), 0.01, 0.99) : 0.5;
+  const sOT = [];
+  for (const s of S) {
+    if (s.a === s.b) sOT.push({ s, ot: true, p: s.p });
+    else { sOT.push({ s, ot: true, p: s.p * qOT }); sOT.push({ s, ot: false, p: s.p * (1 - qOT) }); }
+  }
+  // First tower: forced when only one side scored; otherwise the winner usually got there first
+  const r = clamp(m.comebackRate, 0.02, 0.98);
+  const firstBase = (s) => (s.winner === 'D' ? 0.5 : s.winner === 'A' ? 1 - r : r);
+  const firstCal = fitShift(S.filter((s) => s.a > 0 && s.b > 0).map((s) => ({ w: s.p, base: firstBase(s) })),
+    (1 - m.pNoCrowns) * m.qFirst - mass((s) => s.a > 0 && s.b === 0));
+  // 1,000+ damage before OT: forced if you took a tower and the game never reached OT
+  const dmgCal = {};
+  for (const side of ['A', 'B']) {
+    const cr = (x) => (side === 'A' ? x.s.a : x.s.b);
+    const forced = (x) => !x.ot && cr(x) >= 1;
+    dmgCal[side] = fitShift(sOT.filter((x) => !forced(x)).map((x) => ({ w: x.p, base: cr(x) >= 1 ? DMG_BASE_SCORED : DMG_BASE_BLANK })),
+      m['pDmg' + side] - sOT.filter(forced).reduce((t, x) => t + x.p, 0));
+  }
+  // King Tower activated: forced if it was destroyed; likelier the more crowns you conceded
+  const kingCal = {};
+  for (const side of ['A', 'B']) {
+    const against = (s) => (side === 'A' ? s.b : s.a);
+    kingCal[side] = fitShift(S.filter((s) => against(s) < 3).map((s) => ({ w: s.p, base: KING_BASE[against(s)] })),
+      m['pKing' + side] - mass((s) => against(s) === 3));
+  }
+  const bin = (forcedTrue, q) => (forcedTrue ? [[true, 1]] : [[true, q], [false, 1 - q]]);
+  const states = [];
+  for (const x of sOT) {
+    const s = x.s;
+    const firsts = s.a + s.b === 0 ? [['none', 1]] : s.b === 0 ? [['A', 1]] : s.a === 0 ? [['B', 1]]
+      : (() => { const f = firstCal(firstBase(s)); return [['A', f], ['B', 1 - f]]; })();
+    const dA = bin(!x.ot && s.a >= 1, dmgCal.A(s.a >= 1 ? DMG_BASE_SCORED : DMG_BASE_BLANK));
+    const dB = bin(!x.ot && s.b >= 1, dmgCal.B(s.b >= 1 ? DMG_BASE_SCORED : DMG_BASE_BLANK));
+    const kA = bin(s.b === 3, s.b === 3 ? 1 : kingCal.A(KING_BASE[s.b]));
+    const kB = bin(s.a === 3, s.a === 3 ? 1 : kingCal.B(KING_BASE[s.a]));
+    for (const [first, pf] of firsts) for (const [dmgA, pa] of dA) for (const [dmgB, pb] of dB) for (const [kingA, pka] of kA) for (const [kingB, pkb] of kB) {
+      const p = x.p * pf * pa * pb * pka * pkb;
+      if (p > 1e-12) states.push({ p, o: { a: s.a, b: s.b, winner: s.winner, overtime: x.ot, firstCrown: first, dmgA, dmgB, kingA, kingB } });
+    }
+  }
+  // Damage dealt: depends on your crowns (each crown is roughly a tower's worth of HP), never below what the crowns prove
+  const dealt = {};
+  for (const side of ['A', 'B']) {
+    const cr = (s) => (side === 'A' ? s.a : s.b), d = m['dealt' + side];
+    const ea = S.reduce((t, s) => t + s.p * cr(s), 0) / Math.max(1e-9, mass(() => true));
+    const va = S.reduce((t, s) => t + s.p * (cr(s) - ea) ** 2, 0) / Math.max(1e-9, mass(() => true));
+    const slope = hp.princess;
+    dealt[side] = { mu: d.mu, ea, slope, sd: Math.sqrt(Math.max(500 ** 2, d.sd ** 2 - slope ** 2 * va)) };
+  }
+  return { states, dealt, hp };
+}
+
+// P(this player's damage dealt >= line | their crowns)
+function dealtOver(J, side, crowns, line) {
+  const d = J.dealt[side], floor = crowns === 3 ? J.hp.king : crowns * J.hp.princess;
+  if (line <= floor) return 1;
+  const mu = d.mu + d.slope * (crowns - d.ea);
+  const tailFloor = 1 - phi((floor - mu) / d.sd);
+  return tailFloor < 1e-9 ? 0 : clamp((1 - phi((line - mu) / d.sd)) / tailFloor, 0, 1);
+}
+
+// Probability that every leg lands, summed over the joint table
+function jointProb(J, legs) {
+  let total = 0;
+  for (const st of J.states) {
+    let p = st.p;
+    for (const leg of legs) {
+      if (leg.market.startsWith('dealt')) {
+        const side = leg.market.slice(5), [dir, line] = leg.selection.split(':');
+        const over = dealtOver(J, side, side === 'A' ? st.o.a : st.o.b, +line);
+        p *= dir === 'over' ? over : 1 - over;
+      } else if (settleSelection(leg.market, leg.selection, st.o) !== true) p = 0;
+      if (p === 0) break;
+    }
+    total += p;
+  }
+  return total;
 }
 
 const sumWhere = (scores, fn) => scores.filter(fn).reduce((t, s) => t + s.p, 0);
@@ -452,6 +582,8 @@ const yesNo = (pFn, field) => [
   { key: 'no', label: 'No', prob: (m) => 1 - pFn(m), settle: (o) => (o[field] == null ? null : !o[field]) },
 ];
 
+// Each selection carries a closed-form `prob` (a cross-check for the joint
+// model, which is what actually prices it) and a `settle` rule.
 function marketDefs(nA, nB) {
   const both = (fn) => [['A', nA], ['B', nB]].map(([s, n]) => fn(s, n));
   const defs = [
@@ -505,6 +637,7 @@ function price(p, margin) {
 
 function buildMarkets(a, b) {
   const m = model(a, b, store.matches), margin = store.settings.margin;
+  const J = jointModel(m, { princess: store.settings.princessHp, king: store.settings.kingHp });
   const nA = nameOf(a), nB = nameOf(b);
   const markets = marketDefs(nA, nB).map((def) => {
     let sels;
@@ -514,14 +647,14 @@ function buildMarkets(a, b) {
     } else if (def.key.startsWith('dealt')) {
       const side = def.key.slice(5), dm = m['dealt' + side];
       const line = Math.max(500, Math.round(dm.mu / 500) * 500);
-      const pOver = 1 - phi((line - dm.mu) / dm.sd);
+      const pOver = jointProb(J, [{ market: def.key, selection: 'over:' + line }]);
       def.name = `${side === 'A' ? nA : nB}: total tower damage`;
       def.blurb = `Damage dealt to the other player's towers over the whole game. Expected about ${fmtN(dm.mu)}.`;
       sels = [{ key: 'over:' + line, label: `${fmtN(line)} or more`, ...price(pOver, margin) }, { key: 'under:' + line, label: `Under ${fmtN(line)}`, ...price(1 - pOver, margin) }];
-    } else sels = def.sels.map((s) => ({ key: s.key, label: s.label, ...price(s.prob(m), margin) }));
+    } else sels = def.sels.map((s) => ({ key: s.key, label: s.label, ...price(jointProb(J, [{ market: def.key, selection: s.key }]), margin) }));
     return { key: def.key, name: def.name, blurb: def.blurb, sels };
   });
-  return { nA, nB, sample: m.sample, h2h: m.h2h, markets };
+  return { a, b, nA, nB, sample: m.sample, h2h: m.h2h, markets, model: m, J };
 }
 
 function settleSelection(market, sel, o) {
@@ -533,9 +666,20 @@ function settleSelection(market, sel, o) {
     const v = o['dealt' + market.slice(5)], [dir, line] = sel.split(':');
     return v == null ? null : dir === 'over' ? v >= +line : v < +line;
   }
-  const def = marketDefs('A', 'B').find((d) => d.key === market);
-  const s = def && def.sels.find((x) => x.key === sel);
-  return s ? s.settle(o) : null;
+  if (!SETTLE_INDEX) {
+    SETTLE_INDEX = new Map();
+    for (const d of marketDefs('A', 'B')) for (const x of d.sels) SETTLE_INDEX.set(d.key + '|' + x.key, x.settle);
+  }
+  const fn = SETTLE_INDEX.get(market + '|' + sel);
+  return fn ? fn(o) : null;
+}
+let SETTLE_INDEX = null;
+
+// A Bet Builder wins only if every leg wins. Any lost leg loses it; otherwise
+// a leg that can't be settled (info left blank) voids the whole bet.
+function settleBuilder(legs, o) {
+  const rs = legs.map((l) => settleSelection(l.market, l.selection, o));
+  return rs.includes(false) ? false : rs.includes(null) ? null : true;
 }
 
 // ======================================================================
@@ -546,7 +690,7 @@ function settleSelection(market, sel, o) {
 //    claims/<account>                 { playerId, at }: which player you are
 //    bets/<account>                   { list: [...] }: your bets, only you write
 // ======================================================================
-const DEFAULT_SETTINGS = { margin: 5, startingCoins: 1000, princessHp: 3052, kingHp: 4824, ownMatchBets: false };
+const DEFAULT_SETTINGS = { margin: 5, builderMargin: 10, startingCoins: 1000, princessHp: 3052, kingHp: 4824, ownMatchBets: false };
 const store = { players: [], matches: [], claims: [], betDocs: [], settings: { ...DEFAULT_SETTINGS }, ready: false };
 const me = { uid: null, admin: false, skippedJoin: false };
 let db = null, userApi = null, mode = 'connecting', readOnly = false;
@@ -640,7 +784,8 @@ function betState(bet) {
   if (bet.voided) return { status: 'void', payout: bet.stake };
   const m = store.matches.find((x) => samePair(x, bet.a, bet.b) && x.date >= bet.placedAt);
   if (!m) return { status: 'open', payout: 0 };
-  const r = settleSelection(bet.market, bet.selection, orientPair(m, bet.a));
+  const o = orientPair(m, bet.a);
+  const r = bet.legs ? settleBuilder(bet.legs, o) : settleSelection(bet.market, bet.selection, o);
   if (r === null) return { status: 'void', payout: bet.stake, matchId: m.id };
   return r ? { status: 'won', payout: Math.round(bet.stake * bet.odds), matchId: m.id } : { status: 'lost', payout: 0, matchId: m.id };
 }
@@ -691,6 +836,7 @@ function renderAll() {
   $('#noIdBanner').hidden = !(mode === 'shared' && store.ready && !me.uid);
   $('#tab-admin').hidden = !me.admin;
   for (const t of tabs) document.getElementById(t.getAttribute('aria-controls')).hidden = joining || t.getAttribute('aria-selected') !== 'true';
+  if (joining || $('#p-odds').hidden) $('#slipBar').hidden = true;
   if (joining) { renderJoin(); return; }
   if (mode !== 'connecting' && !me.admin && $('#tab-admin').getAttribute('aria-selected') === 'true') { showTab('tab-odds'); return; }
 
@@ -751,16 +897,21 @@ $('#joinYes').onclick = async () => {
 // ======================================================================
 //  Odds board + bet slip
 // ======================================================================
-let slip = null, slipStake = 50;
+let slip = null, slipStake = 50, slipMode = 'single', currentBook = null;
+let builder = { a: null, b: null, legs: [] };
+const MAX_LEGS = 6;
+const isLeg = (mk, sel) => builder.legs.some((l) => l.market === mk && l.selection === sel);
 function renderOdds() {
   const a = $('#oddsA').value, b = $('#oddsB').value, box = $('#markets');
+  if (builder.legs.length && (builder.a !== a || builder.b !== b)) builder = { a, b, legs: [] };
   if (store.players.length < 2) { box.innerHTML = '<div class="panel empty">Add at least two players on the Squad tab and the book opens.</div>'; $('#oddsMeta').textContent = ''; renderSlip(); return; }
   if (a === b) { box.innerHTML = '<div class="panel empty">Pick two different players. Nobody bets on a mirror match.</div>'; $('#oddsMeta').textContent = ''; renderSlip(); return; }
   const book = buildMarkets(a, b), s = book.sample;
+  currentBook = book;
   const conf = s.h2h >= 10 ? 'high' : s.a + s.b >= 15 ? 'medium' : 'low';
   $('#oddsMeta').innerHTML = `Built from ${s.a} games for ${esc(book.nA)}, ${s.b} for ${esc(book.nB)} and ${s.h2h} head to head (${book.h2h.a}–${book.h2h.b}–${book.h2h.d}). Confidence <span class="conf ${conf}">${conf}</span>`;
   box.innerHTML = book.markets.map((mk) => `<div class="panel market"><h3>${esc(mk.name)}</h3><p>${esc(mk.blurb)}</p><div class="sels">${mk.sels.map((x) => {
-    const on = slip && slip.a === a && slip.b === b && slip.market === mk.key && slip.selection === x.key;
+    const on = slipMode === 'builder' ? isLeg(mk.key, x.key) : !!slip && slip.a === a && slip.b === b && slip.market === mk.key && slip.selection === x.key;
     return `<button type="button" class="price" aria-pressed="${on}" data-m="${esc(mk.key)}" data-mn="${esc(mk.name)}" data-s="${esc(x.key)}" data-l="${esc(x.label)}" data-d="${x.decimal}" data-f="${x.fractional}">
       <span>${esc(x.label)}</span><span class="odd num">${x.fractional}<small>${x.decimal.toFixed(2)} · ${(x.p * 100).toFixed(1)}%</small></span></button>`;
   }).join('')}</div></div>`).join('');
@@ -770,6 +921,7 @@ $('#oddsA').addEventListener('change', renderOdds);
 $('#oddsB').addEventListener('change', renderOdds);
 $('#markets').addEventListener('click', (e) => {
   const b = e.target.closest('.price'); if (!b) return;
+  if (slipMode === 'builder') { toggleLeg(b); return; }
   slip = { a: $('#oddsA').value, b: $('#oddsB').value, market: b.dataset.m, marketName: b.dataset.mn, selection: b.dataset.s, label: b.dataset.l, decimal: +b.dataset.d, fractional: b.dataset.f };
   renderOdds();
 });
@@ -782,37 +934,106 @@ function betBlock(a, b) {
   return '';
 }
 let betBusy = false;
-function renderSlip() {
-  const el = $('#slip');
-  if (!slip) { el.innerHTML = '<h3>Bet slip</h3><p class="muted small" style="margin:0">Tap any price to add it here. Bets settle on the next logged match between those two players.</p>'; return; }
-  const pid = myPlayer(), block = betBlock(slip.a, slip.b);
-  el.innerHTML = `<h3>Bet slip</h3>
-    <div><div class="pick">${esc(slip.label)}</div><div class="small muted">${esc(nameOf(slip.a))} v ${esc(nameOf(slip.b))} · ${esc(slip.marketName)}</div></div>
-    <div class="big-odd num">${slip.fractional} <span class="small muted">${slip.decimal.toFixed(2)}</span></div>
-    ${pid ? `<div class="small">Betting as <b>${esc(nameOf(pid))}</b> · <span class="num">${fmtN(coinsOf(pid))}</span> coins</div>` : ''}
-    ${block ? `<p class="note">${esc(block)}</p>` : `<label class="field">Stake (coins)<input type="number" id="slipStake" min="1" step="10" value="${slipStake}"></label>
-    <div class="small muted num" id="slipReturn"></div>`}
-    <div class="row">${block ? '' : `<button class="btn gold" type="button" id="slipPlace" ${betBusy ? 'disabled' : ''}>Place bet</button>`}<button class="btn" type="button" id="slipClear">Clear</button></div>`;
-  $('#slipClear').onclick = () => { slip = null; renderOdds(); };
-  if (block) return;
-  const upd = () => { $('#slipReturn').textContent = `Returns ${fmtN((+$('#slipStake').value || 0) * slip.decimal)} coins if it lands`; };
-  $('#slipStake').addEventListener('input', (e) => { slipStake = +e.target.value || 0; upd(); }); upd();
-  $('#slipPlace').onclick = placeBet;
+function toggleLeg(btn) {
+  const a = $('#oddsA').value, b = $('#oddsB').value;
+  if (builder.a !== a || builder.b !== b) builder = { a, b, legs: [] };
+  const leg = { market: btn.dataset.m, marketName: btn.dataset.mn, selection: btn.dataset.s, label: btn.dataset.l, decimal: +btn.dataset.d };
+  const i = builder.legs.findIndex((l) => l.market === leg.market);
+  if (i >= 0 && builder.legs[i].selection === leg.selection) builder.legs.splice(i, 1);
+  else if (i >= 0) builder.legs[i] = leg; // one pick per market
+  else if (builder.legs.length >= MAX_LEGS) return toast(`Bet Builder takes up to ${MAX_LEGS} picks.`, true);
+  else builder.legs.push(leg);
+  renderOdds();
 }
+// Price the current builder: joint chance of every leg, plus the builder margin
+function builderQuote() {
+  const legs = builder.legs;
+  if (!currentBook || legs.length < 2) return null;
+  const p = jointProb(currentBook.J, legs);
+  if (p < 0.0005) return { impossible: true };
+  const acca = legs.reduce((t, l) => t * l.decimal, 1);
+  return { p, acca, ...price(p, store.settings.builderMargin) };
+}
+function modeSwitch() {
+  return `<div class="seg mode" role="group" aria-label="Bet type">
+    <button type="button" data-mode="single" aria-pressed="${slipMode === 'single'}">Single</button>
+    <button type="button" data-mode="builder" aria-pressed="${slipMode === 'builder'}">Bet Builder</button></div>`;
+}
+function stakeBlock(decimal, block, label) {
+  return `${block ? `<p class="note">${esc(block)}</p>` : `<label class="field">Stake (coins)<input type="number" id="slipStake" min="1" step="10" value="${slipStake}"></label>
+    <div class="small muted num" id="slipReturn" data-dec="${decimal}"></div>`}
+    <div class="row">${block ? '' : `<button class="btn gold" type="button" id="slipPlace" ${betBusy ? 'disabled' : ''}>${label}</button>`}<button class="btn" type="button" id="slipClear">Clear</button></div>`;
+}
+function renderSlip() {
+  const el = $('#slip'), pid = myPlayer();
+  const who = pid ? `<div class="small">Betting as <b>${esc(nameOf(pid))}</b> · <span class="num">${fmtN(coinsOf(pid))}</span> coins</div>` : '';
+  if (slipMode === 'builder') {
+    const a = $('#oddsA').value, b = $('#oddsB').value, legs = builder.legs, q = builderQuote();
+    const block = legs.length < 2 ? '' : q && q.impossible ? 'These picks can\'t all happen in the same match. Swap one out.' : betBlock(a, b);
+    el.innerHTML = `<div class="row" style="justify-content:space-between"><h3>Bet slip</h3>${modeSwitch()}</div>
+      <p class="note">Combine 2 to ${MAX_LEGS} picks from ${esc(nameOf(a))} v ${esc(nameOf(b))}. Linked picks are priced together, so "wins" + "3-crown win" pays like the 3-crown alone. Every pick has to land.</p>
+      ${legs.length ? `<ol class="legs">${legs.map((l, i) => `<li><span><b>${esc(l.label)}</b><br><span class="small muted">${esc(l.marketName)}</span></span><button type="button" class="btn tiny" data-unleg="${i}" aria-label="Remove ${esc(l.label)}">Remove</button></li>`).join('')}</ol>` : '<p class="muted small" style="margin:0">Tap prices on the board to add picks.</p>'}
+      ${legs.length === 1 ? '<p class="note">Add at least one more pick.</p>' : ''}
+      ${q && !q.impossible ? `<div><div class="big-odd num">${q.fractional} <span class="small muted">${q.decimal.toFixed(2)}</span></div>
+        <div class="small muted num">As separate picks multiplied: ${q.acca.toFixed(2)}${q.acca > q.decimal * 1.05 ? '. These picks are linked, so the price is shorter.' : ''}</div></div>` : ''}
+      ${legs.length >= 2 ? who + stakeBlock(q && !q.impossible ? q.decimal : 0, block, 'Place Bet Builder') : (legs.length ? '<div class="row"><button class="btn" type="button" id="slipClear">Clear</button></div>' : '')}`;
+  } else if (!slip) {
+    el.innerHTML = `<div class="row" style="justify-content:space-between"><h3>Bet slip</h3>${modeSwitch()}</div><p class="muted small" style="margin:0">Tap any price to add it here. Bets settle on the next logged match between those two players.</p>`;
+  } else {
+    el.innerHTML = `<div class="row" style="justify-content:space-between"><h3>Bet slip</h3>${modeSwitch()}</div>
+      <div><div class="pick">${esc(slip.label)}</div><div class="small muted">${esc(nameOf(slip.a))} v ${esc(nameOf(slip.b))} · ${esc(slip.marketName)}</div></div>
+      <div class="big-odd num">${slip.fractional} <span class="small muted">${slip.decimal.toFixed(2)}</span></div>
+      ${who}${stakeBlock(slip.decimal, betBlock(slip.a, slip.b), 'Place bet')}`;
+  }
+  const bar = $('#slipBar'), onOdds = !$('#p-odds').hidden;
+  const legsN = builder.legs.length, q = slipMode === 'builder' ? builderQuote() : null;
+  const barText = slipMode === 'builder'
+    ? (legsN ? `Bet Builder · ${legsN} pick${legsN > 1 ? 's' : ''}${q && !q.impossible ? ` · ${q.fractional}` : ''}` : '')
+    : slip ? `${slip.label} · ${slip.fractional}` : '';
+  bar.hidden = !onOdds || !barText;
+  if (barText) bar.innerHTML = `<span>${esc(barText)}</span><span>View slip</span>`;
+  const clear = $('#slipClear');
+  if (clear) clear.onclick = () => { if (slipMode === 'builder') builder.legs = []; else slip = null; renderOdds(); };
+  const stake = $('#slipStake');
+  if (stake) {
+    const upd = () => { $('#slipReturn').textContent = `Returns ${fmtN((+stake.value || 0) * +$('#slipReturn').dataset.dec)} coins if it lands`; };
+    stake.addEventListener('input', () => { slipStake = +stake.value || 0; upd(); }); upd();
+    $('#slipPlace').onclick = placeBet;
+  }
+}
+$('#slipBar').addEventListener('click', () => $('#slip').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }));
+$('#slip').addEventListener('click', (e) => {
+  const m = e.target.closest('[data-mode]');
+  if (m) { slipMode = m.dataset.mode; renderOdds(); return; }
+  const u = e.target.closest('[data-unleg]');
+  if (u) { builder.legs.splice(+u.dataset.unleg, 1); renderOdds(); }
+});
 async function placeBet() {
   if (betBusy) return;
-  const stake = Math.floor(slipStake), pid = myPlayer();
-  const block = betBlock(slip.a, slip.b); if (block) return toast(block, true);
+  const stake = Math.floor(slipStake), pid = myPlayer(), isB = slipMode === 'builder';
+  const a = isB ? builder.a : slip.a, b = isB ? builder.b : slip.b;
+  const block = betBlock(a, b); if (block) return toast(block, true);
   if (!(stake > 0)) return toast('Stake has to be at least 1 coin.', true);
   if (stake > coinsOf(pid)) return toast(`You only have ${fmtN(coinsOf(pid))} coins.`, true);
-  const bet = { id: newId(), bettor: pid, a: slip.a, b: slip.b, market: slip.market, selection: slip.selection,
-    label: `${nameOf(slip.a)} v ${nameOf(slip.b)}: ${slip.marketName}, ${slip.label}`, odds: slip.decimal, fractional: slip.fractional,
-    stake, placedAt: new Date().toISOString(), voided: false };
+  let bet;
+  if (isB) {
+    const q = builderQuote();
+    if (!q || q.impossible) return toast('That Bet Builder can\'t be priced. Check your picks.', true);
+    bet = { id: newId(), bettor: pid, a, b, market: 'builder', selection: 'builder',
+      legs: builder.legs.map(({ market, selection, label, marketName }) => ({ market, selection, label, marketName })),
+      label: `${nameOf(a)} v ${nameOf(b)}: Bet Builder, ${builder.legs.length} picks`, odds: q.decimal, fractional: q.fractional,
+      stake, placedAt: new Date().toISOString(), voided: false };
+  } else {
+    bet = { id: newId(), bettor: pid, a, b, market: slip.market, selection: slip.selection,
+      label: `${nameOf(a)} v ${nameOf(b)}: ${slip.marketName}, ${slip.label}`, odds: slip.decimal, fractional: slip.fractional,
+      stake, placedAt: new Date().toISOString(), voided: false };
+  }
   const mine = store.betDocs.find((d) => d.id === me.uid);
   betBusy = true; renderSlip();
   try {
     await put('bets', me.uid, { list: [...((mine && mine.list) || []), bet] });
-    toast(`Bet placed: ${stake} coins at ${slip.fractional}.`); slip = null;
+    toast(`Bet placed: ${stake} coins at ${bet.fractional}.`);
+    if (isB) builder.legs = []; else slip = null;
   } catch { /* toast shown */ }
   betBusy = false; renderOdds();
 }
@@ -1007,10 +1228,18 @@ $('#history').addEventListener('click', async (e) => {
 // ======================================================================
 //  Bets + leaderboard
 // ======================================================================
+function legList(bet, st) {
+  const m = st.matchId && store.matches.find((x) => x.id === st.matchId), o = m && orientPair(m, bet.a);
+  return `<ul class="leg-list">${bet.legs.map((l) => {
+    const r = o ? settleSelection(l.market, l.selection, o) : undefined;
+    const tag = r === true ? '<span class="up">✓</span>' : r === false ? '<span class="down">✗</span>' : r === null ? '<span class="na">void</span>' : '';
+    return `<li>${tag} ${esc(l.marketName)}: ${esc(l.label)}</li>`;
+  }).join('')}</ul>`;
+}
 function betRows(bets, showBettor) {
   return `<table><thead><tr>${showBettor ? '<th>Bettor</th>' : ''}<th>Bet</th><th>Price</th><th>Stake</th><th>Result</th>${me.admin ? '<th></th>' : ''}</tr></thead><tbody>${bets.map((b) => {
     const st = betState(b);
-    return `<tr>${showBettor ? `<td>${esc(nameOf(b.bettor))}</td>` : ''}<td>${esc(b.label)}<div class="small muted">${fmtDate(b.placedAt)}</div></td><td class="num">${esc(b.fractional)}</td><td class="num">${fmtN(b.stake)}</td>
+    return `<tr>${showBettor ? `<td>${esc(nameOf(b.bettor))}</td>` : ''}<td>${esc(b.label)}${b.legs ? legList(b, st) : ''}<div class="small muted">${fmtDate(b.placedAt)}</div></td><td class="num">${esc(b.fractional)}</td><td class="num">${fmtN(b.stake)}</td>
       <td><span class="pill ${st.status}">${st.status}</span>${st.status === 'won' ? ` <span class="num up">+${fmtN(st.payout)}</span>` : ''}</td>
       ${me.admin ? `<td>${st.status === 'open' ? `<button class="btn tiny" data-void="${esc(b.id)}" data-uid="${esc(b.uid)}">Void</button>` : ''}</td>` : ''}</tr>`;
   }).join('')}</tbody></table>`;
@@ -1106,7 +1335,7 @@ async function renderAdmin() {
         ${uid ? `<button class="btn tiny" data-release="${esc(uid)}">${confirmRelease === uid ? 'Confirm unlink' : 'Unlink'}</button>` : ''}
         <button class="btn tiny warn" data-remove="${esc(p.id)}">${confirmRemove === p.id ? 'Confirm remove' : 'Remove'}</button></td></tr>`;
   }).join('')}</tbody></table>` : '<div class="empty">No players yet. Add the squad above.</div>';
-  const f = { setMargin: 'margin', setCoins: 'startingCoins', setPrincess: 'princessHp', setKing: 'kingHp' };
+  const f = { setMargin: 'margin', setBuilderMargin: 'builderMargin', setCoins: 'startingCoins', setPrincess: 'princessHp', setKing: 'kingHp' };
   for (const [id, k] of Object.entries(f)) if (document.activeElement !== $('#' + id)) $('#' + id).value = store.settings[k];
   $('#setOwnBets').checked = !!store.settings.ownMatchBets;
   // Account names are resolved fresh each render and never stored
@@ -1158,7 +1387,7 @@ $('#addPlayer').addEventListener('submit', async (e) => {
 });
 $('#settingsForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const s = { margin: clamp(+$('#setMargin').value || 0, 0, 40), startingCoins: Math.max(0, Math.floor(+$('#setCoins').value || 0)),
+  const s = { margin: clamp(+$('#setMargin').value || 0, 0, 40), builderMargin: clamp(+$('#setBuilderMargin').value || 0, 0, 50), startingCoins: Math.max(0, Math.floor(+$('#setCoins').value || 0)),
     princessHp: Math.max(100, Math.floor(+$('#setPrincess').value || DEFAULT_SETTINGS.princessHp)), kingHp: Math.max(100, Math.floor(+$('#setKing').value || DEFAULT_SETTINGS.kingHp)),
     ownMatchBets: $('#setOwnBets').checked };
   try { await put('config', 'settings', s); toast('Settings saved.'); } catch { /* toast shown */ }

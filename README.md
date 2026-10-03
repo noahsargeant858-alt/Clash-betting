@@ -23,6 +23,17 @@ npm run seed                              # writes data/demo.json with 5 players
 DB_FILE=data/demo.json npm start
 ```
 
+## The squad
+
+Everyone in `squad.json` is added automatically when the server starts. To add a new mate, add a line
+there (or use the Players tab):
+
+```json
+{ "tag": "#XXXXXXXX", "name": "Nickname" }
+```
+
+The nickname sticks. Their in-game name is shown underneath it on the Players tab.
+
 ## The tabs
 
 | Tab | What it does |

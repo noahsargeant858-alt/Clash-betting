@@ -214,7 +214,7 @@ function renderPlayers() {
     : '⚠️ No Clash API key set, so syncing is off. You can still add players by name and log matches by hand. See the README to plug a key in.';
   $('#syncAll').disabled = !state.apiConfigured;
   $('#playerList').innerHTML = state.players.length ? `<table><tr><th>Player</th><th>Tag</th><th>Trophies</th><th>PB</th><th>Clan</th><th>Coins</th><th>Last sync</th><th></th></tr>${state.players.map((p) => `
-    <tr><td><b>${esc(p.name)}</b></td><td><small>${esc(p.tag || '—')}</small></td><td>${p.trophies ?? '—'}</td><td>${p.bestTrophies ?? '—'}</td>
+    <tr><td><b>${esc(p.name)}</b>${p.igName && p.igName !== p.name ? `<br><small class="muted">in-game: ${esc(p.igName)}</small>` : ''}</td><td><small>${esc(p.tag || '—')}</small></td><td>${p.trophies ?? '—'}</td><td>${p.bestTrophies ?? '—'}</td>
     <td>${esc(p.clan || '—')}</td><td>${p.coins}</td><td><small>${p.lastSynced ? fmtDate(p.lastSynced) : 'never'}</small></td>
     <td class="nowrap">${p.tag && state.apiConfigured ? `<button class="small" data-sync="${esc(p.id)}">⟳</button>` : ''}
       <button class="small" data-coins="${esc(p.id)}">🪙</button>
@@ -270,7 +270,7 @@ const formStr = (f) => f.map((r) => `<span class="form ${r}">${r}</span>`).join(
 async function loadInsights() {
   const ins = await api('GET', '/api/insights');
   $('#statTable').innerHTML = ins.players.length ? `<table><tr><th>Player</th><th>GP</th><th>W-L-D</th><th>Win%</th><th>3-crown% of wins</th><th>OT%</th><th>1k dmg%</th><th>1st tower%</th><th>Crowns for/against</th><th>Form</th></tr>
-    ${ins.players.map((p) => `<tr><td><b>${esc(p.name)}</b></td><td>${p.games}</td><td>${p.wins}-${p.losses}-${p.draws}</td><td>${pctCell(p.winPct)}</td>
+    ${ins.players.map((p) => `<tr><td><b>${esc(p.name)}</b>${p.igName && p.igName !== p.name ? `<br><small class="muted">in-game: ${esc(p.igName)}</small>` : ''}</td><td>${p.games}</td><td>${p.wins}-${p.losses}-${p.draws}</td><td>${pctCell(p.winPct)}</td>
     <td>${pctCell(p.threeCrownPct)}</td><td>${pctCell(p.otPct)}</td><td>${pctCell(p.dmgPct)}</td><td>${pctCell(p.firstPct)}</td>
     <td>${p.avgCrowns ?? '—'} / ${p.avgCrownsAgainst ?? '—'}</td><td>${formStr(p.form)}</td></tr>`).join('')}</table>` : '<p class="muted">No players.</p>';
 

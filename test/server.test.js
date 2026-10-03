@@ -53,3 +53,13 @@ test('end to end: players, bet, match, settlement', async (t) => {
   const bad = await call('POST', '/api/matches', { playerA: ann.id, playerB: bob.id, crownsA: 3, crownsB: 3 });
   assert.strictEqual(bad.status, 400);
 });
+
+test('squad.json tags are all valid and load once', () => {
+  const { loadSquad, db } = require('../server');
+  const squad = require('../squad.json');
+  const before = db.data.players.length;
+  assert.strictEqual(loadSquad(), squad.length);
+  assert.strictEqual(loadSquad(), 0);
+  assert.strictEqual(db.data.players.length, before + squad.length);
+  assert.ok(db.data.players.some((p) => p.id === '#ULG0PY8UP' && p.name === 'Noah'));
+});

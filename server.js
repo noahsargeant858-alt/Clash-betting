@@ -161,8 +161,10 @@ function addPlayer({ tag, name }) {
 async function syncPlayer(p) {
   if (!p.tag) return { player: p.name, imported: 0, note: 'No tag — manual-only player.' };
   const [profile, log] = await Promise.all([clash.getPlayer(p.tag), clash.getBattleLog(p.tag)]);
+  // Keep the nickname you gave them; remember the in-game name separately
+  if (!p.name || p.name === p.id) p.name = profile.name;
   Object.assign(p, {
-    name: profile.name, trophies: profile.trophies, bestTrophies: profile.bestTrophies,
+    igName: profile.name, trophies: profile.trophies, bestTrophies: profile.bestTrophies,
     expLevel: profile.expLevel, arena: profile.arena && profile.arena.name,
     clan: profile.clan && profile.clan.name, lastSynced: new Date().toISOString(),
   });
@@ -312,11 +314,27 @@ const server = http.createServer(async (req, res) => {
   send(res, 404, { error: 'No such endpoint' });
 });
 
+// Anyone listed in squad.json is added automatically on startup
+function loadSquad(file = path.join(__dirname, 'squad.json')) {
+  if (!fs.existsSync(file)) return 0;
+  let added = 0;
+  for (const { tag, name } of JSON.parse(fs.readFileSync(file, 'utf8'))) {
+    const id = clash.normaliseTag(tag);
+    if (!id) { console.warn(`squad.json: skipping bad tag ${tag}`); continue; }
+    if (playerById(id)) continue;
+    addPlayer({ tag, name }); added++;
+  }
+  if (added) db.save();
+  return added;
+}
+
 if (require.main === module) {
+  const added = loadSquad();
+  if (added) console.log(`👥 Added ${added} player(s) from squad.json`);
   server.listen(PORT, () => {
     console.log(`🏆 Clash Bets running on http://localhost:${PORT}`);
     if (!process.env.CR_API_TOKEN) console.log('⚠️  No CR_API_TOKEN — auto-import is off, manual logging still works.');
   });
 }
 
-module.exports = { server, db, normaliseMatch };
+module.exports = { server, db, normaliseMatch, loadSquad };

@@ -1,0 +1,54 @@
+name: Sync Clash Royale battles
+
+on:
+  schedule:
+    - cron: '23 * * * *'   # every hour
+  workflow_dispatch:       # "Run workflow" button in the Actions tab
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-battles
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Get the battles saved so far
+        run: |
+          if git fetch --depth=1 origin battle-data 2>/dev/null; then
+            git show FETCH_HEAD:battles.json > prev.json || true
+          fi
+
+      - name: Fetch battle logs
+        env:
+          CR_API_TOKEN: ${{ secrets.CR_API_TOKEN }}
+          CR_API_BASE: https://proxy.royaleapi.dev/v1
+        run: node scripts/fetch-battles.js out.json prev.json
+
+      - name: Save to the battle-data branch
+        run: |
+          if [ ! -f out.json ]; then echo "Nothing new to save."; exit 0; fi
+          git config user.name "clashbets-sync"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin battle-data >/dev/null; then
+            git fetch --depth=1 origin battle-data:battle-data
+            git worktree add /tmp/bd battle-data
+          else
+            git worktree add --detach /tmp/bd
+            git -C /tmp/bd checkout --orphan battle-data
+            git -C /tmp/bd rm -rfq .
+          fi
+          cp out.json /tmp/bd/battles.json
+          git -C /tmp/bd add battles.json
+          if git -C /tmp/bd diff --cached --quiet; then echo "No changes."; exit 0; fi
+          git -C /tmp/bd commit -qm "Sync battles"
+          git -C /tmp/bd push origin battle-data

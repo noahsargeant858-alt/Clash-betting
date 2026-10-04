@@ -67,3 +67,30 @@ test('daily import: an official game replaces the hand log without rewriting his
   assert.deepStrictEqual([body(gone).deletedAt, body(gone).mergedInto, body(gone).crownsB], ['2026-10-05T08:54:00.000Z', official.doc_id, 1]);
   fs.rmSync(W, { recursive: true, force: true });
 });
+
+test('daily import: only the players\' own, untouched logs can attach a fixture', () => {
+  const fs = require('fs'), os = require('os'), path = require('path'), { execFileSync } = require('child_process');
+  const run = (logs, extra = {}) => {
+    const W = fs.mkdtempSync(path.join(os.tmpdir(), 'import-'));
+    const put = (f, v) => { fs.mkdirSync(path.dirname(path.join(W, f)), { recursive: true }); fs.writeFileSync(path.join(W, f), JSON.stringify(v)); };
+    put('battles.json', { battles: [battle('20261004T120000.000Z', side('#AAA', 1, 4824, [3052, 900]), side('#BBB', 0, 4100, [3052]))] });
+    put('squad.json', [{ tag: '#AAA', name: 'ann' }, { tag: '#BBB', name: 'bob' }]);
+    put('db/players/ann.json', { name: 'ann' }); put('db/players/bob.json', { name: 'bob' });
+    put('db/links/ann.json', { uid: 'u_ann', at: '2026-10-01T00:00:00.000Z' }); put('db/links/bob.json', { uid: 'u_bob', at: '2026-10-01T00:00:00.000Z' });
+    for (const [uid, id, log] of logs) put(`db/acts/${uid}/items/${id}.json`, log);
+    for (const [id, doc] of Object.entries(extra)) put(`db/matches/${id}.json`, doc);
+    put('window.json', { since: '2026-09-28T00:00:00.000Z', now: '2026-10-05T08:54:00.000Z' });
+    execFileSync(process.execPath, [path.join(__dirname, '../scripts/daily-import.js'), W], { stdio: 'pipe' });
+    const writes = JSON.parse(fs.readFileSync(path.join(W, 'batch-1.json'), 'utf8'));
+    const doc = JSON.parse(fs.readFileSync(writes.find((w) => w.doc_id.startsWith('cr_')).file_path, 'utf8'));
+    fs.rmSync(W, { recursive: true, force: true });
+    return doc;
+  };
+  const log = { type: 'match', playerA: 'ann', playerB: 'bob', crownsA: 1, crownsB: 0, winner: 'A', towersA: { left: 3052, king: 4100, right: 3052 }, towersB: { left: 3052, king: 4824, right: 900 },
+    date: '2026-10-04T12:04:00.000Z', loggedAt: '2026-10-04T12:04:00.000Z', fx: 'u_ann~f1' };
+  assert.strictEqual(run([['u_ann', 'm1', log]]).fx, 'u_ann~f1');
+  assert.strictEqual(run([['u_kim', 'm1', log]]).fx, null); // not one of the players
+  assert.strictEqual(run([['u_ann', 'm1', { ...log, loggedAt: '+002026-10-04T11:00:00.000Z' }]]).fx, null); // odd timestamp
+  assert.strictEqual(run([['u_ann', 'm1', log]], { r1: { ref: 'u_ann~m1', deletedAt: '2026-10-04T13:00:00.000Z', date: '2026-10-04T12:04:00.000Z' } }).fx, null); // admin overruled it
+  assert.strictEqual(run([['u_ann', 'm1', { ...log, loggedAt: '2026-10-04T11:50:00.000Z' }]]).loggedAt, '2026-10-04T12:00:00.000Z'); // never before the game
+});

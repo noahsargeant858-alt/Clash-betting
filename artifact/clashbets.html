@@ -861,6 +861,12 @@ const adminUid = () => store.settings.adminUid || null;
 const isAdminUid = (uid) => !!uid && uid === adminUid();
 const num = (x) => (Number.isFinite(+x) ? +x : 0);
 
+// Every time in the data is written by someone's own phone, so only plain UTC timestamps
+// ("2026-10-04T18:16:09.104Z") are accepted. Odd spellings of the same moment would
+// otherwise compare differently as text and as time.
+const canon = (t) => typeof t === 'string' && t.length === 24 && Number.isFinite(Date.parse(t)) && new Date(Date.parse(t)).toISOString() === t;
+const ms = (t) => Date.parse(t);
+
 // Player links keep their history, so unlinking a wrongly linked account
 // never rewrites what its records meant while it was linked.
 const linkMaps = memo(() => {
@@ -868,7 +874,7 @@ const linkMaps = memo(() => {
   for (const l of store.links) {
     if (!playerById(l.id)) continue;
     if (typeof l.uid === 'string' && !byUid[l.uid]) { byPlayer[l.id] = l.uid; byUid[l.uid] = l.id; }
-    for (const f of Array.isArray(l.former) ? l.former : []) if (f && typeof f.uid === 'string' && typeof f.until === 'string') (former[l.id] ||= []).push(f);
+    for (const f of Array.isArray(l.former) ? l.former : []) if (f && typeof f.uid === 'string' && canon(f.until)) (former[l.id] ||= []).push(f);
   }
   return { byPlayer, byUid, former };
 });
@@ -876,10 +882,10 @@ const linkMaps = memo(() => {
 const uidsFor = (pid, t) => {
   const L = linkMaps(), out = [];
   if (L.byPlayer[pid]) out.push(L.byPlayer[pid]);
-  for (const f of L.former[pid] || []) if (!t || String(t) <= f.until) out.push(f.uid);
+  if (canon(t)) for (const f of L.former[pid] || []) if (t <= f.until) out.push(f.uid);
   return out;
 };
-const speaksFor = (uid, pid, t) => !!uid && uidsFor(pid, t).includes(uid);
+const speaksFor = (uid, pid, t) => !!uid && canon(t) && uidsFor(pid, t).includes(uid);
 const formerOf = (pid) => { const l = store.links.find((x) => x.id === pid); return l && Array.isArray(l.former) ? l.former : []; };
 const myPlayer = () => (me.uid ? linkMaps().byUid[me.uid] || null : null);
 const myClaim = () => (me.uid ? store.claims.find((c) => c.id === me.uid) || null : null);
@@ -888,7 +894,7 @@ const myClaim = () => (me.uid ? store.claims.find((c) => c.id === me.uid) || nul
 const settingsBaseline = () => ({ at: '1970-01-01T00:00:00.000Z', values: Object.fromEntries(SETTING_KEYS.map((k) => [k, store.settings[k] ?? DEFAULT_SETTINGS[k]])) });
 function settingsAt(t) {
   let snap = null;
-  for (const e of Array.isArray(store.settings.history) ? store.settings.history : []) if (e && typeof e.at === 'string' && e.at <= t && e.values) snap = e.values;
+  for (const e of Array.isArray(store.settings.history) ? store.settings.history : []) if (e && canon(e.at) && e.at <= t && e.values && typeof e.values === 'object') snap = e.values;
   return { ...DEFAULT_SETTINGS, ...store.settings, ...(snap || {}) };
 }
 
@@ -899,21 +905,21 @@ const LOCK_GRACE = 60000;
 const fixtureData = memo(() => {
   const list = [], byKey = {};
   for (const [uid, items] of Object.entries(store.acts)) for (const x of items) {
-    if (x.type !== 'fixture' || typeof x.at !== 'string' || !playerById(x.a) || !playerById(x.b) || x.a === x.b) continue;
+    if (x.type !== 'fixture' || !canon(x.at) || !playerById(x.a) || !playerById(x.b) || x.a === x.b) continue;
     if (!(isAdminUid(uid) || speaksFor(uid, x.a, x.at) || speaksFor(uid, x.b, x.at))) continue;
     const f = { key: `${uid}~${x.id}`, docId: x.id, owner: uid, a: x.a, b: x.b, at: x.at };
     list.push(f); byKey[f.key] = f;
   }
   for (const f of list) {
-    const s = settingsAt(f.at), opened = Date.parse(f.at);
+    const s = settingsAt(f.at), opened = ms(f.at);
     f.windowEnds = opened + num(s.betWindowMin) * 60000;
     f.expiresAt = opened + num(s.fixtureHours) * 3600000;
     f.lockers = [...new Set([...uidsFor(f.a, f.at), ...uidsFor(f.b, f.at), adminUid()].filter(Boolean))];
     f.locks = [];
-    for (const uid of f.lockers) for (const x of store.acts[uid] || []) if (x.type === 'lock' && x.fx === f.key && typeof x.at === 'string' && Array.isArray(x.bets)) f.locks.push(x);
-    const inWindow = (l) => { const t = Date.parse(l.at); return t >= opened - LOCK_GRACE && t <= f.windowEnds + LOCK_GRACE; };
-    f.primary = f.locks.filter(inWindow).sort((p, q) => p.at.localeCompare(q.at))[0] || null;
-    f.closesAt = Math.min(f.windowEnds, f.primary ? Date.parse(f.primary.at) : Infinity);
+    for (const uid of f.lockers) for (const x of store.acts[uid] || []) if (x.type === 'lock' && x.fx === f.key && canon(x.at) && Array.isArray(x.bets)) f.locks.push(x);
+    const inWindow = (l) => { const t = ms(l.at); return t >= opened - LOCK_GRACE && t <= f.windowEnds + LOCK_GRACE; };
+    f.primary = f.locks.filter(inWindow).sort((p, q) => p.at.localeCompare(q.at) || String(p.uid).localeCompare(String(q.uid)))[0] || null;
+    f.closesAt = Math.min(f.windowEnds, f.primary ? ms(f.primary.at) : Infinity);
   }
   list.sort((p, q) => q.at.localeCompare(p.at));
   return { list, byKey };
@@ -922,7 +928,7 @@ const canLock = (f) => !!me.uid && f.lockers.includes(me.uid) && !readOnly;
 const myLock = (f) => f.locks.find((l) => l.uid === me.uid) || null;
 
 // Results: the admin's are final; anyone else's count once the other player confirms
-// exactly what was logged. One result per fixture: the first one logged.
+// exactly what was logged. One result per fixture.
 const RESULT_FIELDS = ['playerA', 'playerB', 'crownsA', 'crownsB', 'winner', 'overtime', 'dmgA', 'dmgB', 'kingA', 'kingB', 'firstCrown',
   'towersA', 'towersB', 'dealtA', 'dealtB', 'cardsA', 'cardsB', 'notes', 'date', 'fx', 'hp'];
 const HASH_FIELDS = RESULT_FIELDS.filter((k) => !['cardsA', 'cardsB', 'notes'].includes(k));
@@ -933,108 +939,140 @@ function hashOf(m) {
   return h.toString(36);
 }
 const okCrowns = (c) => Number.isInteger(c) && c >= 0 && c <= 3;
-const validResult = (m) => !!m && typeof m.playerA === 'string' && typeof m.playerB === 'string' && m.playerA !== m.playerB
-  && okCrowns(m.crownsA) && okCrowns(m.crownsB) && ['A', 'B', 'draw'].includes(m.winner) && typeof m.date === 'string';
+const validResult = (m) => !!m && typeof m === 'object' && typeof m.playerA === 'string' && typeof m.playerB === 'string' && m.playerA !== m.playerB
+  && okCrowns(m.crownsA) && okCrowns(m.crownsB) && ['A', 'B', 'draw'].includes(m.winner) && canon(m.date);
+// Whatever a record holds, the page only ever sees well-formed fields
+const bool = (v) => (typeof v === 'boolean' ? v : null);
+const numOr = (v) => (Number.isFinite(v) ? v : null);
+const towersOf = (t) => (t && typeof t === 'object' && ['left', 'king', 'right'].every((k) => Number.isFinite(t[k])) ? { left: t.left, king: t.king, right: t.right } : null);
+const cardsOf = (c) => (Array.isArray(c) ? c.filter((x) => typeof x === 'string').map((x) => x.slice(0, 40)).slice(0, 8) : []);
+const clean = (m) => ({
+  ...m, overtime: bool(m.overtime), dmgA: bool(m.dmgA), dmgB: bool(m.dmgB), kingA: bool(m.kingA), kingB: bool(m.kingB),
+  firstCrown: ['A', 'B', 'none'].includes(m.firstCrown) ? m.firstCrown : null, towersA: towersOf(m.towersA), towersB: towersOf(m.towersB),
+  dealtA: numOr(m.dealtA), dealtB: numOr(m.dealtB), cardsA: cardsOf(m.cardsA), cardsB: cardsOf(m.cardsB),
+  notes: typeof m.notes === 'string' ? m.notes.slice(0, 400) : '', fx: typeof m.fx === 'string' ? m.fx : null,
+  hp: m.hp && Number.isFinite(m.hp.princess) && Number.isFinite(m.hp.king) ? { princess: m.hp.princess, king: m.hp.king } : null,
+});
 const later = (x, y) => (String(x) > String(y) ? x : y);
+const firstCanon = (...xs) => xs.find(canon) || null;
 
-const isoOr = (...xs) => xs.find((x) => typeof x === 'string') || null;
 const resultData = memo(() => {
-  const all = [], pending = [], refTakenAt = {}, confirms = [];
+  const all = [], pending = [], refTakenAt = {}, confirms = [], F = fixtureData().byKey;
+  const soon = new Date(Date.now() + 5 * 60000).toISOString();
   for (const m of store.matches) {
     if (!validResult(m)) continue;
     // Admin results keep their history: an edit files the old version under prev, a delete
     // stamps deletedAt. The odds a bet saw can always be rebuilt, and nothing is erased.
-    const prev = (Array.isArray(m.prev) ? m.prev : []).filter((p) => validResult(p) && typeof p.finalAt === 'string' && typeof p.until === 'string');
-    const loggedAt = isoOr(m.loggedAt, prev[0] && prev[0].finalAt, m.finalAt, m.date);
-    prev.forEach((p, i) => all.push({ ...p, key: `m:${m.id}#${i}`, docId: m.id, loggedAt, byAdmin: true, old: true }));
-    const rec = { ...m, key: 'm:' + m.id, docId: m.id, finalAt: isoOr(m.finalAt, m.date), loggedAt, byAdmin: true, until: isoOr(m.deletedAt) };
+    const prev = (Array.isArray(m.prev) ? m.prev : []).filter((p) => validResult(p) && canon(p.finalAt) && canon(p.until));
+    const loggedAt = firstCanon(m.loggedAt, prev[0] && prev[0].finalAt, m.finalAt) || m.date;
+    prev.forEach((p, i) => all.push({ ...clean(pickResult(p)), finalAt: p.finalAt, until: p.until, key: `m:${m.id}#${i}`, docId: m.id, loggedAt, byAdmin: true, old: true }));
+    const rec = { ...clean(m), key: 'm:' + m.id, docId: m.id, finalAt: firstCanon(m.finalAt) || m.date, loggedAt, byAdmin: true, final: true, until: firstCanon(m.deletedAt) };
     all.push(rec);
     // the admin's version replaces a player's log (and a deleted one still overrules it)
-    if (typeof m.ref === 'string') refTakenAt[m.ref] = [refTakenAt[m.ref], isoOr(prev[0] && prev[0].finalAt, rec.finalAt)].filter(Boolean).sort()[0];
+    if (typeof m.ref === 'string') refTakenAt[m.ref] = [refTakenAt[m.ref], firstCanon(m.refAt, prev[0] && prev[0].finalAt, rec.finalAt)].filter(Boolean).sort()[0];
   }
-  for (const items of Object.values(store.acts)) for (const x of items) if (x.type === 'confirm' && typeof x.ref === 'string') confirms.push(x);
-  const soon = new Date(Date.now() + 5 * 60000).toISOString();
+  // a confirmation only counts if it carries the exact copy it confirms, and when that was logged
+  for (const items of Object.values(store.acts)) for (const c of items) {
+    if (c.type !== 'confirm' || typeof c.ref !== 'string' || !canon(c.at) || c.at > soon) continue;
+    if (c.verdict === 'ok' && !(validResult(c.copy) && hashOf(c.copy) === c.hash && canon(c.loggedAt) && c.at >= c.loggedAt)) continue;
+    confirms.push(c);
+  }
+  // the player a logger speaks for, and the accounts of the other player, who must confirm
+  const sides = (uid, r, t) => {
+    const mine = speaksFor(uid, r.playerA, t) ? r.playerA : speaksFor(uid, r.playerB, t) ? r.playerB : null;
+    return mine ? uidsFor(mine === r.playerA ? r.playerB : r.playerA, t) : null;
+  };
+  const fromCopy = (c, uid) => ({ ...clean(pickResult(c.copy)), id: c.ref, key: c.ref, loggedBy: uid, loggedAt: c.loggedAt, finalAt: later(c.loggedAt, c.at), confirmedBy: c.uid });
   const seen = new Set();
-  // a confirmation only counts for the exact version logged, made after it was logged
-  const goodOk = (c, h, loggedAt) => c.verdict === 'ok' && c.hash === h && c.copy && hashOf(c.copy) === h && typeof c.at === 'string' && c.at >= loggedAt && c.at <= soon;
   for (const [uid, items] of Object.entries(store.acts)) for (const x of items) {
-    if (x.type !== 'match' || !validResult(x)) continue;
-    const key = `${uid}~${x.id}`; seen.add(key);
-    const loggedAt = isoOr(x.loggedAt, x.date);
-    const others = [...uidsFor(x.playerA, loggedAt), ...uidsFor(x.playerB, loggedAt)].filter((u) => u !== uid);
+    if (x.type !== 'match' || !validResult(x) || !canon(x.loggedAt) || x.loggedAt > soon) continue;
+    const others = sides(uid, x, x.loggedAt);
+    if (!others) continue; // only the two players' own accounts can log their game
+    const key = `${uid}~${x.id}`, h = hashOf(pickResult(x)); seen.add(key);
     const mine = confirms.filter((c) => c.ref === key && others.includes(c.uid));
-    const h = hashOf(pickResult(x));
-    const ok = mine.find((c) => goodOk(c, h, loggedAt));
+    const ok = mine.filter((c) => c.verdict === 'ok').sort((p, q) => p.at.localeCompare(q.at))[0];
     if (ok) {
-      const rec = { ...pickResult(x), id: key, key, docId: x.id, loggedBy: uid, loggedAt, finalAt: later(loggedAt, ok.at), confirmedBy: ok.uid, until: null };
-      if (refTakenAt[key]) { if (refTakenAt[key] > rec.finalAt) all.push({ ...rec, until: refTakenAt[key], old: true }); } // kept for the odds history only
-      else all.push(rec);
+      const rec = fromCopy(ok, uid);
+      if (refTakenAt[key]) { if (refTakenAt[key] > rec.finalAt) all.push({ ...rec, until: refTakenAt[key], old: true }); continue; } // odds history only
+      if (ok.hash === h && ok.loggedAt === x.loggedAt) { all.push({ ...rec, docId: x.id, final: true, until: null }); continue; }
+      // Changed after it was confirmed: the confirmed version stays in the odds, the change waits
+      // for the other player to confirm again (or the admin), and the bets wait with it.
+      all.push({ ...rec, key: key + '#c', until: null, bookOnly: true });
+      pending.push({ ...clean(pickResult(x)), id: key, key, docId: x.id, loggedBy: uid, loggedAt: ok.loggedAt, hash: h, waitingFor: [...new Set(others)],
+        confirmedBy: ok.uid, changedSinceConfirm: true, noOpponent: !others.length });
       continue;
     }
     if (refTakenAt[key]) continue;
     const dispute = mine.find((c) => c.verdict === 'dispute');
-    const stale = mine.find((c) => c.verdict === 'ok' && c.hash !== h);
-    pending.push({ ...pickResult(x), id: key, key, docId: x.id, loggedBy: uid, loggedAt, hash: h, waitingFor: [...new Set(others)],
-      disputedBy: dispute ? dispute.uid : null, changedSinceConfirm: !!stale, noOpponent: !others.length });
+    pending.push({ ...clean(pickResult(x)), id: key, key, docId: x.id, loggedBy: uid, loggedAt: x.loggedAt, hash: h, waitingFor: [...new Set(others)],
+      disputedBy: dispute ? dispute.uid : null, noOpponent: !others.length });
   }
-  // A confirmed result whose logger later deleted it doesn't vanish: the confirmer's copy stays,
-  // waiting for the admin, so deleting a result can't turn settled bets into refunds.
+  // A confirmed result whose log has gone: the confirmer's copy waits for the admin, so deleting a
+  // result can't turn settled bets into refunds. It's only one person's word, so it never pushes
+  // aside any other result for its fixture.
   for (const c of confirms) {
-    if (seen.has(c.ref) || refTakenAt[c.ref] || c.verdict !== 'ok' || !c.copy || !validResult(c.copy) || hashOf(c.copy) !== c.hash) continue;
-    const logger = c.ref.split('~')[0], loggedAt = isoOr(c.loggedAt, c.at);
-    if (!logger || logger === c.uid || !(speaksFor(c.uid, c.copy.playerA, c.at) || speaksFor(c.uid, c.copy.playerB, c.at))) continue;
-    if (!(speaksFor(logger, c.copy.playerA, loggedAt) || speaksFor(logger, c.copy.playerB, loggedAt) || isAdminUid(logger))) continue;
+    if (c.verdict !== 'ok' || seen.has(c.ref) || refTakenAt[c.ref]) continue;
+    const logger = c.ref.split('~')[0];
+    if (!logger || logger === c.uid) continue;
+    const others = sides(logger, c.copy, c.loggedAt);
+    if (!others || !others.includes(c.uid)) continue;
     seen.add(c.ref);
-    pending.push({ ...pickResult(c.copy), id: c.ref, key: c.ref, docId: null, loggedBy: logger, loggedAt, hash: c.hash, waitingFor: [],
-      confirmedBy: c.uid, deletedByLogger: true, noOpponent: true });
+    const rec = fromCopy(c, logger);
+    all.push({ ...rec, key: c.ref + '#c', until: null, bookOnly: true });
+    pending.push({ ...rec, docId: null, hash: c.hash, waitingFor: [], deletedByLogger: true, claim: true, noOpponent: true });
   }
   const byDate = (p, q) => String(p.date).localeCompare(String(q.date));
-  const current = all.filter((r) => !r.until).sort(byDate);
-  // one result per fixture: the first logged; later ones are shown as duplicates and don't count
-  const firstFor = {};
-  for (const r of [...current, ...pending].sort((p, q) => String(p.loggedAt).localeCompare(String(q.loggedAt)))) if (r.fx && !firstFor[r.fx]) firstFor[r.fx] = r.key;
-  const dupe = (r) => !!r.fx && firstFor[r.fx] !== r.key;
+  const current = all.filter((r) => !r.until && !r.bookOnly).sort(byDate);
+  // One result per fixture. Only a record for the fixture's two players, about a game played
+  // after it opened and logged before it expired, can settle it. Final results come first,
+  // then results waiting for confirmation, then lone copies; within each, the first logged.
+  const claims = (r) => { const f = F[r.fx]; return !!f && samePair(r, f.a, f.b) && ms(r.date) >= ms(f.at) - LOCK_GRACE && ms(r.loggedAt) >= ms(f.at) - LOCK_GRACE && ms(r.loggedAt) <= f.expiresAt; };
+  const rank = (r) => (r.final ? 0 : r.claim ? 2 : 1);
+  const settles = {};
+  for (const r of [...current, ...pending].filter(claims).sort((p, q) => rank(p) - rank(q) || p.loggedAt.localeCompare(q.loggedAt) || p.key.localeCompare(q.key))) settles[r.fx] ||= r;
+  const dupe = (r) => claims(r) && settles[r.fx] !== r;
   const duplicates = [...current, ...pending].filter(dupe);
   const dupeKeys = new Set(duplicates.map((r) => r.key));
-  return {
-    final: current.filter((r) => !dupe(r)), pending: pending.filter((r) => !dupe(r)).sort(byDate),
-    duplicates, versions: all.filter((r) => !dupeKeys.has(r.key)),
-  };
+  const versions = all.filter((r) => !dupeKeys.has(r.key));
+  // the moments the set of results in force changes, so the odds at any time can be cached
+  const marks = [...new Set(versions.flatMap((r) => [r.finalAt, r.until]).filter(Boolean))].sort();
+  return { final: current.filter((r) => !dupe(r)), pending: pending.filter((r) => !dupe(r)).sort(byDate), duplicates, versions, settles, marks };
 });
 const finalResults = () => resultData().final;
-// only results logged before the fixture expired can settle it, so an expired refund never flips back
-const loggedInTime = (r, f) => Date.parse(r.loggedAt) <= f.expiresAt;
-const resultForFixture = (f) => finalResults().find((r) => r.fx === f.key && samePair(r, f.a, f.b) && loggedInTime(r, f)) || null;
-const pendingForFixture = (f) => resultData().pending.find((r) => r.fx === f.key && samePair(r, f.a, f.b) && loggedInTime(r, f)) || null;
+const resultForFixture = (f) => { const r = resultData().settles[f.key]; return r && r.final ? r : null; };
+const pendingForFixture = (f) => { const r = resultData().settles[f.key]; return r && !r.final ? r : null; };
 
 // The odds as they stood when a bet was placed: the result versions in force then, settings in force then
 let BOOK_CACHE = new Map();
 const resetBooks = () => { BOOK_CACHE = new Map(); };
 function bookAt(a, b, cutoff, s) {
-  const res = resultData().versions.filter((r) => String(r.finalAt) <= cutoff && !(r.until && r.until <= cutoff));
-  const k = [a, b, cutoff, res.length, s.margin, s.builderMargin, s.princessHp, s.kingHp].join('|');
+  const R = resultData();
+  let lo = 0, hi = R.marks.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (R.marks[mid] <= cutoff) lo = mid + 1; else hi = mid; }
+  const k = [a, b, lo, s.margin, s.builderMargin, s.princessHp, s.kingHp].join('|');
   if (!BOOK_CACHE.has(k)) {
-    if (BOOK_CACHE.size > 400) resetBooks();
-    const m = model(a, b, res);
+    if (BOOK_CACHE.size > 600) resetBooks();
+    const m = model(a, b, R.versions.filter((r) => r.finalAt <= cutoff && !(r.until && r.until <= cutoff)));
     BOOK_CACHE.set(k, { m, J: jointModel(m, { princess: s.princessHp, king: s.kingHp }) });
   }
   return BOOK_CACHE.get(k);
 }
-// A bet only counts if its price is no better than the book offered (5% leeway; also checked
-// against the book three minutes earlier, so a few minutes of clock difference can't void it)
+// Damage lines are the board's own: the expected damage rounded to the nearest 500
+const dealtLine = (m, side) => Math.max(500, Math.round(m['dealt' + side].mu / 500) * 500);
+const legsOk = (legs) => Array.isArray(legs) && legs.length >= 2 && legs.length <= MAX_LEGS
+  && legs.every((l) => l && typeof l.market === 'string' && typeof l.selection === 'string') && new Set(legs.map((l) => l.market)).size === legs.length;
+// A bet only counts if its price is no better than the book offered (5% leeway on the winnings;
+// also checked against the book three minutes earlier, so a little clock difference can't void it)
 function priceOk(b, s) {
-  const legs = b.legs;
-  if (legs) {
-    if (!Array.isArray(legs) || legs.length < 2 || legs.length > MAX_LEGS) return false;
-    if (new Set(legs.map((l) => l && l.market)).size !== legs.length || legs.some((l) => !l || typeof l.market !== 'string' || typeof l.selection !== 'string')) return false;
-  } else if (typeof b.market !== 'string' || typeof b.selection !== 'string') return false;
-  const earlier = new Date(Date.parse(b.placedAt) - 3 * 60000).toISOString();
+  const legs = b.legs ? b.legs : [{ market: b.market, selection: b.selection }];
+  if (b.legs ? !legsOk(legs) : typeof b.market !== 'string' || typeof b.selection !== 'string' || b.market === 'builder') return false;
+  const earlier = new Date(ms(b.placedAt) - 3 * 60000).toISOString();
   return [b.placedAt, earlier].some((cut) => {
-    const { J } = bookAt(b.a, b.b, cut, s);
-    const q = jointProb(J, legs || [{ market: b.market, selection: b.selection }]);
-    if (q < 1e-9 || (legs && q < 0.002)) return false;
-    const fair = legs ? price(q, s.builderMargin, 1).decimal : price(q, s.margin).decimal;
-    return b.odds <= fair * 1.05 + 1e-9;
+    const { m, J } = bookAt(b.a, b.b, cut, s);
+    if (legs.some((l) => l.market.startsWith('dealt') && !['over:', 'under:'].map((d) => d + dealtLine(m, l.market.slice(5))).includes(l.selection))) return false;
+    const q = jointProb(J, legs);
+    if (q < 1e-9 || (b.legs && q < 0.002)) return false;
+    const fair = b.legs ? price(q, s.builderMargin, 1).decimal : price(q, s.margin).decimal;
+    return b.odds - 1 <= (fair - 1) * 1.05 + 1e-9;
   });
 }
 function ownBetProblem(b, s) {
@@ -1047,6 +1085,7 @@ function ownBetProblem(b, s) {
 const CORE = ['id', 'uid', 'bettor', 'fx', 'a', 'b', 'market', 'selection', 'legs', 'odds', 'stake', 'placedAt'];
 const coreEq = (x, y) => JSON.stringify(CORE.map((k) => x[k] ?? null)) === JSON.stringify(CORE.map((k) => y[k] ?? null));
 const betKey = (uid, fx, id) => `${uid}|${fx}|${id}`;
+const voidOf = (b) => { const v = store.house.voids; return v && typeof v === 'object' ? v[betKey(b.uid, b.fx, b.id)] || null : null; };
 
 // Every bet with its checked status and payout. A bet is identified by the
 // account that placed it, its fixture and its id, so nobody can shadow
@@ -1054,52 +1093,66 @@ const betKey = (uid, fx, id) => `${uid}|${fx}|${id}`;
 // record: changing or deleting your own bet afterwards changes nothing, and
 // a bet that isn't in the lock is refunded. Where the lock and the bettor's
 // own list disagree, the bet is flagged so the admin can look.
+const BET_FIELDS = [...CORE, 'fractional', 'label'];
+const pickBet = (b) => Object.fromEntries(BET_FIELDS.map((k) => [k, b[k]]));
 const ledger = memo(() => {
   const out = new Map(), live = new Map();
   for (const d of store.betDocs) for (const b of Array.isArray(d.list) ? d.list : []) {
-    if (b && typeof b.id === 'string' && typeof b.fx === 'string') live.set(betKey(d.id, b.fx, b.id), { ...b, uid: d.id });
+    if (b && typeof b === 'object' && typeof b.id === 'string' && typeof b.fx === 'string') live.set(betKey(d.id, b.fx, b.id), { ...pickBet(b), uid: d.id });
   }
   const fx = fixtureData().byKey;
   for (const f of fixtureData().list) {
     if (!f.primary) continue;
     for (const fb of f.primary.bets) {
-      if (!fb || typeof fb.id !== 'string' || typeof fb.uid !== 'string' || fb.fx !== f.key) continue;
+      if (!fb || typeof fb !== 'object' || typeof fb.id !== 'string' || typeof fb.uid !== 'string' || fb.fx !== f.key) continue;
       const k = betKey(fb.uid, f.key, fb.id);
       if (out.has(k)) continue;
       const own = live.get(k);
-      out.set(k, { ...fb, frozen: true, flag: !own ? 'Not in their own bet list' : coreEq(own, fb) ? null : 'Their own copy of this bet is different' });
+      out.set(k, { ...pickBet(fb), frozen: true, lockedBy: f.primary.uid, flag: !own ? 'Not in their own bet list' : coreEq(own, fb) ? null : 'Their own copy of this bet is different' });
     }
   }
   for (const [k, b] of live) if (!out.has(k)) out.set(k, { ...b, frozen: false, late: !!(fx[b.fx] && fx[b.fx].primary) });
-  return [...out.values()].map((b) => ({ ...b, ...judge(b) })).filter((b) => b.status !== 'ignore');
+  const bets = [...out.values()].map((b) => ({ ...b, ...judge(b) })).filter((b) => b.status !== 'ignore');
+  // Nobody can stake coins they didn't have: each bettor's bets are walked in the order they were placed
+  const gifts = {}; for (const g of houseGifts()) gifts[g.pid] = (gifts[g.pid] || 0) + g.amount;
+  const bal = {};
+  for (const b of [...bets].sort((p, q) => p.placedAt.localeCompare(q.placedAt) || betKey(p.uid, p.fx, p.id).localeCompare(betKey(q.uid, q.fx, q.id)))) {
+    if (!(b.bettor in bal)) bal[b.bettor] = num(store.settings.startingCoins) + (gifts[b.bettor] || 0);
+    if (b.status !== 'void' && b.stake > bal[b.bettor]) Object.assign(b, { status: 'void', payout: b.stake, why: 'Not enough coins when it was placed', matchKey: undefined });
+    bal[b.bettor] += (b.payout || 0) - b.stake;
+  }
+  return bets;
 });
 
 function judge(b) {
-  if (!(Number.isInteger(b.stake) && b.stake > 0 && Number.isFinite(b.odds) && b.odds >= 1.01 && typeof b.placedAt === 'string')) return { status: 'ignore' };
-  if (!b.bettor || !speaksFor(b.uid, b.bettor, b.placedAt)) return { status: 'ignore' }; // not this account's player
-  const voidIt = (why) => ({ status: 'void', payout: b.stake, why });
-  const hv = store.house.voids && store.house.voids[b.id];
+  if (!(Number.isInteger(b.stake) && b.stake > 0 && Number.isFinite(b.odds) && b.odds >= 1.01 && canon(b.placedAt) && typeof b.a === 'string' && typeof b.b === 'string')) return { status: 'ignore' };
+  if (b.legs != null && !legsOk(b.legs)) return { status: 'ignore' };
+  if (typeof b.bettor !== 'string' || !speaksFor(b.uid, b.bettor, b.placedAt)) return { status: 'ignore' }; // not this account's player
+  const voidIt = (why) => ({ status: 'void', payout: b.stake, why, matchKey: undefined });
+  const hv = voidOf(b);
   if (hv) return voidIt(`Voided by the admin${hv.reason ? `: ${hv.reason}` : ''}`);
   const f = fixtureData().byKey[b.fx];
   if (!f || !((f.a === b.a && f.b === b.b) || (f.a === b.b && f.b === b.a))) return voidIt('No matching fixture');
   if (b.late) return voidIt('Didn\'t make it into the lock before the draft');
-  const placed = Date.parse(b.placedAt);
-  if (!(placed >= Date.parse(f.at) - LOCK_GRACE && placed <= f.windowEnds)) return voidIt('Placed outside the betting window');
+  const placed = ms(b.placedAt);
+  if (!(placed >= ms(f.at) - LOCK_GRACE && placed <= f.windowEnds)) return voidIt('Placed outside the betting window');
   const s = settingsAt(b.placedAt);
   if (b.stake < s.minStake || b.stake > s.maxStake || b.stake * b.odds > s.maxReturn + 0.5) return voidIt('Over the stake limits');
   const own = ownBetProblem(b, s); if (own) return voidIt(own);
+  // a player's bet on their own match needs a lock from someone other than themselves
+  if (b.frozen && (b.bettor === b.a || b.bettor === b.b) && speaksFor(b.lockedBy, b.bettor, f.at)) return voidIt('Your own match bet needs your opponent or the admin to lock the fixture');
   if (!priceOk(b, s)) return voidIt('Price check failed');
   // no lock made inside the window: nothing proves when bets were placed, so they're refunded
-  if (!f.primary) return Date.now() > f.windowEnds + LOCK_GRACE ? voidIt('Betting wasn\'t locked before the game') : { status: 'open', payout: 0 };
+  if (!f.primary) return Date.now() > f.windowEnds + LOCK_GRACE ? voidIt('Betting wasn\'t locked before the game') : { status: 'open', payout: 0, matchKey: undefined };
   const fin = resultForFixture(f);
   if (fin) {
     const o = orientPair(fin, b.a), r = b.legs ? settleBuilder(b.legs, o) : settleSelection(b.market, b.selection, o);
     if (r === null) return { ...voidIt('A detail this bet needed wasn\'t recorded'), matchKey: fin.key };
     return r ? { status: 'won', payout: Math.round(b.stake * b.odds), matchKey: fin.key } : { status: 'lost', payout: 0, matchKey: fin.key };
   }
-  if (pendingForFixture(f)) return { status: 'pending', payout: 0, why: 'Result waiting for confirmation' };
+  if (pendingForFixture(f)) return { status: 'pending', payout: 0, why: 'Result waiting for confirmation', matchKey: undefined };
   if (Date.now() > f.expiresAt) return voidIt('Not played in time');
-  return { status: Date.now() > f.closesAt ? 'locked' : 'open', payout: 0 };
+  return { status: Date.now() > f.closesAt ? 'locked' : 'open', payout: 0, matchKey: undefined };
 }
 
 const houseGifts = () => (Array.isArray(store.house.gifts) ? store.house.gifts : []).filter((g) => g && typeof g.pid === 'string' && Number.isFinite(g.amount));
@@ -1232,7 +1285,7 @@ function resultLine(r) {
 }
 function renderConfirmBox(joining) {
   const box = $('#confirmBox');
-  const mine = joining || !me.uid ? [] : resultData().pending.filter((r) => r.waitingFor.includes(me.uid) && (() => { const c = myConfirm(r.key); return !c || c.hash !== r.hash; })());
+  const mine = joining || !me.uid ? [] : resultData().pending.filter((r) => r.waitingFor.includes(me.uid) && (() => { const c = myConfirm(r.key); return !c || c.hash !== r.hash || c.loggedAt !== r.loggedAt; })());
   box.hidden = !mine.length;
   if (!mine.length) return;
   box.innerHTML = `<h3>Is this right?</h3><p class="note">A result only counts once the other player confirms it.</p>${mine.map((r) => `
@@ -1244,7 +1297,7 @@ $('#confirmBox').addEventListener('click', async (e) => {
   const r = resultData().pending.find((x) => x.key === key); if (!r) return;
   const verdict = e.target.dataset.confirm ? 'ok' : 'dispute', copy = pickResult(r);
   try {
-    await put(`acts/${me.uid}/items`, 'c_' + safeSeg(key), { type: 'confirm', ref: key, verdict, copy, hash: hashOf(copy), loggedAt: r.loggedAt, at: nowIso() });
+    await put(`acts/${me.uid}/items`, 'c_' + safeSeg(key), { type: 'confirm', ref: key, verdict, copy, hash: hashOf(copy), loggedAt: r.loggedAt, at: later(nowIso(), r.loggedAt) });
     toast(verdict === 'ok' ? 'Confirmed. Bets on it are settled.' : 'Disputed. The admin will sort it out.');
   } catch { /* toast shown */ }
 });
@@ -1321,8 +1374,8 @@ let builder = { a: null, b: null, legs: [] };
 const MAX_LEGS = 6;
 const isLeg = (mk, sel) => builder.legs.some((l) => l.market === mk && l.selection === sel);
 function buildMarkets(a, b) {
-  const s = store.settings, m = model(a, b, finalResults());
-  const J = jointModel(m, { princess: s.princessHp, king: s.kingHp });
+  // the same book the price check rebuilds later, so a bet taken off the board always passes it
+  const now = nowIso(), s = settingsAt(now), { m, J } = bookAt(a, b, now, s);
   const nA = nameOf(a), nB = nameOf(b);
   const markets = marketDefs(nA, nB).map((def) => {
     let sels;
@@ -1331,7 +1384,7 @@ function buildMarkets(a, b) {
         label: x.winner === 'D' ? `Draw ${x.a}–${x.b}` : `${x.winner === 'A' ? nA : nB} ${x.a}–${x.b}${x.a === x.b ? ' on tiebreaker' : ''}`, ...price(x.p, s.margin) }));
     } else if (def.key.startsWith('dealt')) {
       const side = def.key.slice(5), dm = m['dealt' + side];
-      const line = Math.max(500, Math.round(dm.mu / 500) * 500);
+      const line = dealtLine(m, side);
       const pOver = jointProb(J, [{ market: def.key, selection: 'over:' + line }]);
       def.name = `${side === 'A' ? nA : nB}: total tower damage`;
       def.blurb = `Damage dealt to the other player's towers over the whole game. Expected about ${fmtN(dm.mu)}.`;
@@ -1630,7 +1683,8 @@ $('#sides').addEventListener('click', (e) => {
 // Fixtures the viewer can log a result for (live, no result logged yet)
 function fillFixtureSelect() {
   const sel = $('#fxSel'), prev = sel.value;
-  const list = liveFixtures().filter((f) => !pendingForFixture(f) || (editing && editing.rec.fx === f.key));
+  // editing a result keeps its fixture on the list, even once it's settled or expired
+  const list = fixtureData().list.filter((f) => (editing && editing.rec.fx === f.key) || (liveFixtures().includes(f) && !pendingForFixture(f)));
   sel.innerHTML = list.map((f) => `<option value="${esc(f.key)}">${esc(nameOf(f.a))} v ${esc(nameOf(f.b))} (opened ${esc(ago(Date.now() - Date.parse(f.at)))})</option>`).join('')
     + '<option value="">No fixture (results only, no bets)</option>';
   // first fill after a reset picks the newest fixture; after that, keep what the logger chose
@@ -1809,7 +1863,7 @@ async function deleteResult(r) {
 // ======================================================================
 function legList(bet) {
   const fin = bet.matchKey && finalResults().find((x) => x.key === bet.matchKey), o = fin && orientPair(fin, bet.a);
-  return `<ul class="leg-list">${(bet.legs || []).map((l) => {
+  return `<ul class="leg-list">${(Array.isArray(bet.legs) ? bet.legs : []).map((l) => {
     const r = o ? settleSelection(l.market, l.selection, o) : undefined;
     const tag = r === true ? '<span class="up">✓</span>' : r === false ? '<span class="down">✗</span>' : r === null ? '<span class="na">void</span>' : '';
     return `<li>${tag} ${esc(l.marketName)}: ${esc(l.label)}</li>`;
@@ -1821,10 +1875,11 @@ function betRows(bets, showBettor) {
   return `<table><thead><tr>${showBettor ? '<th>Bettor</th>' : ''}<th>Bet</th><th>Price</th><th>Stake</th><th>Result</th>${me.admin ? '<th></th>' : ''}</tr></thead><tbody>${bets.map((b) => `
     <tr>${showBettor ? `<td>${esc(nameOf(b.bettor))}</td>` : ''}<td>${esc(b.label)}${b.legs ? legList(b) : ''}<div class="small muted">${fmtDate(b.placedAt)}</div></td>
     <td class="num">${esc(b.fractional)}</td><td class="num">${fmtN(b.stake)}</td>
-    <td><span class="pill ${b.status}">${b.status}</span>${b.status === 'won' ? ` <span class="num up">+${fmtN(b.payout)}</span>` : ''}${b.why ? `<div class="small muted">${esc(b.why)}</div>` : ''}</td>
-    ${me.admin ? `<td>${b.status !== 'void' && b.bettor !== pid ? (voiding === b.id
-      ? `<form class="row" data-void-form="${esc(b.id)}"><input type="text" id="voidWhy" placeholder="Reason" maxlength="80" aria-label="Reason for voiding"><button class="btn tiny warn" type="submit">Void</button></form>`
-      : `<button class="btn tiny" type="button" data-void="${esc(b.id)}">Void</button>`) : ''}</td>` : ''}</tr>`).join('')}</tbody></table>`;
+    <td><span class="pill ${esc(b.status)}">${esc(b.status)}</span>${b.status === 'won' ? ` <span class="num up">+${fmtN(b.payout)}</span>` : ''}${b.why ? `<div class="small muted">${esc(b.why)}</div>` : ''}
+      ${b.flag && (me.admin || b.bettor === pid) ? `<div class="small"><span class="pill warn">${esc(b.flag)}</span></div>` : ''}</td>
+    ${me.admin ? `<td>${b.status !== 'void' && b.bettor !== pid ? (voiding === betKey(b.uid, b.fx, b.id)
+      ? `<form class="row" data-void-form="${esc(betKey(b.uid, b.fx, b.id))}"><input type="text" id="voidWhy" placeholder="Reason" maxlength="80" aria-label="Reason for voiding"><button class="btn tiny warn" type="submit">Void</button></form>`
+      : `<button class="btn tiny" type="button" data-void="${esc(betKey(b.uid, b.fx, b.id))}">Void</button>`) : ''}</td>` : ''}</tr>`).join('')}</tbody></table>`;
 }
 function renderBets() {
   const bets = [...ledger()].sort((x, y) => String(y.placedAt).localeCompare(String(x.placedAt))), pid = myPlayer();
@@ -1837,7 +1892,7 @@ function renderBets() {
   $('#betList').innerHTML = bets.length ? betRows(bets, true) : '<div class="empty">No bets yet. Head to Odds and tap a price.</div>';
   const log = [
     ...houseGifts().map((g) => ({ at: g.at, text: `${g.amount >= 0 ? 'Gave' : 'Took'} ${fmtN(Math.abs(g.amount))} coins ${g.amount >= 0 ? 'to' : 'from'} ${nameOf(g.pid)}${g.reason ? ` (${g.reason})` : ''}` })),
-    ...Object.entries(store.house.voids || {}).map(([id, v]) => { const b = ledger().find((x) => x.id === id); return { at: v && v.at, text: `Voided ${b ? `${nameOf(b.bettor)}'s bet "${b.label}"` : 'a bet'}${v && v.reason ? ` (${v.reason})` : ''}` }; }),
+    ...Object.entries(store.house.voids && typeof store.house.voids === 'object' ? store.house.voids : {}).map(([k, v]) => { const b = ledger().find((x) => betKey(x.uid, x.fx, x.id) === k); return { at: v && v.at, text: `Voided ${b ? `${nameOf(b.bettor)}'s bet "${b.label}"` : 'a bet'}${v && v.reason ? ` (${v.reason})` : ''}` }; }),
   ].filter((x) => typeof x.at === 'string').sort((x, y) => y.at.localeCompare(x.at));
   $('#houseLog').innerHTML = log.length ? `<ul class="house-log">${log.map((x) => `<li><span class="small muted">${fmtDate(x.at)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : '<p class="note">Nothing yet. Every coin gift and voided bet from the admin shows up here.</p>';
 }

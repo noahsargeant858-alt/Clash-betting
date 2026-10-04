@@ -11,6 +11,7 @@
 //   battles.json, squad.json            from GitHub
 //   db/players/<id>.json                 the site's players
 //   db/matches/<id>.json                 the site's results dated within the window
+//   db/links/<playerId>.json             (if any) which account speaks for which player
 //   db/acts/<uid>/items/<id>.json        (if any) players' own logged results in the window
 //   versions.json                        {"matches/<id>": version} for the window's results
 //   window.json                          {"since": ISO, "now": ISO}
@@ -43,12 +44,23 @@ for (const r of lib.officialResults(read('battles.json').battles || [], playerOf
   if (r.date >= since && !deletedIds.has(id)) official[id] = r;
 }
 
-// Results people logged: the admin's (in matches) and players' own (in acts)
+// Results people logged: the admin's (in matches) and players' own (in acts). A player's log only
+// counts if it came from one of the two players' accounts, has a proper timestamp, and the site
+// hasn't already replaced or overruled it.
+const canon = (t) => typeof t === 'string' && t.length === 24 && Number.isFinite(Date.parse(t)) && new Date(Date.parse(t)).toISOString() === t;
+const later = (x, y) => (x > y ? x : y);
+const links = readDir('db/links');
+const speaks = (uid, pid, t) => links.some((l) => l.id === pid && (l.uid === uid || (Array.isArray(l.former) && l.former.some((f) => f && f.uid === uid && canon(f.until) && t <= f.until))));
+const overruled = new Set(existing.filter((m) => typeof m.ref === 'string').map((m) => m.ref));
 const handLogs = existing.filter((m) => m.source !== 'api' && typeof m.playerA === 'string' && !m.deletedAt).map((m) => ({ ...m, key: 'matches/' + m.id }));
 const actsRoot = path.join(W, 'db/acts');
 if (fs.existsSync(actsRoot)) {
   for (const uid of fs.readdirSync(actsRoot)) {
-    for (const x of readDir(`db/acts/${uid}/items`)) if (x.type === 'match' && typeof x.playerA === 'string') handLogs.push({ ...x, key: `acts/${uid}~${x.id}`, actsKey: `${uid}~${x.id}` });
+    for (const x of readDir(`db/acts/${uid}/items`)) {
+      if (x.type !== 'match' || typeof x.playerA !== 'string' || typeof x.playerB !== 'string' || !canon(x.loggedAt) || !canon(x.date)) continue;
+      if (overruled.has(`${uid}~${x.id}`) || !(speaks(uid, x.playerA, x.loggedAt) || speaks(uid, x.playerB, x.loggedAt))) continue;
+      handLogs.push({ ...x, key: `acts/${uid}~${x.id}`, actsKey: `${uid}~${x.id}` });
+    }
   }
 }
 
@@ -68,10 +80,11 @@ for (const p of pairs.merged) {
   const r = docs[p.into], m = handLogs.find((h) => h.key === p.key), isNew = !existingIds.has(p.into);
   // a result already on the site may gain missing details, but never a second fixture or a new "final" time
   if (m.fx && r.fx && r.fx !== m.fx) { conflicts.add(p.key); log.push(`CHECK: ${p.key} looks like ${p.into}, but they belong to different fixtures. Left both in place.`); continue; }
-  if (m.fx && !r.fx) r.loggedAt = m.loggedAt || m.finalAt || m.date; // still counts as logged in time for its fixture
+  // still counts as logged in time for its fixture, but never as logged before it was played
+  if (m.fx && !r.fx) r.loggedAt = later([m.loggedAt, m.finalAt, m.date].find(canon) || r.date, r.date);
   if (m.fx) r.fx = m.fx;
-  if (m.actsKey) r.ref = m.actsKey; // the official record replaces the player's log, keeping its fixture so bets settle
-  else if (m.ref && !r.ref) r.ref = m.ref;
+  const newRef = m.actsKey ? m.actsKey : !r.ref ? m.ref : null; // the official record replaces the log, keeping its fixture so bets settle
+  if (newRef && newRef !== r.ref) { r.ref = newRef; if (!isNew) r.refAt = now; }
   // a new official record enters the odds from now, the moment the log it replaces leaves them
   if (isNew) r.finalAt = now;
   changedIds.add(p.into);

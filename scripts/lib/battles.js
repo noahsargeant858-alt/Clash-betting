@@ -117,7 +117,7 @@ function pairUp(handLogs, docs, isTaken = () => false) {
   for (const id of Object.keys(docs)) if (isTaken(id)) usedR.set(id, '(earlier)');
   const cands = [];
   for (const m of handLogs) for (const [id, r] of Object.entries(docs)) { const sc = score(m, r); if (sc.s >= 2) cands.push({ m, id, r, ...sc }); }
-  cands.sort((x, y) => y.s - x.s || x.gap - y.gap);
+  cands.sort((x, y) => y.s - x.s || (!!y.m.fx - !!x.m.fx) || x.gap - y.gap); // on a tie, the log tied to a fixture wins
   for (const c of cands) {
     if (usedM.has(c.m.key) || usedR.has(c.id)) continue;
     usedM.add(c.m.key); usedR.set(c.id, c.m.key);

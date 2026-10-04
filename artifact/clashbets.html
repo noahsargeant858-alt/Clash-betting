@@ -348,7 +348,8 @@ function orient(m, id) {
     overtime: m.overtime ?? null,
     firstCrown: m.firstCrown == null ? null : m.firstCrown === 'none' ? 'none' : m.firstCrown === mine ? 'me' : 'opp',
     dmgMe: m['dmg' + mine] ?? null, dmgOpp: m['dmg' + opp] ?? null,
-    kingMe: m['king' + mine] ?? null, kingOpp: m['king' + opp] ?? null,
+    // losing any tower wakes your King, whatever was logged
+    kingMe: m['crowns' + opp] >= 1 ? true : m['king' + mine] ?? null, kingOpp: m['crowns' + mine] >= 1 ? true : m['king' + opp] ?? null,
     dealtMe: m['dealt' + mine] ?? null, dealtOpp: m['dealt' + opp] ?? null,
     myCards: m['cards' + mine] || [], oppCards: m['cards' + opp] || [], date: m.date,
   };
@@ -551,8 +552,9 @@ function jointModel(m, hp) {
     const cr = (s) => (side === 'A' ? s.a : s.b), d = m['dealt' + side];
     const ea = S.reduce((t, s) => t + s.p * cr(s), 0) / Math.max(1e-9, mass(() => true));
     const va = S.reduce((t, s) => t + s.p * (cr(s) - ea) ** 2, 0) / Math.max(1e-9, mass(() => true));
-    const slope = hp.princess;
-    dealt[side] = { mu: d.mu, ea, slope, sd: Math.sqrt(Math.max(500 ** 2, d.sd ** 2 - slope ** 2 * va)) };
+    const slope = 0.75 * hp.princess;
+    const sdFloor = Math.max(0.5 * d.sd, hp.princess / 3); // keeps chip damage without a tower reachable
+    dealt[side] = { mu: d.mu, ea, slope, sd: Math.sqrt(Math.max(sdFloor ** 2, d.sd ** 2 - slope ** 2 * va)) };
   }
   return { states, dealt, hp };
 }
@@ -563,10 +565,10 @@ function jointModel(m, hp) {
 function dealtOver(J, side, o, line) {
   const d = J.dealt[side], crowns = side === 'A' ? o.a : o.b, dmg = side === 'A' ? o.dmgA : o.dmgB;
   const floor = Math.max(crowns === 3 ? J.hp.king : crowns * J.hp.princess, dmg ? 1000 : 0);
-  const cap = !o.overtime && !dmg ? 1000 : Infinity;
+  const cap = !o.overtime && !dmg ? 1000 : 2 * J.hp.princess + J.hp.king;
   if (line <= floor) return 1;
   if (line >= cap) return 0;
-  const mu = d.mu + d.slope * (crowns - d.ea), tail = (x) => (x === Infinity ? 0 : 1 - phi((x - mu) / d.sd));
+  const mu = d.mu + d.slope * (crowns - d.ea), tail = (x) => 1 - phi((x - mu) / d.sd);
   const span = tail(floor) - tail(cap);
   return span < 1e-12 ? (line - floor < cap - line ? 1 : 0) : clamp((tail(line) - tail(cap)) / span, 0, 1);
 }
@@ -976,8 +978,14 @@ function builderQuote() {
   const legs = builder.legs;
   if (!currentBook || legs.length < 2) return null;
   const p = jointProb(currentBook.J, legs);
-  if (p < 0.0005) return { impossible: true };
-  const acca = legs.reduce((t, l) => t * l.decimal, 1);
+  if (p < 1e-6) return { impossible: true, why: 'These picks can\'t all happen in the same match. Swap one out.' };
+  // below 1 in 500 the model is mostly guessing, so the book won't take it
+  if (p < 0.002) return { impossible: true, why: 'That combo is too much of a long shot for the book to price. Swap a pick out.' };
+  const single = (l) => {
+    const mk = currentBook.markets.find((x) => x.key === l.market), sel = mk && mk.sels.find((x) => x.key === l.selection);
+    return sel ? sel.decimal : price(jointProb(currentBook.J, [l]), store.settings.margin).decimal;
+  };
+  const acca = legs.reduce((t, l) => t * single(l), 1);
   return { p, acca, ...price(p, store.settings.builderMargin, 1) };
 }
 function modeSwitch() {
@@ -995,7 +1003,7 @@ function renderSlip() {
   const who = pid ? `<div class="small">Betting as <b>${esc(nameOf(pid))}</b> · <span class="num">${fmtN(coinsOf(pid))}</span> coins</div>` : '';
   if (slipMode === 'builder') {
     const a = $('#oddsA').value, b = $('#oddsB').value, legs = builder.legs, q = builderQuote();
-    const block = legs.length < 2 ? '' : q && q.impossible ? 'These picks can\'t all happen in the same match. Swap one out.' : betBlock(a, b);
+    const block = legs.length < 2 ? '' : q && q.impossible ? q.why : betBlock(a, b);
     el.innerHTML = `<div class="row" style="justify-content:space-between"><h3>Bet slip</h3>${modeSwitch()}</div>
       <p class="note">Combine 2 to ${MAX_LEGS} picks from ${esc(nameOf(a))} v ${esc(nameOf(b))}. Linked picks are priced together, so "wins" + "3-crown win" pays like the 3-crown alone. Every pick has to land.</p>
       ${legs.length ? `<ol class="legs">${legs.map((l, i) => `<li><span><b>${esc(l.label)}</b><br><span class="small muted">${esc(l.marketName)}</span></span><button type="button" class="btn tiny" data-unleg="${i}" aria-label="Remove ${esc(l.label)}">Remove</button></li>`).join('')}</ol>` : '<p class="muted small" style="margin:0">Tap prices on the board to add picks.</p>'}

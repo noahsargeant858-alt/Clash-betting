@@ -1055,7 +1055,7 @@ function fillPlayers(sel, fallbackIndex) {
   if (store.players.some((p) => p.id === prev)) sel.value = prev;
   else if (store.players[fallbackIndex]) sel.value = store.players[fallbackIndex].id;
 }
-const accountName = (uid) => { const pid = linkMaps().byUid[uid]; return pid ? nameOf(pid) : isAdminUid(uid) ? 'the admin' : 'someone'; };
+const accountName = (uid) => { if (uid === 'api') return 'Clash Royale'; const pid = linkMaps().byUid[uid]; return pid ? nameOf(pid) : isAdminUid(uid) ? 'the admin' : 'someone'; };
 
 // tabs
 const tabs = [...document.querySelectorAll('[role="tab"]')];
@@ -1642,7 +1642,7 @@ function isDuplicate(r, all) {
     && JSON.stringify([x.towersA, x.towersB].map((t) => t && [t.left, t.king, t.right])) === JSON.stringify([r.towersA, r.towersB].map((t) => t && [t.left, t.king, t.right])));
 }
 function resultStatus(r) {
-  if (!r.pending) return r.byAdmin ? '<span class="pill won">Final</span>' : `<span class="pill won">Confirmed by ${esc(accountName(r.confirmedBy))}</span>${r.editedSince ? ' <span class="pill warn">Edited after confirming</span>' : ''}`;
+  if (!r.pending) return r.source === 'api' ? '<span class="pill won">Official</span>' : r.byAdmin ? '<span class="pill won">Final</span>' : `<span class="pill won">Confirmed by ${esc(accountName(r.confirmedBy))}</span>${r.editedSince ? ' <span class="pill warn">Edited after confirming</span>' : ''}`;
   if (r.disputedBy) return `<span class="pill lost">Disputed by ${esc(accountName(r.disputedBy))}</span>`;
   if (r.noOpponent) return '<span class="pill warn">Waiting for the admin</span>';
   return `<span class="pill warn">Waiting for ${esc(r.waitingFor.map(accountName).join(' or '))}</span>`;

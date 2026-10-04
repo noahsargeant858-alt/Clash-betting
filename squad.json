@@ -1,36 +1,12 @@
 [
-  {
-    "name": "Nizz"
-  },
-  {
-    "tag": "#ULG0PY8UP",
-    "name": "triqqi"
-  },
-  {
-    "tag": "#89R88C82Y",
-    "name": "zac"
-  },
-  {
-    "tag": "#QL2GJVR02",
-    "name": "jamie"
-  },
-  {
-    "tag": "#9Q0L20PL2",
-    "name": "sek"
-  },
-  {
-    "name": "caleb"
-  },
-  {
-    "name": "rishi"
-  },
-  {
-    "name": "rocky"
-  },
-  {
-    "name": "ethan"
-  },
-  {
-    "name": "johnny"
-  }
+  { "tag": "#8GQQ9YC2", "name": "Nizz" },
+  { "tag": "#ULG0PY8UP", "name": "triqqi" },
+  { "tag": "#89R88C82Y", "name": "zac" },
+  { "tag": "#9CY0VCVJG", "name": "jamie" },
+  { "tag": "#9Q0L20PL2", "name": "sek" },
+  { "tag": "#UJ20VUYC8", "name": "caleb" },
+  { "name": "rishi" },
+  { "name": "rocky" },
+  { "tag": "#QL2GJVR02", "name": "ethan" },
+  { "tag": "#890UCYCGU", "name": "johnny" }
 ]

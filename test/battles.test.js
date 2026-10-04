@@ -42,3 +42,28 @@ test('hand logs pair with their official game, including tiebreakers', () => {
   assert.strictEqual(tb.tiebreaker, true);
   assert.strictEqual(tb.overtime, true);
 });
+
+test('daily import: an official game replaces the hand log without rewriting history', () => {
+  const fs = require('fs'), os = require('os'), path = require('path'), { execFileSync } = require('child_process');
+  const W = fs.mkdtempSync(path.join(os.tmpdir(), 'import-'));
+  const put = (f, v) => { fs.mkdirSync(path.dirname(path.join(W, f)), { recursive: true }); fs.writeFileSync(path.join(W, f), JSON.stringify(v)); };
+  put('battles.json', { battles: [battle('20261004T120000.000Z', side('#AAA', 1, 4824, [3052, 900]), side('#BBB', 0, 4100, [3052]))] });
+  put('squad.json', [{ tag: '#AAA', name: 'ann' }, { tag: '#BBB', name: 'bob' }]);
+  put('db/players/ann.json', { name: 'ann' }); put('db/players/bob.json', { name: 'bob' });
+  const hand = { playerA: 'bob', playerB: 'ann', crownsA: 0, crownsB: 1, winner: 'B', towersA: { left: 3052, king: 4824, right: 0 }, towersB: { left: 900, king: 4824, right: 3052 },
+    date: '2026-10-04T12:05:00.000Z', loggedAt: '2026-10-04T12:06:00.000Z', finalAt: '2026-10-04T12:06:00.000Z', fx: 'admin~f1', overtime: false };
+  put('db/matches/h1.json', hand);
+  put('db/matches/old.json', { ...hand, date: '2026-10-04T12:30:00.000Z', deletedAt: '2026-10-04T13:00:00.000Z' });
+  put('versions.json', { 'matches/h1': 3, 'matches/old': 2 });
+  put('window.json', { since: '2026-09-28T00:00:00.000Z', now: '2026-10-05T08:54:00.000Z' });
+  execFileSync(process.execPath, [path.join(__dirname, '../scripts/daily-import.js'), W], { stdio: 'pipe' });
+  const writes = JSON.parse(fs.readFileSync(path.join(W, 'batch-1.json'), 'utf8'));
+  const body = (w) => JSON.parse(fs.readFileSync(w.file_path, 'utf8'));
+  const official = writes.find((w) => w.doc_id.startsWith('cr_')), gone = writes.find((w) => w.doc_id === 'h1');
+  assert.strictEqual(writes.length, 2); // the already-deleted log is left alone
+  assert.deepStrictEqual([body(official).fx, body(official).loggedAt, body(official).finalAt], ['admin~f1', '2026-10-04T12:06:00.000Z', '2026-10-05T08:54:00.000Z']);
+  assert.strictEqual(gone.op, 'set'); // marked deleted, never erased
+  assert.strictEqual(gone.if_version, 3);
+  assert.deepStrictEqual([body(gone).deletedAt, body(gone).mergedInto, body(gone).crownsB], ['2026-10-05T08:54:00.000Z', official.doc_id, 1]);
+  fs.rmSync(W, { recursive: true, force: true });
+});

@@ -35,11 +35,16 @@ const existingIds = new Set(existing.map((m) => m.id));
 
 // Official results in the window; new ones count as final from now, so bets
 // placed before this import are judged on the odds they actually saw.
+// Results the admin deleted on the site stay deleted and are never touched.
+const deletedIds = new Set(existing.filter((m) => typeof m.deletedAt === 'string').map((m) => m.id));
 const official = {};
-for (const r of lib.officialResults(read('battles.json').battles || [], playerOf, now)) if (r.date >= since) official[lib.docId(r.battleKey)] = r;
+for (const r of lib.officialResults(read('battles.json').battles || [], playerOf, now)) {
+  const id = lib.docId(r.battleKey);
+  if (r.date >= since && !deletedIds.has(id)) official[id] = r;
+}
 
 // Results people logged: the admin's (in matches) and players' own (in acts)
-const handLogs = existing.filter((m) => m.source !== 'api' && typeof m.playerA === 'string').map((m) => ({ ...m, key: 'matches/' + m.id }));
+const handLogs = existing.filter((m) => m.source !== 'api' && typeof m.playerA === 'string' && !m.deletedAt).map((m) => ({ ...m, key: 'matches/' + m.id }));
 const actsRoot = path.join(W, 'db/acts');
 if (fs.existsSync(actsRoot)) {
   for (const uid of fs.readdirSync(actsRoot)) {
@@ -63,10 +68,12 @@ for (const p of pairs.merged) {
   const r = docs[p.into], m = handLogs.find((h) => h.key === p.key), isNew = !existingIds.has(p.into);
   // a result already on the site may gain missing details, but never a second fixture or a new "final" time
   if (m.fx && r.fx && r.fx !== m.fx) { conflicts.add(p.key); log.push(`CHECK: ${p.key} looks like ${p.into}, but they belong to different fixtures. Left both in place.`); continue; }
+  if (m.fx && !r.fx) r.loggedAt = m.loggedAt || m.finalAt || m.date; // still counts as logged in time for its fixture
   if (m.fx) r.fx = m.fx;
   if (m.actsKey) r.ref = m.actsKey; // the official record replaces the player's log, keeping its fixture so bets settle
   else if (m.ref && !r.ref) r.ref = m.ref;
-  if (isNew && !m.actsKey) r.finalAt = m.finalAt || m.date; // keep when the admin's result became final
+  // a new official record enters the odds from now, the moment the log it replaces leaves them
+  if (isNew) r.finalAt = now;
   changedIds.add(p.into);
   log.push(`Merged ${p.key} into ${p.into} (${p.how})`);
 }
@@ -79,12 +86,15 @@ for (const [id, r] of Object.entries(docs)) {
     else log.push(`SKIPPED update of ${id}: no version known`);
   }
 }
-// The admin's own hand logs that are now inside an official result (or second copies) go;
+// The admin's own hand logs that are now inside an official result (or second copies) are
+// marked deleted, not erased, so the odds bets were placed at can still be rebuilt;
 // players' logs stay where they are and are simply replaced via ref.
 for (const x of [...pairs.merged, ...pairs.duplicates]) {
   if (!x.key.startsWith('matches/') || conflicts.has(x.key)) continue;
   const id = x.key.slice('matches/'.length), v = versions[x.key];
-  if (v) { writes.push({ op: 'delete', collection: 'matches', doc_id: id, if_version: v }); log.push(`Removed hand log ${id} (${x.into ? 'merged' : 'second copy'})`); }
+  const { id: _id, key: _key, ...m } = handLogs.find((h) => h.key === x.key);
+  const gone = { ...m, deletedAt: now, ...(x.into ? { mergedInto: x.into } : {}) };
+  if (v) { writes.push({ op: 'set', collection: 'matches', doc_id: id, file_path: saveDoc(id, gone), if_version: v }); log.push(`Removed hand log ${id} (${x.into ? 'merged' : 'second copy'})`); }
   else log.push(`SKIPPED removing ${id}: no version known`);
 }
 for (const x of pairs.mislabeled) log.push(`CHECK: hand log ${x.key} "${x.label}" has the tower HP of official "${x.official}". Left in place for the admin to look at.`);

@@ -312,12 +312,12 @@ tr.mine td { background: var(--panel-2); }
         <div class="shared">
           <label class="field">Bookie margin (%)<input type="number" id="setMargin" min="0" max="40" step="0.5"></label>
           <label class="field">Bet Builder margin (%)<input type="number" id="setBuilderMargin" min="0" max="50" step="0.5"></label>
-          <label class="field">Starting coins<input type="number" id="setCoins" min="0" step="50"></label>
+          <label class="field">Starting coins<input type="number" id="setCoins" min="0" step="1"></label>
           <label class="field">Princess Tower max HP<input type="number" id="setPrincess" min="100" step="1"></label>
           <label class="field">King Tower max HP<input type="number" id="setKing" min="100" step="1"></label>
           <label class="field">Minimum stake<input type="number" id="setMinStake" min="1" step="1"></label>
-          <label class="field">Maximum stake<input type="number" id="setMaxStake" min="1" step="10"></label>
-          <label class="field">Maximum return per bet<input type="number" id="setMaxReturn" min="10" step="100"></label>
+          <label class="field">Maximum stake<input type="number" id="setMaxStake" min="1" step="1"></label>
+          <label class="field">Maximum return per bet<input type="number" id="setMaxReturn" min="10" step="1"></label>
           <label class="field">Betting window (minutes after a fixture opens)<input type="number" id="setWindow" min="1" max="120" step="1"></label>
           <label class="field">Fixture expires after (hours)<input type="number" id="setExpiry" min="1" max="168" step="1"></label>
         </div>
@@ -773,13 +773,13 @@ async function put(coll, id, data) {
     const doc = { ...data, id, ...(uid ? { uid } : {}) }, i = list.findIndex((x) => x.id === id);
     if (i >= 0) list[i] = doc; else list.push(doc);
   }
-  changed(); saveLocal(); renderAll();
+  resetBooks(); changed(); saveLocal(); renderAll();
 }
 async function remove(coll, id) {
   if (db) { await db.collection(coll).doc(id).delete(); return; }
   const list = localList(coll), i = list.findIndex((x) => x.id === id);
   if (i >= 0) list.splice(i, 1);
-  changed(); saveLocal(); renderAll();
+  resetBooks(); changed(); saveLocal(); renderAll();
 }
 
 async function connect() {
@@ -803,7 +803,7 @@ async function connect() {
   }
   try { me.skippedJoin = me.admin && sessionStorage.getItem('clashbets-skip') === '1'; } catch { /* ignore */ }
   const pending = new Set(['players', 'matches', 'claims', 'links', 'bets', 'settings', 'house']);
-  const done = (k) => { pending.delete(k); store.ready = pending.size === 0; changed(); if (store.ready) { watchActs(); adminChores(); } renderAll(); };
+  const done = (k) => { pending.delete(k); store.ready = pending.size === 0; resetBooks(); changed(); if (store.ready) { watchActs(); adminChores(); } renderAll(); };
   const onErr = () => { $('#syncState').textContent = 'Lost connection. Reload to retry.'; };
   const watch = (name, key) => db.collection(name).onSnapshot((snap) => {
     store[key] = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
@@ -819,13 +819,14 @@ async function connect() {
 const actsWatched = new Set();
 function watchActs() {
   if (!db) return;
-  const uids = [...store.links.map((l) => l.uid), store.settings.adminUid, me.uid].filter((u) => typeof u === 'string' && /^[A-Za-z0-9_\-.~:@+]{1,200}$/.test(u));
+  const uids = [...store.links.flatMap((l) => [l.uid, ...(Array.isArray(l.former) ? l.former.map((f) => f && f.uid) : [])]), store.settings.adminUid, me.uid]
+    .filter((u) => typeof u === 'string' && /^[A-Za-z0-9_\-.~:@+]{1,200}$/.test(u));
   for (const uid of uids) {
     if (actsWatched.has(uid) || actsWatched.size >= 45) continue;
     actsWatched.add(uid);
     db.collection(`acts/${uid}/items`).onSnapshot((snap) => {
       store.acts[uid] = snap.docs.map((d) => ({ ...d.data(), id: d.id, uid }));
-      changed(); renderAll();
+      resetBooks(); changed(); renderAll();
     }, () => {});
   }
 }
@@ -836,9 +837,15 @@ async function adminChores() {
   if (!me.admin || mode !== 'shared' || !me.uid || choresRunning) return;
   choresRunning = true;
   try {
-    if (store.settings.adminUid !== me.uid) { const { id: _i, ...s } = store.settings; await put('config', 'settings', { ...s, adminUid: me.uid }); }
+    // tell everyone which account is the admin, and start the settings history with what's in force now,
+    // so the first change of settings never rewrites bets already placed
+    const hist = Array.isArray(store.settings.history) ? store.settings.history : [];
+    if (store.settings.adminUid !== me.uid || !hist.length) {
+      const { id: _i, ...s } = store.settings;
+      await put('config', 'settings', { ...s, adminUid: me.uid, history: hist.length ? hist : [settingsBaseline()] });
+    }
     const mine = store.claims.find((c) => c.id === me.uid), L = linkMaps();
-    if (mine && playerById(mine.playerId) && !L.byPlayer[mine.playerId] && !L.byUid[me.uid]) await put('links', mine.playerId, { uid: me.uid, at: nowIso() });
+    if (mine && playerById(mine.playerId) && !L.byPlayer[mine.playerId] && !L.byUid[me.uid]) await put('links', mine.playerId, { uid: me.uid, at: nowIso(), former: formerOf(mine.playerId) });
   } catch { /* shown by put */ }
   choresRunning = false;
 }
@@ -854,46 +861,68 @@ const adminUid = () => store.settings.adminUid || null;
 const isAdminUid = (uid) => !!uid && uid === adminUid();
 const num = (x) => (Number.isFinite(+x) ? +x : 0);
 
+// Player links keep their history, so unlinking a wrongly linked account
+// never rewrites what its records meant while it was linked.
 const linkMaps = memo(() => {
-  const byPlayer = {}, byUid = {};
-  for (const l of store.links) if (playerById(l.id) && typeof l.uid === 'string' && !byUid[l.uid]) { byPlayer[l.id] = l.uid; byUid[l.uid] = l.id; }
-  return { byPlayer, byUid };
+  const byPlayer = {}, byUid = {}, former = {};
+  for (const l of store.links) {
+    if (!playerById(l.id)) continue;
+    if (typeof l.uid === 'string' && !byUid[l.uid]) { byPlayer[l.id] = l.uid; byUid[l.uid] = l.id; }
+    for (const f of Array.isArray(l.former) ? l.former : []) if (f && typeof f.uid === 'string' && typeof f.until === 'string') (former[l.id] ||= []).push(f);
+  }
+  return { byPlayer, byUid, former };
 });
+// Accounts that spoke for a player at moment t: the current one, plus any former one until it was unlinked
+const uidsFor = (pid, t) => {
+  const L = linkMaps(), out = [];
+  if (L.byPlayer[pid]) out.push(L.byPlayer[pid]);
+  for (const f of L.former[pid] || []) if (!t || String(t) <= f.until) out.push(f.uid);
+  return out;
+};
+const speaksFor = (uid, pid, t) => !!uid && uidsFor(pid, t).includes(uid);
+const formerOf = (pid) => { const l = store.links.find((x) => x.id === pid); return l && Array.isArray(l.former) ? l.former : []; };
 const myPlayer = () => (me.uid ? linkMaps().byUid[me.uid] || null : null);
 const myClaim = () => (me.uid ? store.claims.find((c) => c.id === me.uid) || null : null);
 
 // Settings in force at a moment, so changing margins or limits never rewrites old bets
+const settingsBaseline = () => ({ at: '1970-01-01T00:00:00.000Z', values: Object.fromEntries(SETTING_KEYS.map((k) => [k, store.settings[k] ?? DEFAULT_SETTINGS[k]])) });
 function settingsAt(t) {
   let snap = null;
   for (const e of Array.isArray(store.settings.history) ? store.settings.history : []) if (e && typeof e.at === 'string' && e.at <= t && e.values) snap = e.values;
   return { ...DEFAULT_SETTINGS, ...store.settings, ...(snap || {}) };
 }
 
-// Fixtures: a match opened for betting by one of its players (or the admin)
+// Fixtures: a match opened for betting by one of its players (or the admin).
+// The first lock made inside the betting window is the record of what was bet;
+// a lock dated outside the window doesn't count, so a late lock can't pull in late bets.
+const LOCK_GRACE = 60000;
 const fixtureData = memo(() => {
-  const { byUid, byPlayer } = linkMaps(), list = [], byKey = {};
+  const list = [], byKey = {};
   for (const [uid, items] of Object.entries(store.acts)) for (const x of items) {
     if (x.type !== 'fixture' || typeof x.at !== 'string' || !playerById(x.a) || !playerById(x.b) || x.a === x.b) continue;
-    if (!(isAdminUid(uid) || byUid[uid] === x.a || byUid[uid] === x.b)) continue;
+    if (!(isAdminUid(uid) || speaksFor(uid, x.a, x.at) || speaksFor(uid, x.b, x.at))) continue;
     const f = { key: `${uid}~${x.id}`, docId: x.id, owner: uid, a: x.a, b: x.b, at: x.at };
     list.push(f); byKey[f.key] = f;
   }
   for (const f of list) {
-    f.lockers = [...new Set([byPlayer[f.a], byPlayer[f.b], adminUid()].filter(Boolean))];
-    f.locks = [];
-    for (const uid of f.lockers) for (const x of store.acts[uid] || []) if (x.type === 'lock' && x.fx === f.key && typeof x.at === 'string') f.locks.push(x);
-    f.locks.sort((p, q) => p.at.localeCompare(q.at));
     const s = settingsAt(f.at), opened = Date.parse(f.at);
     f.windowEnds = opened + num(s.betWindowMin) * 60000;
-    f.closesAt = Math.min(f.windowEnds, f.locks.length ? Date.parse(f.locks[0].at) : Infinity);
     f.expiresAt = opened + num(s.fixtureHours) * 3600000;
+    f.lockers = [...new Set([...uidsFor(f.a, f.at), ...uidsFor(f.b, f.at), adminUid()].filter(Boolean))];
+    f.locks = [];
+    for (const uid of f.lockers) for (const x of store.acts[uid] || []) if (x.type === 'lock' && x.fx === f.key && typeof x.at === 'string' && Array.isArray(x.bets)) f.locks.push(x);
+    const inWindow = (l) => { const t = Date.parse(l.at); return t >= opened - LOCK_GRACE && t <= f.windowEnds + LOCK_GRACE; };
+    f.primary = f.locks.filter(inWindow).sort((p, q) => p.at.localeCompare(q.at))[0] || null;
+    f.closesAt = Math.min(f.windowEnds, f.primary ? Date.parse(f.primary.at) : Infinity);
   }
   list.sort((p, q) => q.at.localeCompare(p.at));
   return { list, byKey };
 });
 const canLock = (f) => !!me.uid && f.lockers.includes(me.uid) && !readOnly;
+const myLock = (f) => f.locks.find((l) => l.uid === me.uid) || null;
 
-// Results: the admin's are final; anyone else's count once the other player confirms them
+// Results: the admin's are final; anyone else's count once the other player confirms
+// exactly what was logged. One result per fixture: the first one logged.
 const RESULT_FIELDS = ['playerA', 'playerB', 'crownsA', 'crownsB', 'winner', 'overtime', 'dmgA', 'dmgB', 'kingA', 'kingB', 'firstCrown',
   'towersA', 'towersB', 'dealtA', 'dealtB', 'cardsA', 'cardsB', 'notes', 'date', 'fx', 'hp'];
 const HASH_FIELDS = RESULT_FIELDS.filter((k) => !['cardsA', 'cardsB', 'notes'].includes(k));
@@ -906,63 +935,107 @@ function hashOf(m) {
 const okCrowns = (c) => Number.isInteger(c) && c >= 0 && c <= 3;
 const validResult = (m) => !!m && typeof m.playerA === 'string' && typeof m.playerB === 'string' && m.playerA !== m.playerB
   && okCrowns(m.crownsA) && okCrowns(m.crownsB) && ['A', 'B', 'draw'].includes(m.winner) && typeof m.date === 'string';
+const later = (x, y) => (String(x) > String(y) ? x : y);
 
+const isoOr = (...xs) => xs.find((x) => typeof x === 'string') || null;
 const resultData = memo(() => {
-  const { byPlayer } = linkMaps(), final = [], pending = [], adminRefs = new Set(), confirms = [];
+  const all = [], pending = [], refTakenAt = {}, confirms = [];
   for (const m of store.matches) {
     if (!validResult(m)) continue;
-    final.push({ ...m, key: 'm:' + m.id, docId: m.id, finalAt: m.finalAt || m.date, byAdmin: true });
-    if (m.ref) adminRefs.add(m.ref);
+    // Admin results keep their history: an edit files the old version under prev, a delete
+    // stamps deletedAt. The odds a bet saw can always be rebuilt, and nothing is erased.
+    const prev = (Array.isArray(m.prev) ? m.prev : []).filter((p) => validResult(p) && typeof p.finalAt === 'string' && typeof p.until === 'string');
+    const loggedAt = isoOr(m.loggedAt, prev[0] && prev[0].finalAt, m.finalAt, m.date);
+    prev.forEach((p, i) => all.push({ ...p, key: `m:${m.id}#${i}`, docId: m.id, loggedAt, byAdmin: true, old: true }));
+    const rec = { ...m, key: 'm:' + m.id, docId: m.id, finalAt: isoOr(m.finalAt, m.date), loggedAt, byAdmin: true, until: isoOr(m.deletedAt) };
+    all.push(rec);
+    // the admin's version replaces a player's log (and a deleted one still overrules it)
+    if (typeof m.ref === 'string') refTakenAt[m.ref] = [refTakenAt[m.ref], isoOr(prev[0] && prev[0].finalAt, rec.finalAt)].filter(Boolean).sort()[0];
   }
-  for (const [uid, items] of Object.entries(store.acts)) for (const x of items) if (x.type === 'confirm' && typeof x.ref === 'string') confirms.push(x);
+  for (const items of Object.values(store.acts)) for (const x of items) if (x.type === 'confirm' && typeof x.ref === 'string') confirms.push(x);
+  const soon = new Date(Date.now() + 5 * 60000).toISOString();
+  const seen = new Set();
+  // a confirmation only counts for the exact version logged, made after it was logged
+  const goodOk = (c, h, loggedAt) => c.verdict === 'ok' && c.hash === h && c.copy && hashOf(c.copy) === h && typeof c.at === 'string' && c.at >= loggedAt && c.at <= soon;
   for (const [uid, items] of Object.entries(store.acts)) for (const x of items) {
     if (x.type !== 'match' || !validResult(x)) continue;
-    const key = `${uid}~${x.id}`;
-    if (adminRefs.has(key)) continue;
-    const players = [byPlayer[x.playerA], byPlayer[x.playerB]].filter(Boolean), others = players.filter((u) => u !== uid);
+    const key = `${uid}~${x.id}`; seen.add(key);
+    const loggedAt = isoOr(x.loggedAt, x.date);
+    const others = [...uidsFor(x.playerA, loggedAt), ...uidsFor(x.playerB, loggedAt)].filter((u) => u !== uid);
     const mine = confirms.filter((c) => c.ref === key && others.includes(c.uid));
-    const ok = mine.find((c) => c.verdict === 'ok' && c.copy && validResult(c.copy) && hashOf(c.copy) === c.hash);
+    const h = hashOf(pickResult(x));
+    const ok = mine.find((c) => goodOk(c, h, loggedAt));
     if (ok) {
-      final.push({ ...pickResult(ok.copy), id: key, key, docId: x.id, loggedBy: uid, finalAt: typeof ok.at === 'string' ? ok.at : x.date,
-        confirmedBy: ok.uid, editedSince: hashOf(pickResult(x)) !== ok.hash });
-    } else {
-      const dispute = mine.find((c) => c.verdict === 'dispute');
-      pending.push({ ...pickResult(x), id: key, key, docId: x.id, loggedBy: uid, hash: hashOf(pickResult(x)), waitingFor: others,
-        disputedBy: dispute ? dispute.uid : null, noOpponent: !others.length });
+      const rec = { ...pickResult(x), id: key, key, docId: x.id, loggedBy: uid, loggedAt, finalAt: later(loggedAt, ok.at), confirmedBy: ok.uid, until: null };
+      if (refTakenAt[key]) { if (refTakenAt[key] > rec.finalAt) all.push({ ...rec, until: refTakenAt[key], old: true }); } // kept for the odds history only
+      else all.push(rec);
+      continue;
     }
+    if (refTakenAt[key]) continue;
+    const dispute = mine.find((c) => c.verdict === 'dispute');
+    const stale = mine.find((c) => c.verdict === 'ok' && c.hash !== h);
+    pending.push({ ...pickResult(x), id: key, key, docId: x.id, loggedBy: uid, loggedAt, hash: h, waitingFor: [...new Set(others)],
+      disputedBy: dispute ? dispute.uid : null, changedSinceConfirm: !!stale, noOpponent: !others.length });
+  }
+  // A confirmed result whose logger later deleted it doesn't vanish: the confirmer's copy stays,
+  // waiting for the admin, so deleting a result can't turn settled bets into refunds.
+  for (const c of confirms) {
+    if (seen.has(c.ref) || refTakenAt[c.ref] || c.verdict !== 'ok' || !c.copy || !validResult(c.copy) || hashOf(c.copy) !== c.hash) continue;
+    const logger = c.ref.split('~')[0], loggedAt = isoOr(c.loggedAt, c.at);
+    if (!logger || logger === c.uid || !(speaksFor(c.uid, c.copy.playerA, c.at) || speaksFor(c.uid, c.copy.playerB, c.at))) continue;
+    if (!(speaksFor(logger, c.copy.playerA, loggedAt) || speaksFor(logger, c.copy.playerB, loggedAt) || isAdminUid(logger))) continue;
+    seen.add(c.ref);
+    pending.push({ ...pickResult(c.copy), id: c.ref, key: c.ref, docId: null, loggedBy: logger, loggedAt, hash: c.hash, waitingFor: [],
+      confirmedBy: c.uid, deletedByLogger: true, noOpponent: true });
   }
   const byDate = (p, q) => String(p.date).localeCompare(String(q.date));
-  final.sort(byDate); pending.sort(byDate);
-  return { final, pending };
+  const current = all.filter((r) => !r.until).sort(byDate);
+  // one result per fixture: the first logged; later ones are shown as duplicates and don't count
+  const firstFor = {};
+  for (const r of [...current, ...pending].sort((p, q) => String(p.loggedAt).localeCompare(String(q.loggedAt)))) if (r.fx && !firstFor[r.fx]) firstFor[r.fx] = r.key;
+  const dupe = (r) => !!r.fx && firstFor[r.fx] !== r.key;
+  const duplicates = [...current, ...pending].filter(dupe);
+  const dupeKeys = new Set(duplicates.map((r) => r.key));
+  return {
+    final: current.filter((r) => !dupe(r)), pending: pending.filter((r) => !dupe(r)).sort(byDate),
+    duplicates, versions: all.filter((r) => !dupeKeys.has(r.key)),
+  };
 });
 const finalResults = () => resultData().final;
-const resultForFixture = (f) => finalResults().find((r) => r.fx === f.key && samePair(r, f.a, f.b)) || null;
-const pendingForFixture = (f) => resultData().pending.find((r) => r.fx === f.key && samePair(r, f.a, f.b)) || null;
+// only results logged before the fixture expired can settle it, so an expired refund never flips back
+const loggedInTime = (r, f) => Date.parse(r.loggedAt) <= f.expiresAt;
+const resultForFixture = (f) => finalResults().find((r) => r.fx === f.key && samePair(r, f.a, f.b) && loggedInTime(r, f)) || null;
+const pendingForFixture = (f) => resultData().pending.find((r) => r.fx === f.key && samePair(r, f.a, f.b) && loggedInTime(r, f)) || null;
 
-// The odds as they stood when a bet was placed: results final by then, settings in force then
-const BOOK_CACHE = new Map();
+// The odds as they stood when a bet was placed: the result versions in force then, settings in force then
+let BOOK_CACHE = new Map();
+const resetBooks = () => { BOOK_CACHE = new Map(); };
 function bookAt(a, b, cutoff, s) {
-  const res = finalResults().filter((r) => String(r.finalAt) <= cutoff);
-  const k = [a, b, res.length, res.length ? res[res.length - 1].key : '', s.margin, s.builderMargin, s.princessHp, s.kingHp].join('|');
+  const res = resultData().versions.filter((r) => String(r.finalAt) <= cutoff && !(r.until && r.until <= cutoff));
+  const k = [a, b, cutoff, res.length, s.margin, s.builderMargin, s.princessHp, s.kingHp].join('|');
   if (!BOOK_CACHE.has(k)) {
-    if (BOOK_CACHE.size > 400) BOOK_CACHE.clear();
+    if (BOOK_CACHE.size > 400) resetBooks();
     const m = model(a, b, res);
     BOOK_CACHE.set(k, { m, J: jointModel(m, { princess: s.princessHp, king: s.kingHp }) });
   }
   return BOOK_CACHE.get(k);
 }
-// A bet only counts if its price is no better than the book offered (5% leeway for clocks and timing)
+// A bet only counts if its price is no better than the book offered (5% leeway; also checked
+// against the book three minutes earlier, so a few minutes of clock difference can't void it)
 function priceOk(b, s) {
   const legs = b.legs;
   if (legs) {
     if (!Array.isArray(legs) || legs.length < 2 || legs.length > MAX_LEGS) return false;
     if (new Set(legs.map((l) => l && l.market)).size !== legs.length || legs.some((l) => !l || typeof l.market !== 'string' || typeof l.selection !== 'string')) return false;
   } else if (typeof b.market !== 'string' || typeof b.selection !== 'string') return false;
-  const { J } = bookAt(b.a, b.b, b.placedAt, s);
-  const q = jointProb(J, legs || [{ market: b.market, selection: b.selection }]);
-  if (q < 1e-9 || (legs && q < 0.002)) return false;
-  const fair = legs ? price(q, s.builderMargin, 1).decimal : price(q, s.margin).decimal;
-  return b.odds <= fair * 1.05 + 1e-9;
+  const earlier = new Date(Date.parse(b.placedAt) - 3 * 60000).toISOString();
+  return [b.placedAt, earlier].some((cut) => {
+    const { J } = bookAt(b.a, b.b, cut, s);
+    const q = jointProb(J, legs || [{ market: b.market, selection: b.selection }]);
+    if (q < 1e-9 || (legs && q < 0.002)) return false;
+    const fair = legs ? price(q, s.builderMargin, 1).decimal : price(q, s.margin).decimal;
+    return b.odds <= fair * 1.05 + 1e-9;
+  });
 }
 function ownBetProblem(b, s) {
   if (b.bettor !== b.a && b.bettor !== b.b) return '';
@@ -973,53 +1046,60 @@ function ownBetProblem(b, s) {
 
 const CORE = ['id', 'uid', 'bettor', 'fx', 'a', 'b', 'market', 'selection', 'legs', 'odds', 'stake', 'placedAt'];
 const coreEq = (x, y) => JSON.stringify(CORE.map((k) => x[k] ?? null)) === JSON.stringify(CORE.map((k) => y[k] ?? null));
+const betKey = (uid, fx, id) => `${uid}|${fx}|${id}`;
 
-// Every bet, from the frozen copies taken when betting locked (they win) and
-// from each account's own list, with its checked status and payout.
+// Every bet with its checked status and payout. A bet is identified by the
+// account that placed it, its fixture and its id, so nobody can shadow
+// someone else's bet. Once a fixture locks, the lock's frozen copy is the
+// record: changing or deleting your own bet afterwards changes nothing, and
+// a bet that isn't in the lock is refunded. Where the lock and the bettor's
+// own list disagree, the bet is flagged so the admin can look.
 const ledger = memo(() => {
-  const seen = new Map();
+  const out = new Map(), live = new Map();
+  for (const d of store.betDocs) for (const b of Array.isArray(d.list) ? d.list : []) {
+    if (b && typeof b.id === 'string' && typeof b.fx === 'string') live.set(betKey(d.id, b.fx, b.id), { ...b, uid: d.id });
+  }
+  const fx = fixtureData().byKey;
   for (const f of fixtureData().list) {
-    if (!f.locks.length) continue;
-    for (const fb of Array.isArray(f.locks[0].bets) ? f.locks[0].bets : []) {
-      if (!fb || typeof fb.id !== 'string' || fb.fx !== f.key || seen.has(fb.id)) continue;
-      const agree = f.locks.every((l) => Array.isArray(l.bets) && l.bets.some((x) => x && x.id === fb.id && coreEq(x, fb)));
-      seen.set(fb.id, { ...fb, frozen: true, tampered: !agree });
+    if (!f.primary) continue;
+    for (const fb of f.primary.bets) {
+      if (!fb || typeof fb.id !== 'string' || typeof fb.uid !== 'string' || fb.fx !== f.key) continue;
+      const k = betKey(fb.uid, f.key, fb.id);
+      if (out.has(k)) continue;
+      const own = live.get(k);
+      out.set(k, { ...fb, frozen: true, flag: !own ? 'Not in their own bet list' : coreEq(own, fb) ? null : 'Their own copy of this bet is different' });
     }
   }
-  for (const d of store.betDocs) for (const b of Array.isArray(d.list) ? d.list : []) {
-    if (!b || typeof b.id !== 'string' || seen.has(b.id)) continue;
-    seen.set(b.id, { ...b, uid: d.id, frozen: false });
-  }
-  return [...seen.values()].map((b) => ({ ...b, ...judge(b) })).filter((b) => b.status !== 'ignore');
+  for (const [k, b] of live) if (!out.has(k)) out.set(k, { ...b, frozen: false, late: !!(fx[b.fx] && fx[b.fx].primary) });
+  return [...out.values()].map((b) => ({ ...b, ...judge(b) })).filter((b) => b.status !== 'ignore');
 });
 
 function judge(b) {
-  const { byPlayer } = linkMaps();
-  if (!b.bettor || byPlayer[b.bettor] !== b.uid) return { status: 'ignore' }; // not this account's player
   if (!(Number.isInteger(b.stake) && b.stake > 0 && Number.isFinite(b.odds) && b.odds >= 1.01 && typeof b.placedAt === 'string')) return { status: 'ignore' };
+  if (!b.bettor || !speaksFor(b.uid, b.bettor, b.placedAt)) return { status: 'ignore' }; // not this account's player
   const voidIt = (why) => ({ status: 'void', payout: b.stake, why });
   const hv = store.house.voids && store.house.voids[b.id];
   if (hv) return voidIt(`Voided by the admin${hv.reason ? `: ${hv.reason}` : ''}`);
   const f = fixtureData().byKey[b.fx];
   if (!f || !((f.a === b.a && f.b === b.b) || (f.a === b.b && f.b === b.a))) return voidIt('No matching fixture');
-  if (b.tampered) return voidIt('The lock records don\'t agree');
-  if (f.locks.length && !b.frozen) return voidIt('Placed after betting locked');
+  if (b.late) return voidIt('Didn\'t make it into the lock before the draft');
   const placed = Date.parse(b.placedAt);
-  if (!(placed >= Date.parse(f.at) - 60000 && placed <= f.windowEnds)) return voidIt('Placed outside the betting window');
+  if (!(placed >= Date.parse(f.at) - LOCK_GRACE && placed <= f.windowEnds)) return voidIt('Placed outside the betting window');
   const s = settingsAt(b.placedAt);
   if (b.stake < s.minStake || b.stake > s.maxStake || b.stake * b.odds > s.maxReturn + 0.5) return voidIt('Over the stake limits');
   const own = ownBetProblem(b, s); if (own) return voidIt(own);
   if (!priceOk(b, s)) return voidIt('Price check failed');
+  // no lock made inside the window: nothing proves when bets were placed, so they're refunded
+  if (!f.primary) return Date.now() > f.windowEnds + LOCK_GRACE ? voidIt('Betting wasn\'t locked before the game') : { status: 'open', payout: 0 };
   const fin = resultForFixture(f);
   if (fin) {
     const o = orientPair(fin, b.a), r = b.legs ? settleBuilder(b.legs, o) : settleSelection(b.market, b.selection, o);
     if (r === null) return { ...voidIt('A detail this bet needed wasn\'t recorded'), matchKey: fin.key };
     return r ? { status: 'won', payout: Math.round(b.stake * b.odds), matchKey: fin.key } : { status: 'lost', payout: 0, matchKey: fin.key };
   }
-  if (Date.now() > f.expiresAt) return voidIt('Not played in time');
   if (pendingForFixture(f)) return { status: 'pending', payout: 0, why: 'Result waiting for confirmation' };
-  if (Date.now() > f.closesAt) return { status: 'locked', payout: 0 };
-  return { status: 'open', payout: 0 };
+  if (Date.now() > f.expiresAt) return voidIt('Not played in time');
+  return { status: Date.now() > f.closesAt ? 'locked' : 'open', payout: 0 };
 }
 
 const houseGifts = () => (Array.isArray(store.house.gifts) ? store.house.gifts : []).filter((g) => g && typeof g.pid === 'string' && Number.isFinite(g.amount));
@@ -1029,8 +1109,8 @@ function coinsOf(pid) {
   for (const b of ledger()) if (b.bettor === pid) c += (b.payout || 0) - b.stake;
   return c;
 }
-// Betting is open on a fixture until its window ends, someone locks it, or a result is logged
-const isOpen = (f) => Date.now() < f.closesAt && Date.now() < f.expiresAt && !resultForFixture(f) && !pendingForFixture(f);
+// Betting is open from when a fixture opens (a minute's leeway for clocks) until its window ends or it locks
+const isOpen = (f) => Date.now() >= Date.parse(f.at) - LOCK_GRACE && Date.now() < f.closesAt && Date.now() < f.expiresAt && !resultForFixture(f) && !pendingForFixture(f);
 const liveFixtures = () => fixtureData().list.filter((f) => !resultForFixture(f) && Date.now() < f.expiresAt);
 const openFixtureFor = (a, b) => fixtureData().list.find((f) => ((f.a === a && f.b === b) || (f.a === b && f.b === a)) && isOpen(f)) || null;
 
@@ -1132,7 +1212,7 @@ $('#joinYes').onclick = async () => {
   const pid = joinPick; if (!pid || !me.uid) return;
   try {
     await put('claims', me.uid, { playerId: pid, at: nowIso() });
-    if (me.admin) await put('links', pid, { uid: me.uid, at: nowIso() });
+    if (me.admin) await put('links', pid, { uid: me.uid, at: nowIso(), former: formerOf(pid) });
     joinPick = null;
     toast(me.admin ? `You're ${nameOf(pid)}.` : `Asked to be ${nameOf(pid)}. The admin will approve it.`);
     renderAll();
@@ -1164,7 +1244,7 @@ $('#confirmBox').addEventListener('click', async (e) => {
   const r = resultData().pending.find((x) => x.key === key); if (!r) return;
   const verdict = e.target.dataset.confirm ? 'ok' : 'dispute', copy = pickResult(r);
   try {
-    await put(`acts/${me.uid}/items`, 'c_' + safeSeg(key), { type: 'confirm', ref: key, verdict, copy, hash: hashOf(copy), at: nowIso() });
+    await put(`acts/${me.uid}/items`, 'c_' + safeSeg(key), { type: 'confirm', ref: key, verdict, copy, hash: hashOf(copy), loggedAt: r.loggedAt, at: nowIso() });
     toast(verdict === 'ok' ? 'Confirmed. Bets on it are settled.' : 'Disputed. The admin will sort it out.');
   } catch { /* toast shown */ }
 });
@@ -1176,11 +1256,13 @@ function renderFixtures() {
   const pid = myPlayer(), list = liveFixtures(), now = Date.now();
   $('#fixtureList').innerHTML = list.length ? list.map((f) => {
     const pend = pendingForFixture(f), open = isOpen(f);
-    const status = pend ? '<span class="pill warn">Result waiting</span>' : open ? `<span class="pill open">Betting open · closes in ${left(f.closesAt - now)}</span>` : '<span class="pill">Betting closed</span>';
+    const status = pend ? '<span class="pill warn">Result waiting</span>' : open ? `<span class="pill open">Betting open · closes in ${left(f.closesAt - now)}</span>`
+      : f.primary ? '<span class="pill">Betting locked</span>' : now > f.windowEnds + LOCK_GRACE ? '<span class="pill lost">Never locked: bets refunded</span>' : '<span class="pill">Betting closed</span>';
     const nBets = ledger().filter((b) => b.fx === f.key).length;
-    return `<div class="fx-row"><div><b>${esc(nameOf(f.a))}</b> v <b>${esc(nameOf(f.b))}</b> ${status}<div class="small muted">Opened ${ago(now - Date.parse(f.at))} · ${nBets} bet${nBets === 1 ? '' : 's'}</div></div>
+    const hint = open && canLock(f) && !f.primary ? '<div class="small">Tap Lock as the draft starts. If nobody in the match locks it before betting closes, every bet on it is refunded.</div>' : '';
+    return `<div class="fx-row"><div><b>${esc(nameOf(f.a))}</b> v <b>${esc(nameOf(f.b))}</b> ${status}<div class="small muted">Opened ${ago(now - Date.parse(f.at))} · ${nBets} bet${nBets === 1 ? '' : 's'}</div>${hint}</div>
       <div class="row">${open ? `<button class="btn tiny" type="button" data-fxbet="${esc(f.key)}">Bet on this</button>` : ''}
-      ${open && canLock(f) ? `<button class="btn tiny warn" type="button" data-fxlock="${esc(f.key)}">Lock: draft starting</button>` : ''}
+      ${open && canLock(f) && !f.primary ? `<button class="btn tiny warn" type="button" data-fxlock="${esc(f.key)}">Lock: draft starting</button>` : ''}
       ${!pend && (pid || me.admin) && !readOnly ? `<button class="btn tiny" type="button" data-fxlog="${esc(f.key)}">Log result</button>` : ''}</div></div>`;
   }).join('') : '<p class="note">No fixtures open. When you\'re about to play, open one so everyone can bet before the draft starts.</p>';
   const form = $('#fixtureForm');
@@ -1199,22 +1281,35 @@ $('#fixtureForm').addEventListener('submit', async (e) => {
     toast(`Fixture open: ${nameOf(a)} v ${nameOf(b)}. Betting closes in ${num(store.settings.betWindowMin)} minutes or when you lock it.`);
   } catch { /* toast shown */ }
 });
-// Lock: freeze a copy of every bet on the fixture, so nothing can be added, edited or deleted after the draft starts
+// Lock: freeze a copy of every bet on the fixture, so nothing can be added, edited or deleted after the draft starts.
+// Only the first lock made inside the betting window counts, so there's no point locking twice.
+const locking = new Set();
 async function lockFixture(f) {
+  if (f.primary || myLock(f) || !canLock(f) || locking.has(f.key)) return;
   const bets = [];
   for (const d of store.betDocs) for (const b of Array.isArray(d.list) ? d.list : []) if (b && b.fx === f.key) bets.push({ ...b, uid: d.id });
-  await put(`acts/${me.uid}/items`, 'l_' + safeSeg(f.key), { type: 'lock', fx: f.key, a: f.a, b: f.b, at: nowIso(), bets });
+  locking.add(f.key);
+  try { await put(`acts/${me.uid}/items`, 'l_' + safeSeg(f.key), { type: 'lock', fx: f.key, a: f.a, b: f.b, at: nowIso(), bets }); }
+  finally { locking.delete(f.key); }
+}
+// If a player (or the admin) has the page open when the betting window runs out, it locks by itself
+async function autoLock() {
+  const now = Date.now();
+  for (const f of fixtureData().list) {
+    if (f.primary || myLock(f) || !canLock(f) || resultForFixture(f)) continue;
+    if (now >= f.windowEnds - 20000 && now <= f.windowEnds + LOCK_GRACE / 2) { try { await lockFixture(f); } catch { /* toast shown */ } }
+  }
 }
 $('#fixtureList').addEventListener('click', async (e) => {
   const t = e.target.dataset, f = fixtureData().byKey[t.fxbet || t.fxlock || t.fxlog]; if (!f) return;
   if (t.fxbet) { $('#oddsA').value = f.a; $('#oddsB').value = f.b; renderOdds(); $('#markets').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   if (t.fxlock) { try { await lockFixture(f); toast('Betting locked. Good luck in the draft.'); } catch { /* toast shown */ } }
-  if (t.fxlog) { resetForm(); $('#fxSel').value = f.key; applyFixtureToForm(); showTab('tab-log'); }
+  if (t.fxlog) { showTab('tab-log'); resetForm(); $('#fxSel').value = f.key; applyFixtureToForm(); }
 });
 // Refresh countdowns and open/closed states without touching anything the viewer is typing in
 setInterval(() => {
   if (mode === 'connecting') return;
-  changed(); renderMe();
+  changed(); renderMe(); autoLock();
   if (!$('#p-odds').hidden) { renderFixtures(); renderSlip(); }
 }, 15000);
 
@@ -1590,25 +1685,41 @@ $('#matchForm').addEventListener('submit', async (e) => {
     if (need.length) return toast(`Bets on this match need: ${need.join(', ')}. Fill them in, or tick "Genuinely unknown" to refund those bets.`, true);
   }
   if (editing && !$('#when').value) m.date = editing.rec.date;
+  // Two easy slips, each caught once (press Log again to go ahead anyway):
+  // logging a fixture's game without its fixture, and logging a game the other player already logged
+  const sig = `${m.playerA}|${m.playerB}|${m.crownsA}|${m.crownsB}`;
+  if (!editing && submitWarned !== sig) {
+    const liveFx = !f && liveFixtures().find((x) => samePair(m, x.a, x.b) && !pendingForFixture(x) && Date.parse(x.at) <= Date.parse(m.date));
+    if (liveFx) { submitWarned = sig; return toast(`${nameOf(liveFx.a)} v ${nameOf(liveFx.b)} has an open fixture. Pick it above so the bets settle. If this was a different game, press Log again.`, true); }
+    const theirs = resultData().pending.find((r) => samePair(r, m.playerA, m.playerB) && r.loggedBy !== me.uid && Math.abs(Date.parse(r.date) - Date.parse(m.date)) < 3600000);
+    if (theirs) { submitWarned = sig; return toast(`${accountName(theirs.loggedBy)} already logged ${nameOf(m.playerA)} v ${nameOf(m.playerB)}. Confirm theirs at the top instead. If this was another game, press Log again.`, true); }
+  }
+  submitWarned = null;
   try {
-    // logging a fixture also locks its betting, if the logger is allowed to and hasn't yet
-    if (f && canLock(f) && !f.locks.some((l) => l.uid === me.uid)) await lockFixture(f);
     if (me.admin) {
-      // the admin's results are final; editing a player's result stores the admin's version, which replaces theirs
-      const fromPlayer = editing && editing.coll === 'acts';
-      const id = !editing ? newId() : fromPlayer ? 'r_' + safeSeg(editing.rec.key) : editing.docId;
-      const ref = !editing ? null : fromPlayer ? editing.rec.key : editing.rec.ref || null;
-      await put('matches', id, { ...m, loggedBy: editing ? editing.rec.loggedBy || me.uid : me.uid,
-        finalAt: editing && editing.rec.finalAt ? editing.rec.finalAt : nowIso(), ...(ref ? { ref } : {}) });
+      // The admin's results are final. Editing a player's result stores the admin's version, which
+      // replaces theirs; editing the admin's own files the old version under prev.
+      const fromPlayer = editing && editing.coll === 'acts', now = nowIso();
+      if (!editing) await put('matches', newId(), { ...m, loggedBy: me.uid, loggedAt: now, finalAt: now });
+      else if (fromPlayer) await put('matches', 'r_' + safeSeg(editing.rec.key), { ...m, ref: editing.rec.key, loggedBy: editing.rec.loggedBy, loggedAt: editing.rec.loggedAt || now, finalAt: now });
+      else {
+        const raw = store.matches.find((x) => x.id === editing.docId); if (!raw) return toast('That result has gone. Reload and try again.', true);
+        const { id: _id, prev, ...old } = raw;
+        await put('matches', editing.docId, { ...old, ...m, edited: true, loggedAt: editing.rec.loggedAt || now, finalAt: now,
+          prev: [...(Array.isArray(prev) ? prev : []), { ...pickResult(old), finalAt: old.finalAt || old.date, until: now }].slice(-20) });
+      }
       toast(editing ? 'Result updated.' : 'Result logged. Bets on it are settled.');
     } else {
       const id = editing ? editing.docId : 'm_' + newId();
-      await put(`acts/${me.uid}/items`, id, { ...m, type: 'match', loggedAt: nowIso() });
-      toast(editing ? 'Result updated. The other player needs to confirm it again.' : 'Result logged. It counts once the other player confirms it.');
+      await put(`acts/${me.uid}/items`, id, { ...m, type: 'match', loggedAt: editing ? editing.rec.loggedAt || nowIso() : nowIso() });
+      const opp = m.playerA === myPlayer() ? m.playerB : m.playerA;
+      toast(editing ? 'Result updated. The other player needs to confirm it again.'
+        : !linkMaps().byPlayer[opp] ? `Logged. Nobody's linked to ${nameOf(opp)} yet, so the admin has to confirm it.` : 'Result logged. It counts once the other player confirms it.');
     }
     resetForm();
   } catch { /* toast shown */ }
 });
+let submitWarned = null;
 function editResult(r) {
   resetForm();
   editing = r.byAdmin ? { coll: 'matches', docId: r.docId, rec: r } : { coll: 'acts', docId: r.docId, rec: r };
@@ -1637,19 +1748,25 @@ function editResult(r) {
 // ======================================================================
 const missing = (m) => m.overtime == null || m.dmgA == null || m.dmgB == null || m.firstCrown == null || m.kingA == null || m.kingB == null;
 let confirmDelete = null;
+// Same two players and the same tower HP left, whichever way round each was logged
 function isDuplicate(r, all) {
-  return all.some((x) => x.key !== r.key && samePair(x, r.playerA, r.playerB) && x.dealtA != null && r.dealtA != null
-    && JSON.stringify([x.towersA, x.towersB].map((t) => t && [t.left, t.king, t.right])) === JSON.stringify([r.towersA, r.towersB].map((t) => t && [t.left, t.king, t.right])));
+  const tw = (t) => t && [t.left, t.king, t.right].join(',');
+  const sides = (m, a) => (m.playerA === a ? [tw(m.towersA), tw(m.towersB)] : [tw(m.towersB), tw(m.towersA)]).join('|');
+  return all.some((x) => x.key !== r.key && samePair(x, r.playerA, r.playerB) && x.towersA && r.towersA && sides(x, r.playerA) === sides(r, r.playerA));
 }
 function resultStatus(r) {
-  if (!r.pending) return r.source === 'api' ? '<span class="pill won">Official</span>' : r.byAdmin ? '<span class="pill won">Final</span>' : `<span class="pill won">Confirmed by ${esc(accountName(r.confirmedBy))}</span>${r.editedSince ? ' <span class="pill warn">Edited after confirming</span>' : ''}`;
+  if (r.dup) return '<span class="pill lost">Second log of the same fixture: doesn\'t count</span>';
+  if (!r.pending) return r.source === 'api' ? `<span class="pill won">Official${r.edited ? ', edited by the admin' : ''}</span>` : r.byAdmin ? '<span class="pill won">Final</span>' : `<span class="pill won">Confirmed by ${esc(accountName(r.confirmedBy))}</span>`;
+  if (r.deletedByLogger) return `<span class="pill lost">Deleted by ${esc(accountName(r.loggedBy))} after ${esc(accountName(r.confirmedBy))} confirmed it. Waiting for the admin</span>`;
   if (r.disputedBy) return `<span class="pill lost">Disputed by ${esc(accountName(r.disputedBy))}</span>`;
+  if (r.changedSinceConfirm) return `<span class="pill warn">Changed after it was confirmed. Waiting for ${esc(r.waitingFor.map(accountName).join(' or ') || 'the admin')}</span>`;
   if (r.noOpponent) return '<span class="pill warn">Waiting for the admin</span>';
   return `<span class="pill warn">Waiting for ${esc(r.waitingFor.map(accountName).join(' or '))}</span>`;
 }
-const canChange = (r) => !readOnly && (me.admin ? true : r.pending && r.loggedBy === me.uid);
+const canChange = (r) => !readOnly && (me.admin ? true : r.pending && r.loggedBy === me.uid && !!r.docId);
 function renderHistory() {
-  const R = resultData(), all = [...R.final, ...R.pending.map((p) => ({ ...p, pending: true }))].sort((x, y) => String(y.date).localeCompare(String(x.date)));
+  const R = resultData(), all = [...R.final, ...R.pending.map((p) => ({ ...p, pending: true })), ...R.duplicates.map((d) => ({ ...d, dup: true, pending: !d.byAdmin && !d.confirmedBy }))]
+    .sort((x, y) => String(y.date).localeCompare(String(x.date)));
   $('#history').innerHTML = all.length ? `<table><thead><tr><th>When</th><th>Result</th><th>Status</th><th class="c">OT</th><th class="c">1k before OT</th><th class="c">King woke</th><th class="c">Damage</th><th>First tower</th><th>Logged by</th><th></th></tr></thead><tbody>${all.map((m) => `
     <tr><td class="small">${fmtDate(m.date)}${missing(m) ? '<br><span class="pill warn">missing info</span>' : ''}${me.admin && isDuplicate(m, all) ? '<br><span class="pill lost">Possible duplicate</span>' : ''}</td>
     <td><span class="${m.winner === 'A' ? 'wa' : ''}">${esc(nameOf(m.playerA))}</span> <b class="num">${m.crownsA}–${m.crownsB}</b> <span class="${m.winner === 'B' ? 'wb' : ''}">${esc(nameOf(m.playerB))}</span>
@@ -1664,16 +1781,28 @@ function renderHistory() {
 }
 $('#history').addEventListener('click', async (e) => {
   const key = e.target.dataset.edit || e.target.dataset.del; if (!key) return;
-  const R = resultData(), r = R.final.find((x) => x.key === key) || (R.pending.find((x) => x.key === key) && { ...R.pending.find((x) => x.key === key), pending: true });
+  const R = resultData(), d = R.duplicates.find((x) => x.key === key);
+  const r = R.final.find((x) => x.key === key) || (R.pending.find((x) => x.key === key) && { ...R.pending.find((x) => x.key === key), pending: true })
+    || (d && { ...d, dup: true, pending: !d.byAdmin && !d.confirmedBy });
   if (!r || !canChange(r)) return;
   if (e.target.dataset.edit) { editResult(r); return; }
   if (confirmDelete !== key) { confirmDelete = key; renderHistory(); return; }
   confirmDelete = null;
-  try {
-    if (r.byAdmin) await remove('matches', r.docId); else await remove(`acts/${r.loggedBy}/items`, r.docId);
-    toast('Result deleted.');
-  } catch { toast('Couldn\'t delete that result.', true); }
+  try { await deleteResult(r); toast('Result deleted.'); } catch { toast('Couldn\'t delete that result.', true); }
 });
+// The admin's results are only marked deleted, so the odds bets were placed at can still be checked.
+// The admin deletes a player's log with a deleted admin version, which overrules it and any copy a
+// confirmation left behind. A player can only delete their own unconfirmed log.
+async function deleteResult(r) {
+  const now = nowIso();
+  if (r.byAdmin) {
+    const raw = store.matches.find((x) => x.id === r.docId); if (!raw) return;
+    const { id: _id, ...old } = raw;
+    await put('matches', r.docId, { ...old, deletedAt: now });
+  } else if (me.admin) {
+    await put('matches', 'r_' + safeSeg(r.key), { ...pickResult(r), ref: r.key, loggedBy: r.loggedBy, loggedAt: r.loggedAt || now, finalAt: now, deletedAt: now });
+  } else if (r.docId) await remove(`acts/${r.loggedBy}/items`, r.docId);
+}
 
 // ======================================================================
 //  Bets, leaderboard and the house log
@@ -1827,23 +1956,29 @@ $('#p-admin').addEventListener('click', async (e) => {
     if (t.approve) {
       const c = store.claims.find((x) => x.id === t.approve); if (!c) return;
       if (linkMaps().byPlayer[c.playerId]) return toast(`${nameOf(c.playerId)} is already linked. Unlink them first.`, true);
-      await put('links', c.playerId, { uid: c.id, at: nowIso() }); toast(`Approved: they're now ${nameOf(c.playerId)}.`);
+      await put('links', c.playerId, { uid: c.id, at: nowIso(), former: formerOf(c.playerId) }); toast(`Approved: they're now ${nameOf(c.playerId)}.`);
     }
     if (t.reject) { await remove('claims', t.reject); toast('Request rejected.'); }
     if (t.aconfirm) {
       const r = resultData().pending.find((x) => x.key === t.aconfirm); if (!r) return;
-      await put('matches', 'r_' + safeSeg(r.key), { ...pickResult(r), ref: r.key, loggedBy: r.loggedBy, finalAt: nowIso() }); toast('Result confirmed. Bets on it are settled.');
+      const now = nowIso();
+      await put('matches', 'r_' + safeSeg(r.key), { ...pickResult(r), ref: r.key, loggedBy: r.loggedBy, loggedAt: r.loggedAt || now, finalAt: now }); toast('Result confirmed. Bets on it are settled.');
     }
     if (t.areject) {
       const r = resultData().pending.find((x) => x.key === t.areject); if (!r) return;
-      await remove(`acts/${r.loggedBy}/items`, r.docId); toast('Result deleted.');
+      await deleteResult(r); toast('Result deleted.');
     }
     if (t.rename) { renaming = t.rename; renderAdmin(); }
     if (t.release) {
       if (confirmRelease !== t.release) { confirmRelease = t.release; renderAdmin(); return; }
       confirmRelease = null;
-      const uid = linkMaps().byPlayer[t.release];
-      await remove('links', t.release); if (uid) await remove('claims', uid).catch(() => {});
+      // the link is kept with its history, so what the account did while linked still counts
+      const link = store.links.find((l) => l.id === t.release), uid = link && typeof link.uid === 'string' ? link.uid : null;
+      if (uid) {
+        const now = nowIso();
+        await put('links', t.release, { uid: null, at: now, former: [...formerOf(t.release), { uid, from: link.at || null, until: now }].slice(-20) });
+        await remove('claims', uid).catch(() => {});
+      }
       toast('Unlinked. That account can ask for a player again.');
     }
     if (t.remove) {
@@ -1887,7 +2022,9 @@ $('#settingsForm').addEventListener('submit', async (e) => {
   };
   if (values.minStake > values.maxStake) return toast('Minimum stake can\'t be above the maximum.', true);
   // keep a dated copy, so bets are always judged by the settings in force when they were placed
-  const history = [...(Array.isArray(store.settings.history) ? store.settings.history : []), { at: nowIso(), values }].slice(-200);
+  const hist = Array.isArray(store.settings.history) && store.settings.history.length ? store.settings.history : [settingsBaseline()];
+  const history = [...hist, { at: nowIso(), values }];
+  if (history.length > 200) history.splice(1, history.length - 200); // never drop the baseline
   try { await put('config', 'settings', { ...values, adminUid: store.settings.adminUid || me.uid, history }); toast('Settings saved.'); } catch { /* toast shown */ }
 });
 

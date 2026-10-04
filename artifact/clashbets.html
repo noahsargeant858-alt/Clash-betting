@@ -140,6 +140,14 @@ ul.leg-list { margin: 4px 0 0; padding: 0; list-style: none; font-size: 13px; co
   #p-odds { padding-bottom: 64px; }
 }
 
+/* ---------- fixtures, confirmations, house log ---------- */
+.fx-row, .confirm-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.fx-row > div:first-child, .confirm-row > span:first-child { min-width: 0; }
+#confirmBox { border-color: var(--gold); }
+#fixtureForm select { min-width: 0; }
+ul.house-log { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 14px; }
+.inline-text { width: 120px; padding: 5px 8px; }
+
 /* ---------- accounts ---------- */
 .me-chip { display: inline-flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 99px; padding: 3px 4px 3px 12px; font-size: 13px; font-weight: 700; }
 .me-chip .coins { color: var(--gold); }
@@ -191,10 +199,12 @@ tr.mine td { background: var(--panel-2); }
   <div id="readonlyBanner" class="banner" hidden>You're in view-only mode, so you can see the odds but can't pick a player, bet or log matches. Ask the admin to invite your email as an Editor, then open the link from that invite.</div>
   <div id="noIdBanner" class="banner" hidden>This view doesn't know who you are, so you can browse the odds but can't pick a player or bet.</div>
 
+  <section id="confirmBox" class="panel stack" hidden aria-live="polite"></section>
+
   <!-- JOIN: pick your player -->
   <section id="join" class="panel stack join" hidden>
     <h2>Who are you?</h2>
-    <p class="note">Pick your player. Your account gets linked to them, so your bets and coins are yours. Only the admin can change it afterwards, so pick carefully.</p>
+    <p class="note">Pick your player. The admin approves it, then your bets and coins are yours. Only the admin can change it afterwards.</p>
     <p id="joinMsg" class="banner" hidden></p>
     <div class="join-grid" id="joinGrid"></div>
     <div class="row" id="joinConfirm" hidden>
@@ -206,6 +216,16 @@ tr.mine td { background: var(--panel-2); }
 
   <!-- ODDS -->
   <section role="tabpanel" id="p-odds" aria-labelledby="tab-odds">
+    <div class="panel stack" id="fixturesPanel">
+      <div class="row" style="justify-content:space-between"><h2>Fixtures</h2><span class="small muted">Bets are taken from when a fixture opens until the draft starts.</span></div>
+      <div id="fixtureList" class="stack"></div>
+      <form id="fixtureForm" class="row" hidden>
+        <select id="newFxA" aria-label="First player"></select>
+        <span id="newFxAName" class="small"></span>
+        <select id="newFxB" aria-label="Opponent"></select>
+        <button class="btn gold" type="submit">Open fixture</button>
+      </form>
+    </div>
     <div class="panel versus">
       <select id="oddsA" class="a" aria-label="Left player"></select>
       <span class="vs">VS</span>
@@ -225,6 +245,7 @@ tr.mine td { background: var(--panel-2); }
         <h2 id="formTitle">Log a triple draft</h2>
         <label class="check small"><input type="checkbox" id="trackTowers" checked> Record tower HP (crowns fill in automatically)</label>
       </div>
+      <label class="field">Fixture<select id="fxSel"></select></label>
       <div class="score-head num" aria-live="polite"><span class="a" id="crA">0</span><span class="dash">–</span><span class="b" id="crB">0</span></div>
       <div id="liveLine" class="muted"></div>
       <div class="sides" id="sides"></div>
@@ -235,6 +256,7 @@ tr.mine td { background: var(--panel-2); }
         <label class="field">When (blank means just now)<input type="datetime-local" id="when"></label>
       </div>
       <label class="field">How it went<textarea id="notes" rows="2" placeholder="e.g. sek drafted three spells and no win condition"></textarea></label>
+      <label class="check small"><input type="checkbox" id="unknownOk"> Some details are genuinely unknown (bets that need them get refunded)</label>
       <div class="row">
         <button class="btn gold" type="submit" id="saveMatch">Log match</button>
         <button class="btn" type="button" id="cancelEdit" hidden>Cancel edit</button>
@@ -256,6 +278,7 @@ tr.mine td { background: var(--panel-2); }
     <div class="panel stack"><h2>Coin leaderboard</h2><div class="scroll" id="leaderboard"></div></div>
     <div class="panel stack" id="myBetsPanel" hidden><h2>My bets</h2><div class="scroll" id="myBets"></div></div>
     <div class="panel stack"><h2>Everyone's bets</h2><div class="scroll" id="betList"></div></div>
+    <div class="panel stack"><h2>House log</h2><p class="note">Every coin gift and voided bet from the admin, for everyone to see.</p><div id="houseLog"></div></div>
   </section>
 
   <!-- STATS -->
@@ -272,9 +295,11 @@ tr.mine td { background: var(--panel-2); }
 
   <!-- ADMIN (owner only) -->
   <section role="tabpanel" id="p-admin" aria-labelledby="tab-admin" hidden>
+    <div class="panel stack"><h2>Player link requests</h2><div id="linkRequests" class="stack"></div></div>
+    <div class="panel stack"><h2>Results to confirm</h2><p class="note">A player's result counts once their opponent confirms it. You can confirm anything here, for example when the opponent hasn't joined yet.</p><div id="adminResults" class="stack"></div></div>
     <div class="panel stack">
       <h2>Squad and accounts</h2>
-      <p class="note">See who has linked their account to each player. Release a link if someone picked the wrong player, and give or take coins with a positive or negative number.</p>
+      <p class="note">Unlink an account if someone got the wrong player. Coin gifts need a reason and show up in the house log.</p>
       <form id="addPlayer" class="row">
         <input type="text" id="newName" placeholder="Name" maxlength="30" aria-label="New player name">
         <button class="btn gold" type="submit">Add player</button>
@@ -290,8 +315,13 @@ tr.mine td { background: var(--panel-2); }
           <label class="field">Starting coins<input type="number" id="setCoins" min="0" step="50"></label>
           <label class="field">Princess Tower max HP<input type="number" id="setPrincess" min="100" step="1"></label>
           <label class="field">King Tower max HP<input type="number" id="setKing" min="100" step="1"></label>
+          <label class="field">Minimum stake<input type="number" id="setMinStake" min="1" step="1"></label>
+          <label class="field">Maximum stake<input type="number" id="setMaxStake" min="1" step="10"></label>
+          <label class="field">Maximum return per bet<input type="number" id="setMaxReturn" min="10" step="100"></label>
+          <label class="field">Betting window (minutes after a fixture opens)<input type="number" id="setWindow" min="1" max="120" step="1"></label>
+          <label class="field">Fixture expires after (hours)<input type="number" id="setExpiry" min="1" max="168" step="1"></label>
         </div>
-        <label class="check"><input type="checkbox" id="setOwnBets"> Let players bet on matches they're playing in</label>
+        <label class="check"><input type="checkbox" id="setOwnBets"> Let players back themselves to win their own matches (nothing else on their own games)</label>
         <p class="small muted" style="margin:0">Tower HP defaults to level 11 (3,052 Princess and 4,824 King). Check a fresh tower in your next draft and change these if they don't match. Margin is the house edge: at 5%, every market's chances add up to about 105%. Bet Builders carry their own, higher margin because combos are harder to price.</p>
         <div><button class="btn" type="submit">Save settings</button></div>
       </form>
@@ -309,7 +339,7 @@ tr.mine td { background: var(--panel-2); }
 //  triple-draft prior and moves toward the logged data as games pile up.
 // ======================================================================
 const PRIORS = {
-  drawRate: 0.04, drawStrength: 25, winStrength: 6, h2hStrength: 4,
+  drawRate: 0.01, drawStrength: 25, winStrength: 6, h2hStrength: 4,
   winnerCrowns: { 0: 0.02, 1: 0.28, 2: 0.35, 3: 0.35 }, crownStrength: 10, playerCrownStrength: 8,
   loserCrowns: { 0: { 0: 1 }, 1: { 0: 0.9, 1: 0.1 }, 2: { 0: 0.6, 1: 0.35, 2: 0.05 }, 3: { 0: 0.55, 1: 0.35, 2: 0.1 } },
   loserStrength: 8, drawCrowns: { 0: 0.55, 1: 0.4, 2: 0.05 },
@@ -658,28 +688,6 @@ function price(p, margin, keep = 0.5) {
   return { p, decimal: Math.round((1 + best.x) * 100) / 100, fractional: best.f };
 }
 
-function buildMarkets(a, b) {
-  const m = model(a, b, store.matches), margin = store.settings.margin;
-  const J = jointModel(m, { princess: store.settings.princessHp, king: store.settings.kingHp });
-  const nA = nameOf(a), nB = nameOf(b);
-  const markets = marketDefs(nA, nB).map((def) => {
-    let sels;
-    if (def.key === 'score') {
-      sels = m.scores.filter((s) => s.p >= 0.004).sort((x, y) => y.p - x.p).map((s) => ({ key: `${s.winner}:${s.a}-${s.b}`,
-        label: s.winner === 'D' ? `Draw ${s.a}–${s.b}` : `${s.winner === 'A' ? nA : nB} ${s.a}–${s.b}${s.a === s.b ? ' on tiebreaker' : ''}`, ...price(s.p, margin) }));
-    } else if (def.key.startsWith('dealt')) {
-      const side = def.key.slice(5), dm = m['dealt' + side];
-      const line = Math.max(500, Math.round(dm.mu / 500) * 500);
-      const pOver = jointProb(J, [{ market: def.key, selection: 'over:' + line }]);
-      def.name = `${side === 'A' ? nA : nB}: total tower damage`;
-      def.blurb = `Damage dealt to the other player's towers over the whole game. Expected about ${fmtN(dm.mu)}.`;
-      sels = [{ key: 'over:' + line, label: `${fmtN(line)} or more`, ...price(pOver, margin) }, { key: 'under:' + line, label: `Under ${fmtN(line)}`, ...price(1 - pOver, margin) }];
-    } else sels = def.sels.map((s) => ({ key: s.key, label: s.label, ...price(jointProb(J, [{ market: def.key, selection: s.key }]), margin) }));
-    return { key: def.key, name: def.name, blurb: def.blurb, sels };
-  });
-  return { a, b, nA, nB, sample: m.sample, h2h: m.h2h, markets, model: m, J };
-}
-
 function settleSelection(market, sel, o) {
   if (market === 'score') {
     const r = /^([ABD]):(\d)-(\d)$/.exec(sel);
@@ -707,50 +715,72 @@ function settleBuilder(legs, o) {
 
 // ======================================================================
 //  Data. Shared store (db capability), with an on-device practice copy as
-//  fallback. Paths:
-//    players/<id>, config/settings   admin (page owner) writes
-//    matches/<id>                     anyone with edit access writes
-//    claims/<account>                 { playerId, at }: which player you are
-//    bets/<account>                   { list: [...] }: your bets, only you write
+//  fallback. The database rules decide who may write where:
+//    players, links, matches, config/*   the admin (page owner) only
+//    claims/<account>                    your own request to be a player
+//    bets/<account>                      your own bets
+//    acts/<account>/items/<id>           your own fixtures, bet locks,
+//                                        logged results and confirmations
+//  Nobody can write into anyone else's records, and every number on screen
+//  (results, coins, bet outcomes) is recomputed from these records on each
+//  viewer's device, with every bet re-checked before it counts.
 // ======================================================================
-const DEFAULT_SETTINGS = { margin: 5, builderMargin: 10, startingCoins: 1000, princessHp: 3052, kingHp: 4824, ownMatchBets: false };
-const store = { players: [], matches: [], claims: [], betDocs: [], settings: { ...DEFAULT_SETTINGS }, ready: false };
+const DEFAULT_SETTINGS = { margin: 5, builderMargin: 10, startingCoins: 1000, princessHp: 3052, kingHp: 4824, ownMatchBets: false,
+  minStake: 5, maxStake: 250, maxReturn: 5000, betWindowMin: 5, fixtureHours: 24, history: [] };
+const SETTING_KEYS = ['margin', 'builderMargin', 'startingCoins', 'princessHp', 'kingHp', 'ownMatchBets', 'minStake', 'maxStake', 'maxReturn', 'betWindowMin', 'fixtureHours'];
+const store = { players: [], matches: [], claims: [], links: [], betDocs: [], acts: {}, house: { gifts: [], voids: {} }, settings: { ...DEFAULT_SETTINGS }, ready: false };
 const me = { uid: null, admin: false, skippedJoin: false };
-let db = null, userApi = null, mode = 'connecting', readOnly = false;
-const LOCAL_KEY = 'clashbets-local-v2';
+let db = null, userApi = null, mode = 'connecting', readOnly = false, gen = 0;
+const LOCAL_KEY = 'clashbets-local-v3';
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-const listKey = (coll) => (coll === 'bets' ? 'betDocs' : coll);
+const nowIso = () => new Date().toISOString();
+const safeSeg = (s) => String(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_');
+const changed = () => { gen++; };
 
 function loadLocal() {
   try { return JSON.parse(localStorage.getItem(LOCAL_KEY)) || {}; } catch { return {}; }
 }
 function saveLocal() {
-  try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ players: store.players, matches: store.matches, claims: store.claims, betDocs: store.betDocs, settings: store.settings })); } catch { /* storage blocked */ }
+  try {
+    const { players, matches, claims, links, betDocs, acts, house, settings } = store;
+    localStorage.setItem(LOCAL_KEY, JSON.stringify({ players, matches, claims, links, betDocs, acts, house, settings }));
+  } catch { /* storage blocked */ }
+}
+function localList(coll) {
+  if (coll.startsWith('acts/')) { const uid = coll.split('/')[1]; return (store.acts[uid] ||= []); }
+  return store[coll === 'bets' ? 'betDocs' : coll];
 }
 
 async function put(coll, id, data) {
-  if (readOnly) { toast('Your account can\'t save here. Ask the admin for Editor access.', true); throw new Error('read only'); }
+  if (readOnly) { toast('You\'re view-only, so this can\'t be saved. Ask the admin to invite you as an Editor.', true); throw new Error('read only'); }
   if (db) {
     try { await db.collection(coll).doc(id).set(data); }
     catch (e) {
-      if (e && e.code === 'invalid_argument' && ['matches', 'claims', 'bets'].includes(coll)) {
-        readOnly = true; $('#readonlyBanner').hidden = false; toast('Your account can\'t save here. Ask the admin for Editor access.', true);
+      if (e && e.code === 'invalid_argument' && /^(claims|bets|acts)/.test(coll)) {
+        readOnly = true; $('#readonlyBanner').hidden = false; toast('You\'re view-only, so this can\'t be saved. Ask the admin to invite you as an Editor.', true);
       } else if (e && e.code === 'invalid_argument') toast('Only the admin can change that.', true);
-      else if (e && e.code === 'quota_exceeded') toast('Storage is full. The admin needs to delete some old matches.', true);
+      else if (e && e.code === 'quota_exceeded') toast('Storage is full. The admin needs to delete some old records.', true);
       else toast('Couldn\'t save. Check your connection and try again.', true);
       throw e;
     }
     return;
   }
-  if (coll === 'config') store.settings = { ...DEFAULT_SETTINGS, ...data };
-  else { const list = store[listKey(coll)]; const i = list.findIndex((x) => x.id === id); const doc = { id, ...data }; if (i >= 0) list[i] = doc; else list.push(doc); }
-  sortMatches(); saveLocal(); renderAll();
+  if (coll === 'config') {
+    if (id === 'settings') store.settings = { ...DEFAULT_SETTINGS, ...data };
+    else store.house = { gifts: [], voids: {}, ...data };
+  } else {
+    const list = localList(coll), uid = coll.startsWith('acts/') ? coll.split('/')[1] : null;
+    const doc = { ...data, id, ...(uid ? { uid } : {}) }, i = list.findIndex((x) => x.id === id);
+    if (i >= 0) list[i] = doc; else list.push(doc);
+  }
+  changed(); saveLocal(); renderAll();
 }
 async function remove(coll, id) {
   if (db) { await db.collection(coll).doc(id).delete(); return; }
-  store[listKey(coll)] = store[listKey(coll)].filter((x) => x.id !== id); saveLocal(); renderAll();
+  const list = localList(coll), i = list.findIndex((x) => x.id === id);
+  if (i >= 0) list.splice(i, 1);
+  changed(); saveLocal(); renderAll();
 }
-const sortMatches = () => store.matches.sort((x, y) => (x.date || '').localeCompare(y.date || ''));
 
 async function connect() {
   let api = null;
@@ -758,11 +788,11 @@ async function connect() {
   if (!api) {
     mode = 'local'; me.uid = 'local'; me.admin = true;
     const l = loadLocal();
-    Object.assign(store, { players: l.players || [], matches: l.matches || [], claims: l.claims || [], betDocs: l.betDocs || [], settings: { ...DEFAULT_SETTINGS, ...(l.settings || {}) }, ready: true });
+    Object.assign(store, { players: l.players || [], matches: l.matches || [], claims: l.claims || [], links: l.links || [], betDocs: l.betDocs || [],
+      acts: l.acts || {}, house: { gifts: [], voids: {}, ...(l.house || {}) }, settings: { ...DEFAULT_SETTINGS, ...(l.settings || {}), adminUid: 'local' }, ready: true });
     if (!store.players.length) store.players = ['Nizz', 'triqqi', 'zac', 'jamie', 'sek', 'caleb', 'rishi', 'rocky', 'ethan', 'johnny'].map((name, i) => ({ id: newId() + i, name, addedAt: new Date(Date.now() + i).toISOString() }));
-    sortMatches();
     $('#localBanner').hidden = false;
-    renderAll(); return;
+    changed(); renderAll(); return;
   }
   db = api; mode = 'shared';
   try { userApi = await window.claude.use('user'); } catch { userApi = null; }
@@ -772,55 +802,237 @@ async function connect() {
     if (!me.admin && (await userApi.can('data.write')) === false) { readOnly = true; $('#readonlyBanner').hidden = false; }
   }
   try { me.skippedJoin = me.admin && sessionStorage.getItem('clashbets-skip') === '1'; } catch { /* ignore */ }
-  const pending = new Set(['players', 'matches', 'claims', 'bets']);
+  const pending = new Set(['players', 'matches', 'claims', 'links', 'bets', 'settings', 'house']);
+  const done = (k) => { pending.delete(k); store.ready = pending.size === 0; changed(); if (store.ready) { watchActs(); adminChores(); } renderAll(); };
   const onErr = () => { $('#syncState').textContent = 'Lost connection. Reload to retry.'; };
-  for (const coll of [...pending]) {
-    db.collection(coll).onSnapshot((snap) => {
-      store[listKey(coll)] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      if (coll === 'matches') sortMatches();
-      if (coll === 'players') store.players.sort((x, y) => (x.addedAt || '').localeCompare(y.addedAt || ''));
-      pending.delete(coll); store.ready = pending.size === 0;
-      renderAll();
-    }, onErr);
+  const watch = (name, key) => db.collection(name).onSnapshot((snap) => {
+    store[key] = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    if (name === 'players') store.players.sort((x, y) => String(x.addedAt || '').localeCompare(String(y.addedAt || '')));
+    done(name);
+  }, onErr);
+  watch('players', 'players'); watch('matches', 'matches'); watch('claims', 'claims'); watch('links', 'links'); watch('bets', 'betDocs');
+  db.doc('config/settings').onSnapshot((d) => { store.settings = { ...DEFAULT_SETTINGS, ...(d.exists ? d.data() : {}) }; done('settings'); }, onErr);
+  db.doc('config/house').onSnapshot((d) => { store.house = { gifts: [], voids: {}, ...(d.exists ? d.data() : {}) }; done('house'); }, onErr);
+}
+
+// Each linked account (and the admin) keeps their fixtures, locks, results and confirmations in their own folder
+const actsWatched = new Set();
+function watchActs() {
+  if (!db) return;
+  const uids = [...store.links.map((l) => l.uid), store.settings.adminUid, me.uid].filter((u) => typeof u === 'string' && /^[A-Za-z0-9_\-.~:@+]{1,200}$/.test(u));
+  for (const uid of uids) {
+    if (actsWatched.has(uid) || actsWatched.size >= 45) continue;
+    actsWatched.add(uid);
+    db.collection(`acts/${uid}/items`).onSnapshot((snap) => {
+      store.acts[uid] = snap.docs.map((d) => ({ ...d.data(), id: d.id, uid }));
+      changed(); renderAll();
+    }, () => {});
   }
-  db.doc('config/settings').onSnapshot((d) => { store.settings = { ...DEFAULT_SETTINGS, ...(d.exists ? d.data() : {}) }; renderAll(); }, onErr);
+}
+
+// One-off admin housekeeping: tell everyone which account is the admin, and link the admin's own pick
+let choresRunning = false;
+async function adminChores() {
+  if (!me.admin || mode !== 'shared' || !me.uid || choresRunning) return;
+  choresRunning = true;
+  try {
+    if (store.settings.adminUid !== me.uid) { const { id: _i, ...s } = store.settings; await put('config', 'settings', { ...s, adminUid: me.uid }); }
+    const mine = store.claims.find((c) => c.id === me.uid), L = linkMaps();
+    if (mine && playerById(mine.playerId) && !L.byPlayer[mine.playerId] && !L.byUid[me.uid]) await put('links', mine.playerId, { uid: me.uid, at: nowIso() });
+  } catch { /* shown by put */ }
+  choresRunning = false;
 }
 
 // ======================================================================
-//  Derived state. Who-is-who, bet results and coin balances are computed
-//  from the stored records, never stored themselves, so two people saving
-//  at once can't corrupt anyone's balance.
+//  Derived state, recomputed whenever the data changes
 // ======================================================================
+const memo = (fn) => { let g = -1, v; return () => (g === gen ? v : ((g = gen), (v = fn()))); };
 const playerById = (id) => store.players.find((p) => p.id === id);
 const nameOf = (id) => (playerById(id) || {}).name || 'Removed player';
 const samePair = (m, a, b) => (m.playerA === a && m.playerB === b) || (m.playerA === b && m.playerB === a);
+const adminUid = () => store.settings.adminUid || null;
+const isAdminUid = (uid) => !!uid && uid === adminUid();
+const num = (x) => (Number.isFinite(+x) ? +x : 0);
 
-// First account to claim a player keeps them; later claims on the same player don't count
-function claimMaps() {
+const linkMaps = memo(() => {
   const byPlayer = {}, byUid = {};
-  for (const c of [...store.claims].sort((x, y) => (x.at || '').localeCompare(y.at || ''))) {
-    if (!playerById(c.playerId) || byPlayer[c.playerId] || byUid[c.id]) continue;
-    byPlayer[c.playerId] = c.id; byUid[c.id] = c.playerId;
-  }
+  for (const l of store.links) if (playerById(l.id) && typeof l.uid === 'string' && !byUid[l.uid]) { byPlayer[l.id] = l.uid; byUid[l.uid] = l.id; }
   return { byPlayer, byUid };
-}
-const myPlayer = () => (me.uid ? claimMaps().byUid[me.uid] || null : null);
-const allBets = () => store.betDocs.flatMap((d) => (Array.isArray(d.list) ? d.list : []).map((b) => ({ ...b, uid: d.id })));
+});
+const myPlayer = () => (me.uid ? linkMaps().byUid[me.uid] || null : null);
+const myClaim = () => (me.uid ? store.claims.find((c) => c.id === me.uid) || null : null);
 
-function betState(bet) {
-  if (bet.voided) return { status: 'void', payout: bet.stake };
-  const m = store.matches.find((x) => samePair(x, bet.a, bet.b) && x.date >= bet.placedAt);
-  if (!m) return { status: 'open', payout: 0 };
-  const o = orientPair(m, bet.a);
-  const r = bet.legs ? settleBuilder(bet.legs, o) : settleSelection(bet.market, bet.selection, o);
-  if (r === null) return { status: 'void', payout: bet.stake, matchId: m.id };
-  return r ? { status: 'won', payout: Math.round(bet.stake * bet.odds), matchId: m.id } : { status: 'lost', payout: 0, matchId: m.id };
+// Settings in force at a moment, so changing margins or limits never rewrites old bets
+function settingsAt(t) {
+  let snap = null;
+  for (const e of Array.isArray(store.settings.history) ? store.settings.history : []) if (e && typeof e.at === 'string' && e.at <= t && e.values) snap = e.values;
+  return { ...DEFAULT_SETTINGS, ...store.settings, ...(snap || {}) };
 }
-function coinsOf(id) {
-  let c = store.settings.startingCoins + ((playerById(id) || {}).adjust || 0);
-  for (const b of allBets()) if (b.bettor === id) { c -= b.stake; c += betState(b).payout; }
+
+// Fixtures: a match opened for betting by one of its players (or the admin)
+const fixtureData = memo(() => {
+  const { byUid, byPlayer } = linkMaps(), list = [], byKey = {};
+  for (const [uid, items] of Object.entries(store.acts)) for (const x of items) {
+    if (x.type !== 'fixture' || typeof x.at !== 'string' || !playerById(x.a) || !playerById(x.b) || x.a === x.b) continue;
+    if (!(isAdminUid(uid) || byUid[uid] === x.a || byUid[uid] === x.b)) continue;
+    const f = { key: `${uid}~${x.id}`, docId: x.id, owner: uid, a: x.a, b: x.b, at: x.at };
+    list.push(f); byKey[f.key] = f;
+  }
+  for (const f of list) {
+    f.lockers = [...new Set([byPlayer[f.a], byPlayer[f.b], adminUid()].filter(Boolean))];
+    f.locks = [];
+    for (const uid of f.lockers) for (const x of store.acts[uid] || []) if (x.type === 'lock' && x.fx === f.key && typeof x.at === 'string') f.locks.push(x);
+    f.locks.sort((p, q) => p.at.localeCompare(q.at));
+    const s = settingsAt(f.at), opened = Date.parse(f.at);
+    f.windowEnds = opened + num(s.betWindowMin) * 60000;
+    f.closesAt = Math.min(f.windowEnds, f.locks.length ? Date.parse(f.locks[0].at) : Infinity);
+    f.expiresAt = opened + num(s.fixtureHours) * 3600000;
+  }
+  list.sort((p, q) => q.at.localeCompare(p.at));
+  return { list, byKey };
+});
+const canLock = (f) => !!me.uid && f.lockers.includes(me.uid) && !readOnly;
+
+// Results: the admin's are final; anyone else's count once the other player confirms them
+const RESULT_FIELDS = ['playerA', 'playerB', 'crownsA', 'crownsB', 'winner', 'overtime', 'dmgA', 'dmgB', 'kingA', 'kingB', 'firstCrown',
+  'towersA', 'towersB', 'dealtA', 'dealtB', 'cardsA', 'cardsB', 'notes', 'date', 'fx', 'hp'];
+const HASH_FIELDS = RESULT_FIELDS.filter((k) => !['cardsA', 'cardsB', 'notes'].includes(k));
+const pickResult = (m) => Object.fromEntries(RESULT_FIELDS.map((k) => [k, m[k] ?? null]));
+function hashOf(m) {
+  const s = JSON.stringify(HASH_FIELDS.map((k) => m[k] ?? null));
+  let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+const okCrowns = (c) => Number.isInteger(c) && c >= 0 && c <= 3;
+const validResult = (m) => !!m && typeof m.playerA === 'string' && typeof m.playerB === 'string' && m.playerA !== m.playerB
+  && okCrowns(m.crownsA) && okCrowns(m.crownsB) && ['A', 'B', 'draw'].includes(m.winner) && typeof m.date === 'string';
+
+const resultData = memo(() => {
+  const { byPlayer } = linkMaps(), final = [], pending = [], adminRefs = new Set(), confirms = [];
+  for (const m of store.matches) {
+    if (!validResult(m)) continue;
+    final.push({ ...m, key: 'm:' + m.id, docId: m.id, finalAt: m.finalAt || m.date, byAdmin: true });
+    if (m.ref) adminRefs.add(m.ref);
+  }
+  for (const [uid, items] of Object.entries(store.acts)) for (const x of items) if (x.type === 'confirm' && typeof x.ref === 'string') confirms.push(x);
+  for (const [uid, items] of Object.entries(store.acts)) for (const x of items) {
+    if (x.type !== 'match' || !validResult(x)) continue;
+    const key = `${uid}~${x.id}`;
+    if (adminRefs.has(key)) continue;
+    const players = [byPlayer[x.playerA], byPlayer[x.playerB]].filter(Boolean), others = players.filter((u) => u !== uid);
+    const mine = confirms.filter((c) => c.ref === key && others.includes(c.uid));
+    const ok = mine.find((c) => c.verdict === 'ok' && c.copy && validResult(c.copy) && hashOf(c.copy) === c.hash);
+    if (ok) {
+      final.push({ ...pickResult(ok.copy), id: key, key, docId: x.id, loggedBy: uid, finalAt: typeof ok.at === 'string' ? ok.at : x.date,
+        confirmedBy: ok.uid, editedSince: hashOf(pickResult(x)) !== ok.hash });
+    } else {
+      const dispute = mine.find((c) => c.verdict === 'dispute');
+      pending.push({ ...pickResult(x), id: key, key, docId: x.id, loggedBy: uid, hash: hashOf(pickResult(x)), waitingFor: others,
+        disputedBy: dispute ? dispute.uid : null, noOpponent: !others.length });
+    }
+  }
+  const byDate = (p, q) => String(p.date).localeCompare(String(q.date));
+  final.sort(byDate); pending.sort(byDate);
+  return { final, pending };
+});
+const finalResults = () => resultData().final;
+const resultForFixture = (f) => finalResults().find((r) => r.fx === f.key && samePair(r, f.a, f.b)) || null;
+const pendingForFixture = (f) => resultData().pending.find((r) => r.fx === f.key && samePair(r, f.a, f.b)) || null;
+
+// The odds as they stood when a bet was placed: results final by then, settings in force then
+const BOOK_CACHE = new Map();
+function bookAt(a, b, cutoff, s) {
+  const res = finalResults().filter((r) => String(r.finalAt) <= cutoff);
+  const k = [a, b, res.length, res.length ? res[res.length - 1].key : '', s.margin, s.builderMargin, s.princessHp, s.kingHp].join('|');
+  if (!BOOK_CACHE.has(k)) {
+    if (BOOK_CACHE.size > 400) BOOK_CACHE.clear();
+    const m = model(a, b, res);
+    BOOK_CACHE.set(k, { m, J: jointModel(m, { princess: s.princessHp, king: s.kingHp }) });
+  }
+  return BOOK_CACHE.get(k);
+}
+// A bet only counts if its price is no better than the book offered (5% leeway for clocks and timing)
+function priceOk(b, s) {
+  const legs = b.legs;
+  if (legs) {
+    if (!Array.isArray(legs) || legs.length < 2 || legs.length > MAX_LEGS) return false;
+    if (new Set(legs.map((l) => l && l.market)).size !== legs.length || legs.some((l) => !l || typeof l.market !== 'string' || typeof l.selection !== 'string')) return false;
+  } else if (typeof b.market !== 'string' || typeof b.selection !== 'string') return false;
+  const { J } = bookAt(b.a, b.b, b.placedAt, s);
+  const q = jointProb(J, legs || [{ market: b.market, selection: b.selection }]);
+  if (q < 1e-9 || (legs && q < 0.002)) return false;
+  const fair = legs ? price(q, s.builderMargin, 1).decimal : price(q, s.margin).decimal;
+  return b.odds <= fair * 1.05 + 1e-9;
+}
+function ownBetProblem(b, s) {
+  if (b.bettor !== b.a && b.bettor !== b.b) return '';
+  if (!s.ownMatchBets) return 'Bet on their own match';
+  if (b.legs || b.market !== 'result' || b.selection !== (b.bettor === b.a ? 'A' : 'B')) return 'On your own match you can only back yourself to win';
+  return '';
+}
+
+const CORE = ['id', 'uid', 'bettor', 'fx', 'a', 'b', 'market', 'selection', 'legs', 'odds', 'stake', 'placedAt'];
+const coreEq = (x, y) => JSON.stringify(CORE.map((k) => x[k] ?? null)) === JSON.stringify(CORE.map((k) => y[k] ?? null));
+
+// Every bet, from the frozen copies taken when betting locked (they win) and
+// from each account's own list, with its checked status and payout.
+const ledger = memo(() => {
+  const seen = new Map();
+  for (const f of fixtureData().list) {
+    if (!f.locks.length) continue;
+    for (const fb of Array.isArray(f.locks[0].bets) ? f.locks[0].bets : []) {
+      if (!fb || typeof fb.id !== 'string' || fb.fx !== f.key || seen.has(fb.id)) continue;
+      const agree = f.locks.every((l) => Array.isArray(l.bets) && l.bets.some((x) => x && x.id === fb.id && coreEq(x, fb)));
+      seen.set(fb.id, { ...fb, frozen: true, tampered: !agree });
+    }
+  }
+  for (const d of store.betDocs) for (const b of Array.isArray(d.list) ? d.list : []) {
+    if (!b || typeof b.id !== 'string' || seen.has(b.id)) continue;
+    seen.set(b.id, { ...b, uid: d.id, frozen: false });
+  }
+  return [...seen.values()].map((b) => ({ ...b, ...judge(b) })).filter((b) => b.status !== 'ignore');
+});
+
+function judge(b) {
+  const { byPlayer } = linkMaps();
+  if (!b.bettor || byPlayer[b.bettor] !== b.uid) return { status: 'ignore' }; // not this account's player
+  if (!(Number.isInteger(b.stake) && b.stake > 0 && Number.isFinite(b.odds) && b.odds >= 1.01 && typeof b.placedAt === 'string')) return { status: 'ignore' };
+  const voidIt = (why) => ({ status: 'void', payout: b.stake, why });
+  const hv = store.house.voids && store.house.voids[b.id];
+  if (hv) return voidIt(`Voided by the admin${hv.reason ? `: ${hv.reason}` : ''}`);
+  const f = fixtureData().byKey[b.fx];
+  if (!f || !((f.a === b.a && f.b === b.b) || (f.a === b.b && f.b === b.a))) return voidIt('No matching fixture');
+  if (b.tampered) return voidIt('The lock records don\'t agree');
+  if (f.locks.length && !b.frozen) return voidIt('Placed after betting locked');
+  const placed = Date.parse(b.placedAt);
+  if (!(placed >= Date.parse(f.at) - 60000 && placed <= f.windowEnds)) return voidIt('Placed outside the betting window');
+  const s = settingsAt(b.placedAt);
+  if (b.stake < s.minStake || b.stake > s.maxStake || b.stake * b.odds > s.maxReturn + 0.5) return voidIt('Over the stake limits');
+  const own = ownBetProblem(b, s); if (own) return voidIt(own);
+  if (!priceOk(b, s)) return voidIt('Price check failed');
+  const fin = resultForFixture(f);
+  if (fin) {
+    const o = orientPair(fin, b.a), r = b.legs ? settleBuilder(b.legs, o) : settleSelection(b.market, b.selection, o);
+    if (r === null) return { ...voidIt('A detail this bet needed wasn\'t recorded'), matchKey: fin.key };
+    return r ? { status: 'won', payout: Math.round(b.stake * b.odds), matchKey: fin.key } : { status: 'lost', payout: 0, matchKey: fin.key };
+  }
+  if (Date.now() > f.expiresAt) return voidIt('Not played in time');
+  if (pendingForFixture(f)) return { status: 'pending', payout: 0, why: 'Result waiting for confirmation' };
+  if (Date.now() > f.closesAt) return { status: 'locked', payout: 0 };
+  return { status: 'open', payout: 0 };
+}
+
+const houseGifts = () => (Array.isArray(store.house.gifts) ? store.house.gifts : []).filter((g) => g && typeof g.pid === 'string' && Number.isFinite(g.amount));
+function coinsOf(pid) {
+  let c = num(store.settings.startingCoins);
+  for (const g of houseGifts()) if (g.pid === pid) c += g.amount;
+  for (const b of ledger()) if (b.bettor === pid) c += (b.payout || 0) - b.stake;
   return c;
 }
+// Betting is open on a fixture until its window ends, someone locks it, or a result is logged
+const isOpen = (f) => Date.now() < f.closesAt && Date.now() < f.expiresAt && !resultForFixture(f) && !pendingForFixture(f);
+const liveFixtures = () => fixtureData().list.filter((f) => !resultForFixture(f) && Date.now() < f.expiresAt);
+const openFixtureFor = (a, b) => fixtureData().list.find((f) => ((f.a === a && f.b === b) || (f.a === b && f.b === a)) && isOpen(f)) || null;
 
 // ======================================================================
 //  UI helpers
@@ -831,9 +1043,11 @@ const fmtN = (n) => Math.round(n).toLocaleString('en-GB');
 const fmtDate = (iso) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const pct = (n, d) => (d ? Math.round((n / d) * 100) + '%' : '<span class="na">–</span>');
 const yn = (v) => (v == null ? '<span class="na">?</span>' : v ? 'Yes' : 'No');
+const ago = (ms) => { const m = Math.round(ms / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
+const left = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 function toast(msg, bad) {
   const t = $('#toast'); t.textContent = msg; t.className = 'show' + (bad ? ' bad' : '');
-  clearTimeout(toast.t); toast.t = setTimeout(() => { t.className = ''; }, 3600);
+  clearTimeout(toast.t); toast.t = setTimeout(() => { t.className = ''; }, 4200);
 }
 function fillPlayers(sel, fallbackIndex) {
   const prev = sel.value;
@@ -841,6 +1055,7 @@ function fillPlayers(sel, fallbackIndex) {
   if (store.players.some((p) => p.id === prev)) sel.value = prev;
   else if (store.players[fallbackIndex]) sel.value = store.players[fallbackIndex].id;
 }
+const accountName = (uid) => { const pid = linkMaps().byUid[uid]; return pid ? nameOf(pid) : isAdminUid(uid) ? 'the admin' : 'someone'; };
 
 // tabs
 const tabs = [...document.querySelectorAll('[role="tab"]')];
@@ -851,12 +1066,12 @@ function showTab(id) {
 }
 $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('[role="tab"]'); if (b) showTab(b.id); });
 
-// The join screen shows when a signed-in account hasn't linked a player yet
+// The join screen shows when a signed-in account isn't linked to a player yet
 const needsJoin = () => mode !== 'connecting' && store.ready && !!me.uid && !readOnly && !myPlayer() && !me.skippedJoin;
 
 function renderAll() {
   const st = $('#syncState');
-  st.textContent = mode === 'shared' ? (store.ready ? `Live · ${store.matches.length} matches logged` : 'Loading…') : mode === 'local' ? 'Practice copy' : 'Connecting…';
+  st.textContent = mode === 'shared' ? (store.ready ? `Live · ${finalResults().length} results` : 'Loading…') : mode === 'local' ? 'Practice copy' : 'Connecting…';
   renderMe();
   const joining = needsJoin();
   $('#join').hidden = !joining; $('#tabs').hidden = joining;
@@ -864,12 +1079,13 @@ function renderAll() {
   $('#tab-admin').hidden = !me.admin;
   for (const t of tabs) document.getElementById(t.getAttribute('aria-controls')).hidden = joining || t.getAttribute('aria-selected') !== 'true';
   if (joining || $('#p-odds').hidden) $('#slipBar').hidden = true;
+  renderConfirmBox(joining);
   if (joining) { renderJoin(); return; }
   if (mode !== 'connecting' && !me.admin && $('#tab-admin').getAttribute('aria-selected') === 'true') { showTab('tab-odds'); return; }
 
-  for (const [a, b] of [['#oddsA', '#oddsB'], ['#muA', '#muB']]) { fillPlayers($(a), 0); fillPlayers($(b), 1); }
+  for (const [a, b] of [['#oddsA', '#oddsB'], ['#muA', '#muB'], ['#newFxA', '#newFxB']]) { fillPlayers($(a), 0); fillPlayers($(b), 1); }
   fillPlayers($('#whoA'), 0); fillPlayers($('#whoB'), 1);
-  const cards = new Set(BASE_CARDS); store.matches.forEach((m) => [...(m.cardsA || []), ...(m.cardsB || [])].forEach((c) => cards.add(c)));
+  const cards = new Set(BASE_CARDS); finalResults().forEach((m) => [...(m.cardsA || []), ...(m.cardsB || [])].forEach((c) => cards.add(c)));
   $('#cardNames').innerHTML = [...cards].sort().map((c) => `<option value="${esc(c)}">`).join('');
   const sel = tabs.find((t) => t.getAttribute('aria-selected') === 'true').id;
   if (sel === 'tab-odds') renderOdds();
@@ -877,7 +1093,7 @@ function renderAll() {
   if (sel === 'tab-bets') renderBets();
   if (sel === 'tab-stats') renderStats();
   if (sel === 'tab-admin') renderAdmin();
-  if (sel === 'tab-log') updateLive();
+  if (sel === 'tab-log') { fillFixtureSelect(); updateLive(); }
 }
 
 function renderMe() {
@@ -888,21 +1104,22 @@ function renderMe() {
 }
 
 // ======================================================================
-//  Join: link your account to a player
+//  Join: ask to be linked to a player; the admin approves
 // ======================================================================
-let joinPick = null, joinTried = null;
+let joinPick = null;
 function renderJoin() {
-  const { byPlayer } = claimMaps();
-  const msg = $('#joinMsg');
-  msg.hidden = !joinTried;
-  if (joinTried) msg.textContent = `Someone else grabbed ${nameOf(joinTried)} first. If that's wrong, tell the admin.`;
+  const { byPlayer } = linkMaps(), claim = myClaim(), msg = $('#joinMsg');
+  const waiting = claim && playerById(claim.playerId) && !byPlayer[claim.playerId];
+  msg.hidden = !claim;
+  if (claim) msg.textContent = waiting ? `You've asked to be ${nameOf(claim.playerId)}. Waiting for the admin to approve it. You can change your pick below.`
+    : `${nameOf(claim.playerId)} went to someone else. Pick again, or tell the admin if that's wrong.`;
   if (joinPick && byPlayer[joinPick]) joinPick = null;
   $('#joinGrid').innerHTML = store.players.map((p) => {
-    const taken = !!byPlayer[p.id];
-    return `<button type="button" data-join="${esc(p.id)}" ${taken ? 'disabled' : ''} aria-pressed="${joinPick === p.id}">${esc(p.name)}<small>${taken ? 'Taken' : 'Available'}</small></button>`;
+    const taken = !!byPlayer[p.id], asked = claim && claim.playerId === p.id;
+    return `<button type="button" data-join="${esc(p.id)}" ${taken ? 'disabled' : ''} aria-pressed="${joinPick === p.id}">${esc(p.name)}<small>${taken ? 'Taken' : asked ? 'Requested' : 'Available'}</small></button>`;
   }).join('') || '<div class="empty">The admin hasn\'t added any players yet.</div>';
   $('#joinConfirm').hidden = !joinPick;
-  if (joinPick) $('#joinYes').textContent = `Yes, I'm ${nameOf(joinPick)}`;
+  if (joinPick) $('#joinYes').textContent = me.admin ? `I'm ${nameOf(joinPick)}` : `Ask to be ${nameOf(joinPick)}`;
   $('#joinAdminSkip').hidden = !me.admin;
 }
 $('#joinGrid').addEventListener('click', (e) => {
@@ -914,29 +1131,132 @@ $('#joinSkip').onclick = () => { me.skippedJoin = true; try { sessionStorage.set
 $('#joinYes').onclick = async () => {
   const pid = joinPick; if (!pid || !me.uid) return;
   try {
-    await put('claims', me.uid, { playerId: pid, at: new Date().toISOString() });
-    joinTried = pid; joinPick = null;
-    toast(`Welcome, ${nameOf(pid)}. You start with ${fmtN(coinsOf(pid))} coins.`);
+    await put('claims', me.uid, { playerId: pid, at: nowIso() });
+    if (me.admin) await put('links', pid, { uid: me.uid, at: nowIso() });
+    joinPick = null;
+    toast(me.admin ? `You're ${nameOf(pid)}.` : `Asked to be ${nameOf(pid)}. The admin will approve it.`);
     renderAll();
   } catch { /* toast shown */ }
 };
 
 // ======================================================================
+//  Results waiting for the viewer's confirmation
+// ======================================================================
+const myConfirm = (key) => (store.acts[me.uid] || []).find((x) => x.type === 'confirm' && x.ref === key) || null;
+function resultLine(r) {
+  const tb = r.crownsA === r.crownsB && r.winner !== 'draw' ? ` (${nameOf(r.winner === 'A' ? r.playerA : r.playerB)} on tiebreaker)` : r.winner === 'draw' ? ' (draw)' : '';
+  const bits = [`OT ${r.overtime == null ? '?' : r.overtime ? 'yes' : 'no'}`];
+  if (r.firstCrown) bits.push(`first tower ${r.firstCrown === 'none' ? 'nobody' : nameOf(r.firstCrown === 'A' ? r.playerA : r.playerB)}`);
+  if (r.dealtA != null) bits.push(`damage ${fmtN(r.dealtA)} / ${fmtN(r.dealtB)}`);
+  return `${esc(nameOf(r.playerA))} <b class="num">${r.crownsA}–${r.crownsB}</b> ${esc(nameOf(r.playerB))}${tb} · <span class="small muted">${esc(bits.join(' · '))}</span>`;
+}
+function renderConfirmBox(joining) {
+  const box = $('#confirmBox');
+  const mine = joining || !me.uid ? [] : resultData().pending.filter((r) => r.waitingFor.includes(me.uid) && (() => { const c = myConfirm(r.key); return !c || c.hash !== r.hash; })());
+  box.hidden = !mine.length;
+  if (!mine.length) return;
+  box.innerHTML = `<h3>Is this right?</h3><p class="note">A result only counts once the other player confirms it.</p>${mine.map((r) => `
+    <div class="confirm-row"><span>${esc(accountName(r.loggedBy))} logged ${resultLine(r)}</span>
+    <span class="row"><button class="btn gold tiny" type="button" data-confirm="${esc(r.key)}">Confirm</button><button class="btn tiny warn" type="button" data-dispute="${esc(r.key)}">Dispute</button></span></div>`).join('')}`;
+}
+$('#confirmBox').addEventListener('click', async (e) => {
+  const key = e.target.dataset.confirm || e.target.dataset.dispute; if (!key) return;
+  const r = resultData().pending.find((x) => x.key === key); if (!r) return;
+  const verdict = e.target.dataset.confirm ? 'ok' : 'dispute', copy = pickResult(r);
+  try {
+    await put(`acts/${me.uid}/items`, 'c_' + safeSeg(key), { type: 'confirm', ref: key, verdict, copy, hash: hashOf(copy), at: nowIso() });
+    toast(verdict === 'ok' ? 'Confirmed. Bets on it are settled.' : 'Disputed. The admin will sort it out.');
+  } catch { /* toast shown */ }
+});
+
+// ======================================================================
+//  Fixtures
+// ======================================================================
+function renderFixtures() {
+  const pid = myPlayer(), list = liveFixtures(), now = Date.now();
+  $('#fixtureList').innerHTML = list.length ? list.map((f) => {
+    const pend = pendingForFixture(f), open = isOpen(f);
+    const status = pend ? '<span class="pill warn">Result waiting</span>' : open ? `<span class="pill open">Betting open · closes in ${left(f.closesAt - now)}</span>` : '<span class="pill">Betting closed</span>';
+    const nBets = ledger().filter((b) => b.fx === f.key).length;
+    return `<div class="fx-row"><div><b>${esc(nameOf(f.a))}</b> v <b>${esc(nameOf(f.b))}</b> ${status}<div class="small muted">Opened ${ago(now - Date.parse(f.at))} · ${nBets} bet${nBets === 1 ? '' : 's'}</div></div>
+      <div class="row">${open ? `<button class="btn tiny" type="button" data-fxbet="${esc(f.key)}">Bet on this</button>` : ''}
+      ${open && canLock(f) ? `<button class="btn tiny warn" type="button" data-fxlock="${esc(f.key)}">Lock: draft starting</button>` : ''}
+      ${!pend && (pid || me.admin) && !readOnly ? `<button class="btn tiny" type="button" data-fxlog="${esc(f.key)}">Log result</button>` : ''}</div></div>`;
+  }).join('') : '<p class="note">No fixtures open. When you\'re about to play, open one so everyone can bet before the draft starts.</p>';
+  const form = $('#fixtureForm');
+  form.hidden = readOnly || !(pid || me.admin);
+  $('#newFxA').hidden = !me.admin;
+  $('#newFxAName').textContent = me.admin ? 'v' : pid ? `I'm about to play` : '';
+}
+$('#fixtureForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const a = me.admin ? $('#newFxA').value : myPlayer(), b = $('#newFxB').value;
+  if (!a || !b || a === b) return toast('Pick two different players.', true);
+  if (liveFixtures().some((f) => (f.a === a && f.b === b) || (f.a === b && f.b === a))) return toast('There\'s already a live fixture for those two.', true);
+  try {
+    await put(`acts/${me.uid}/items`, 'f_' + newId(), { type: 'fixture', a, b, at: nowIso() });
+    $('#oddsA').value = a; $('#oddsB').value = b;
+    toast(`Fixture open: ${nameOf(a)} v ${nameOf(b)}. Betting closes in ${num(store.settings.betWindowMin)} minutes or when you lock it.`);
+  } catch { /* toast shown */ }
+});
+// Lock: freeze a copy of every bet on the fixture, so nothing can be added, edited or deleted after the draft starts
+async function lockFixture(f) {
+  const bets = [];
+  for (const d of store.betDocs) for (const b of Array.isArray(d.list) ? d.list : []) if (b && b.fx === f.key) bets.push({ ...b, uid: d.id });
+  await put(`acts/${me.uid}/items`, 'l_' + safeSeg(f.key), { type: 'lock', fx: f.key, a: f.a, b: f.b, at: nowIso(), bets });
+}
+$('#fixtureList').addEventListener('click', async (e) => {
+  const t = e.target.dataset, f = fixtureData().byKey[t.fxbet || t.fxlock || t.fxlog]; if (!f) return;
+  if (t.fxbet) { $('#oddsA').value = f.a; $('#oddsB').value = f.b; renderOdds(); $('#markets').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  if (t.fxlock) { try { await lockFixture(f); toast('Betting locked. Good luck in the draft.'); } catch { /* toast shown */ } }
+  if (t.fxlog) { resetForm(); $('#fxSel').value = f.key; applyFixtureToForm(); showTab('tab-log'); }
+});
+// Refresh countdowns and open/closed states without touching anything the viewer is typing in
+setInterval(() => {
+  if (mode === 'connecting') return;
+  changed(); renderMe();
+  if (!$('#p-odds').hidden) { renderFixtures(); renderSlip(); }
+}, 15000);
+
+// ======================================================================
 //  Odds board + bet slip
 // ======================================================================
-let slip = null, slipStake = 50, slipMode = 'single', currentBook = null;
+let slip = null, slipStake = 50, slipMode = 'single', currentBook = null, builderShown = null;
 let builder = { a: null, b: null, legs: [] };
 const MAX_LEGS = 6;
 const isLeg = (mk, sel) => builder.legs.some((l) => l.market === mk && l.selection === sel);
+function buildMarkets(a, b) {
+  const s = store.settings, m = model(a, b, finalResults());
+  const J = jointModel(m, { princess: s.princessHp, king: s.kingHp });
+  const nA = nameOf(a), nB = nameOf(b);
+  const markets = marketDefs(nA, nB).map((def) => {
+    let sels;
+    if (def.key === 'score') {
+      sels = m.scores.filter((x) => x.p >= 0.004).sort((x, y) => y.p - x.p).map((x) => ({ key: `${x.winner}:${x.a}-${x.b}`,
+        label: x.winner === 'D' ? `Draw ${x.a}–${x.b}` : `${x.winner === 'A' ? nA : nB} ${x.a}–${x.b}${x.a === x.b ? ' on tiebreaker' : ''}`, ...price(x.p, s.margin) }));
+    } else if (def.key.startsWith('dealt')) {
+      const side = def.key.slice(5), dm = m['dealt' + side];
+      const line = Math.max(500, Math.round(dm.mu / 500) * 500);
+      const pOver = jointProb(J, [{ market: def.key, selection: 'over:' + line }]);
+      def.name = `${side === 'A' ? nA : nB}: total tower damage`;
+      def.blurb = `Damage dealt to the other player's towers over the whole game. Expected about ${fmtN(dm.mu)}.`;
+      sels = [{ key: 'over:' + line, label: `${fmtN(line)} or more`, ...price(pOver, s.margin) }, { key: 'under:' + line, label: `Under ${fmtN(line)}`, ...price(1 - pOver, s.margin) }];
+    } else sels = def.sels.map((x) => ({ key: x.key, label: x.label, ...price(jointProb(J, [{ market: def.key, selection: x.key }]), s.margin) }));
+    return { key: def.key, name: def.name, blurb: def.blurb, sels };
+  });
+  return { a, b, nA, nB, sample: m.sample, h2h: m.h2h, markets, model: m, J };
+}
 function renderOdds() {
+  renderFixtures();
   const a = $('#oddsA').value, b = $('#oddsB').value, box = $('#markets');
   if (builder.legs.length && (builder.a !== a || builder.b !== b)) builder = { a, b, legs: [] };
-  if (store.players.length < 2) { box.innerHTML = '<div class="panel empty">Add at least two players on the Squad tab and the book opens.</div>'; $('#oddsMeta').textContent = ''; renderSlip(); return; }
+  if (store.players.length < 2) { box.innerHTML = '<div class="panel empty">The admin needs to add at least two players before the book opens.</div>'; $('#oddsMeta').textContent = ''; renderSlip(); return; }
   if (a === b) { box.innerHTML = '<div class="panel empty">Pick two different players. Nobody bets on a mirror match.</div>'; $('#oddsMeta').textContent = ''; renderSlip(); return; }
   const book = buildMarkets(a, b), s = book.sample;
   currentBook = book;
   const conf = s.h2h >= 10 ? 'high' : s.a + s.b >= 15 ? 'medium' : 'low';
-  $('#oddsMeta').innerHTML = `Built from ${s.a} games for ${esc(book.nA)}, ${s.b} for ${esc(book.nB)} and ${s.h2h} head to head (${book.h2h.a}–${book.h2h.b}–${book.h2h.d}). Confidence <span class="conf ${conf}">${conf}</span>`;
+  const n = (k) => `${k} result${k === 1 ? '' : 's'}`;
+  $('#oddsMeta').innerHTML = `Built from ${n(s.a)} for ${esc(book.nA)}, ${n(s.b)} for ${esc(book.nB)} and ${s.h2h} head to head (${book.h2h.a}–${book.h2h.b}–${book.h2h.d}). Confidence <span class="conf ${conf}">${conf}</span>`;
   box.innerHTML = book.markets.map((mk) => `<div class="panel market"><h3>${esc(mk.name)}</h3><p>${esc(mk.blurb)}</p><div class="sels">${mk.sels.map((x) => {
     const on = slipMode === 'builder' ? isLeg(mk.key, x.key) : !!slip && slip.a === a && slip.b === b && slip.market === mk.key && slip.selection === x.key;
     return `<button type="button" class="price" aria-pressed="${on}" data-m="${esc(mk.key)}" data-mn="${esc(mk.name)}" data-s="${esc(x.key)}" data-l="${esc(x.label)}" data-d="${x.decimal}" data-f="${x.fractional}">
@@ -952,20 +1272,27 @@ $('#markets').addEventListener('click', (e) => {
   slip = { a: $('#oddsA').value, b: $('#oddsB').value, market: b.dataset.m, marketName: b.dataset.mn, selection: b.dataset.s, label: b.dataset.l, decimal: +b.dataset.d, fractional: b.dataset.f };
   renderOdds();
 });
-// Why the viewer can't bet on the slip's match, or '' if they can
-function betBlock(a, b) {
-  const pid = myPlayer();
+// Why the viewer can't bet on this, or '' if they can
+function betBlock(a, b, single) {
+  const pid = myPlayer(), s = store.settings;
   if (mode === 'shared' && !me.uid) return 'Sign in to bet.';
   if (readOnly) return 'You\'re view-only. Ask the admin to invite your email as an Editor to bet.';
-  if (!pid) return me.admin ? 'Link yourself to a player (reload and pick one) to bet.' : 'Pick your player first.';
-  if (!store.settings.ownMatchBets && (pid === a || pid === b)) return 'You\'re playing in this one, so no betting on it. Match fixing is frowned upon.';
+  if (!pid) return me.admin ? 'Link yourself to a player (reload and pick one) to bet.' : 'Your player link is waiting for the admin\'s approval.';
+  const f = openFixtureFor(a, b);
+  if (!f) return liveFixtures().some((x) => (x.a === a && x.b === b) || (x.a === b && x.b === a))
+    ? 'Betting\'s closed on this match.' : 'No open fixture for this match. One of the players opens it just before they play.';
+  if (pid === a || pid === b) {
+    if (!s.ownMatchBets) return 'You\'re playing in this one, so no betting on it. Match fixing is frowned upon.';
+    const ownSide = pid === a ? 'A' : 'B';
+    if (!single || single.market !== 'result' || single.selection !== ownSide) return 'On your own match you can only back yourself to win.';
+  }
   return '';
 }
 let betBusy = false;
 function toggleLeg(btn) {
   const a = $('#oddsA').value, b = $('#oddsB').value;
   if (builder.a !== a || builder.b !== b) builder = { a, b, legs: [] };
-  const leg = { market: btn.dataset.m, marketName: btn.dataset.mn, selection: btn.dataset.s, label: btn.dataset.l, decimal: +btn.dataset.d };
+  const leg = { market: btn.dataset.m, marketName: btn.dataset.mn, selection: btn.dataset.s, label: btn.dataset.l };
   const i = builder.legs.findIndex((l) => l.market === leg.market);
   if (i >= 0 && builder.legs[i].selection === leg.selection) builder.legs.splice(i, 1);
   else if (i >= 0) builder.legs[i] = leg; // one pick per market
@@ -985,25 +1312,31 @@ function builderQuote() {
     const mk = currentBook.markets.find((x) => x.key === l.market), sel = mk && mk.sels.find((x) => x.key === l.selection);
     return sel ? sel.decimal : price(jointProb(currentBook.J, [l]), store.settings.margin).decimal;
   };
-  const acca = legs.reduce((t, l) => t * single(l), 1);
-  return { p, acca, ...price(p, store.settings.builderMargin, 1) };
+  return { p, acca: legs.reduce((t, l) => t * single(l), 1), ...price(p, store.settings.builderMargin, 1) };
 }
 function modeSwitch() {
   return `<div class="seg mode" role="group" aria-label="Bet type">
     <button type="button" data-mode="single" aria-pressed="${slipMode === 'single'}">Single</button>
     <button type="button" data-mode="builder" aria-pressed="${slipMode === 'builder'}">Bet Builder</button></div>`;
 }
+function limitsNote() {
+  const s = store.settings;
+  return `<div class="small muted">Stake ${fmtN(s.minStake)}–${fmtN(s.maxStake)} coins · max return ${fmtN(s.maxReturn)}</div>`;
+}
 function stakeBlock(decimal, block, label) {
-  return `${block ? `<p class="note">${esc(block)}</p>` : `<label class="field">Stake (coins)<input type="number" id="slipStake" min="1" step="10" value="${slipStake}"></label>
-    <div class="small muted num" id="slipReturn" data-dec="${decimal}"></div>`}
+  return `${block ? `<p class="note">${esc(block)}</p>` : `<label class="field">Stake (coins)<input type="number" id="slipStake" min="1" step="5" value="${slipStake}"></label>
+    <div class="small muted num" id="slipReturn" data-dec="${decimal}"></div>${limitsNote()}`}
     <div class="row">${block ? '' : `<button class="btn gold" type="button" id="slipPlace" ${betBusy ? 'disabled' : ''}>${label}</button>`}<button class="btn" type="button" id="slipClear">Clear</button></div>`;
 }
 function renderSlip() {
   const el = $('#slip'), pid = myPlayer();
   const who = pid ? `<div class="small">Betting as <b>${esc(nameOf(pid))}</b> · <span class="num">${fmtN(coinsOf(pid))}</span> coins</div>` : '';
+  const stakeFocused = document.activeElement && document.activeElement.id === 'slipStake';
+  if (stakeFocused) return; // don't yank the stake box from under someone typing
   if (slipMode === 'builder') {
     const a = $('#oddsA').value, b = $('#oddsB').value, legs = builder.legs, q = builderQuote();
-    const block = legs.length < 2 ? '' : q && q.impossible ? q.why : betBlock(a, b);
+    builderShown = q && !q.impossible ? q.decimal : null;
+    const block = legs.length < 2 ? '' : q && q.impossible ? q.why : betBlock(a, b, null);
     el.innerHTML = `<div class="row" style="justify-content:space-between"><h3>Bet slip</h3>${modeSwitch()}</div>
       <p class="note">Combine 2 to ${MAX_LEGS} picks from ${esc(nameOf(a))} v ${esc(nameOf(b))}. Linked picks are priced together, so "wins" + "3-crown win" pays like the 3-crown alone. Every pick has to land.</p>
       ${legs.length ? `<ol class="legs">${legs.map((l, i) => `<li><span><b>${esc(l.label)}</b><br><span class="small muted">${esc(l.marketName)}</span></span><button type="button" class="btn tiny" data-unleg="${i}" aria-label="Remove ${esc(l.label)}">Remove</button></li>`).join('')}</ol>` : '<p class="muted small" style="margin:0">Tap prices on the board to add picks.</p>'}
@@ -1012,12 +1345,12 @@ function renderSlip() {
         <div class="small muted num">As separate picks multiplied: ${q.acca.toFixed(2)}${q.acca > q.decimal * 1.05 ? '. These picks are linked, so the price is shorter.' : ''}</div></div>` : ''}
       ${legs.length >= 2 ? who + stakeBlock(q && !q.impossible ? q.decimal : 0, block, 'Place Bet Builder') : (legs.length ? '<div class="row"><button class="btn" type="button" id="slipClear">Clear</button></div>' : '')}`;
   } else if (!slip) {
-    el.innerHTML = `<div class="row" style="justify-content:space-between"><h3>Bet slip</h3>${modeSwitch()}</div><p class="muted small" style="margin:0">Tap any price to add it here. Bets settle on the next logged match between those two players.</p>`;
+    el.innerHTML = `<div class="row" style="justify-content:space-between"><h3>Bet slip</h3>${modeSwitch()}</div><p class="muted small" style="margin:0">Tap any price to add it here. You can bet while a fixture is open, from when the players open it until the draft starts.</p>`;
   } else {
     el.innerHTML = `<div class="row" style="justify-content:space-between"><h3>Bet slip</h3>${modeSwitch()}</div>
       <div><div class="pick">${esc(slip.label)}</div><div class="small muted">${esc(nameOf(slip.a))} v ${esc(nameOf(slip.b))} · ${esc(slip.marketName)}</div></div>
       <div class="big-odd num">${slip.fractional} <span class="small muted">${slip.decimal.toFixed(2)}</span></div>
-      ${who}${stakeBlock(slip.decimal, betBlock(slip.a, slip.b), 'Place bet')}`;
+      ${who}${stakeBlock(slip.decimal, betBlock(slip.a, slip.b, slip), 'Place bet')}`;
   }
   const bar = $('#slipBar'), onOdds = !$('#p-odds').hidden;
   const legsN = builder.legs.length, q = slipMode === 'builder' ? builderQuote() : null;
@@ -1044,29 +1377,37 @@ $('#slip').addEventListener('click', (e) => {
 });
 async function placeBet() {
   if (betBusy) return;
-  const stake = Math.floor(slipStake), pid = myPlayer(), isB = slipMode === 'builder';
+  const stake = Math.floor(slipStake), pid = myPlayer(), isB = slipMode === 'builder', s = store.settings;
   const a = isB ? builder.a : slip.a, b = isB ? builder.b : slip.b;
-  const block = betBlock(a, b); if (block) return toast(block, true);
-  if (!(stake > 0)) return toast('Stake has to be at least 1 coin.', true);
-  if (stake > coinsOf(pid)) return toast(`You only have ${fmtN(coinsOf(pid))} coins.`, true);
-  let bet;
+  const block = betBlock(a, b, isB ? null : slip); if (block) return toast(block, true);
+  const f = openFixtureFor(a, b);
+  // Re-price right now: if the odds moved since the slip was drawn, show the new price and ask again
+  currentBook = buildMarkets(a, b);
+  let odds, fractional;
   if (isB) {
     const q = builderQuote();
     if (!q || q.impossible) return toast('That Bet Builder can\'t be priced. Check your picks.', true);
-    bet = { id: newId(), bettor: pid, a, b, market: 'builder', selection: 'builder',
-      legs: builder.legs.map(({ market, selection, label, marketName }) => ({ market, selection, label, marketName })),
-      label: `${nameOf(a)} v ${nameOf(b)}: Bet Builder, ${builder.legs.length} picks`, odds: q.decimal, fractional: q.fractional,
-      stake, placedAt: new Date().toISOString(), voided: false };
+    if (q.decimal !== builderShown) { renderSlip(); return toast(`The price moved to ${q.fractional}. Tap Place again to take it.`, true); }
+    ({ decimal: odds, fractional } = q);
   } else {
-    bet = { id: newId(), bettor: pid, a, b, market: slip.market, selection: slip.selection,
-      label: `${nameOf(a)} v ${nameOf(b)}: ${slip.marketName}, ${slip.label}`, odds: slip.decimal, fractional: slip.fractional,
-      stake, placedAt: new Date().toISOString(), voided: false };
+    const mk = currentBook.markets.find((x) => x.key === slip.market), sel = mk && mk.sels.find((x) => x.key === slip.selection);
+    if (!sel) { slip = null; renderOdds(); return toast('That selection isn\'t on the board any more.', true); }
+    if (sel.decimal !== slip.decimal) { slip.decimal = sel.decimal; slip.fractional = sel.fractional; renderSlip(); return toast(`The price moved to ${sel.fractional}. Tap Place again to take it.`, true); }
+    ({ decimal: odds, fractional } = sel);
   }
+  if (!(stake >= s.minStake)) return toast(`Minimum stake is ${fmtN(s.minStake)} coins.`, true);
+  if (stake > s.maxStake) return toast(`Maximum stake is ${fmtN(s.maxStake)} coins.`, true);
+  if (stake * odds > s.maxReturn) return toast(`Max return is ${fmtN(s.maxReturn)} coins, so the most you can stake at ${fractional} is ${fmtN(Math.floor(s.maxReturn / odds))}.`, true);
+  if (stake > coinsOf(pid)) return toast(`You only have ${fmtN(coinsOf(pid))} coins.`, true);
+  const bet = { id: newId(), bettor: pid, fx: f.key, a, b, odds, fractional, stake, placedAt: nowIso(),
+    ...(isB ? { market: 'builder', selection: 'builder', legs: builder.legs.map(({ market, selection, label, marketName }) => ({ market, selection, label, marketName })),
+      label: `${nameOf(a)} v ${nameOf(b)}: Bet Builder, ${builder.legs.length} picks` }
+      : { market: slip.market, selection: slip.selection, label: `${nameOf(a)} v ${nameOf(b)}: ${slip.marketName}, ${slip.label}` }) };
   const mine = store.betDocs.find((d) => d.id === me.uid);
   betBusy = true; renderSlip();
   try {
-    await put('bets', me.uid, { list: [...((mine && mine.list) || []), bet] });
-    toast(`Bet placed: ${stake} coins at ${bet.fractional}.`);
+    await put('bets', me.uid, { list: [...((mine && Array.isArray(mine.list) && mine.list) || []), bet] });
+    toast(`Bet placed: ${stake} coins at ${fractional}.`);
     if (isB) builder.legs = []; else slip = null;
   } catch { /* toast shown */ }
   betBusy = false; renderOdds();
@@ -1075,10 +1416,10 @@ async function placeBet() {
 // ======================================================================
 //  Scorecard
 // ======================================================================
-const BASE_CARDS = ['Archers','Arrows','Baby Dragon','Balloon','Bandit','Barbarian Barrel','Barbarians','Bats','Battle Ram','Bomb Tower','Bowler','Cannon','Dark Prince','Dart Goblin','Earthquake','Electro Wizard','Elite Barbarians','Executioner','Fireball','Firecracker','Fisherman','Freeze','Giant','Giant Skeleton','Goblin Barrel','Goblin Gang','Golem','Graveyard','Hog Rider','Hunter','Ice Golem','Ice Spirit','Ice Wizard','Inferno Dragon','Inferno Tower','Knight','Lava Hound','Lightning','Lumberjack','Magic Archer','Mega Knight','Mega Minion','Miner','Mini P.E.K.K.A','Minions','Mortar','Musketeer','Night Witch','P.E.K.K.A','Poison','Prince','Princess','Rage','Ram Rider','Rocket','Royal Ghost','Royal Giant','Royal Hogs','Skeleton Army','Sparky','Tesla','The Log','Tornado','Valkyrie','Witch','Wizard','X-Bow','Zap'];
+const BASE_CARDS = ['Archers','Arrows','Baby Dragon','Balloon','Bandit','Barbarian Barrel','Barbarians','Bats','Battle Ram','Bomb Tower','Bowler','Cannon','Dark Prince','Dart Goblin','Earthquake','Electro Giant','Electro Wizard','Elite Barbarians','Executioner','Fireball','Firecracker','Fisherman','Freeze','Giant','Giant Skeleton','Goblin Barrel','Goblin Gang','Goblin Giant','Golem','Graveyard','Hog Rider','Hunter','Ice Golem','Ice Spirit','Ice Wizard','Inferno Dragon','Inferno Tower','Knight','Lava Hound','Lightning','Lumberjack','Magic Archer','Mega Knight','Mega Minion','Miner','Mini P.E.K.K.A','Minions','Mortar','Mother Witch','Musketeer','Night Witch','P.E.K.K.A','Phoenix','Poison','Prince','Princess','Rage','Ram Rider','Rocket','Royal Ghost','Royal Giant','Royal Hogs','Skeleton Army','Sparky','Tesla','The Log','Three Musketeers','Tornado','Valkyrie','Wall Breakers','Witch','Wizard','X-Bow','Zap'];
 const TOWERS = [['left', 'Princess L'], ['king', 'King'], ['right', 'Princess R']];
 function seg(name, opts, checked = '') {
-  return opts.map(([v, l]) => `<input type="radio" name="${name}" id="${name}-${v || 'u'}" value="${v}" ${v === checked ? 'checked' : ''}><label for="${name}-${v || 'u'}">${l}</label>`).join('');
+  return opts.map(([v, l]) => `<input type="radio" name="${name}" id="${name}-${v || 'u'}" value="${v}" ${checked !== null && v === checked ? 'checked' : ''}><label for="${name}-${v || 'u'}">${l}</label>`).join('');
 }
 const TRI = [['', '?'], ['yes', 'Yes'], ['no', 'No']];
 function buildSides() {
@@ -1096,12 +1437,14 @@ function buildSides() {
     </div>`).join('');
   $('#seg-overtime').innerHTML = seg('overtime', [['', '?'], ['no', 'No'], ['yes', 'Yes']]);
   $('#seg-first').innerHTML = seg('first', [['', 'Auto / ?'], ['A', 'Blue'], ['B', 'Red'], ['none', 'Nobody']]);
-  $('#seg-winner').innerHTML = seg('winner', [['draw', 'Draw'], ['A', 'Blue on tiebreaker'], ['B', 'Red on tiebreaker']], 'draw');
+  // no default: forgetting to pick must not quietly pay out Draw backers
+  $('#seg-winner').innerHTML = seg('winner', [['draw', 'Draw'], ['A', 'Blue on tiebreaker'], ['B', 'Red on tiebreaker']], null);
 }
 buildSides();
 const radio = (name) => { const r = document.querySelector(`input[name="${name}"]:checked`); return r ? r.value : ''; };
 const setRadio = (name, v) => { const r = document.getElementById(`${name}-${v || 'u'}`); if (r) r.checked = true; };
-const maxHp = (k) => (k === 'king' ? store.settings.kingHp : store.settings.princessHp);
+let formHp = null; // tower HP the form uses: the match's own when editing, today's settings otherwise
+const maxHp = (k) => (formHp ? (k === 'king' ? formHp.king : formHp.princess) : (k === 'king' ? store.settings.kingHp : store.settings.princessHp));
 
 function readTowers(s) {
   const out = {};
@@ -1114,7 +1457,7 @@ function readTowers(s) {
 const destroyed = (t) => (t.king === 0 ? 3 : (t.left === 0) + (t.right === 0));
 const damageTaken = (t) => TOWERS.reduce((sum, [k]) => sum + (maxHp(k) - t[k]), 0);
 
-// Turn the form into a clean match record, inferring what we safely can
+// Turn the form into a clean match record, inferring what the game's rules allow and refusing what they don't
 function readForm() {
   const tracked = $('#trackTowers').checked;
   const playerA = $('#whoA').value, playerB = $('#whoB').value;
@@ -1130,8 +1473,10 @@ function readForm() {
     dealtA = damageTaken(towersB); dealtB = damageTaken(towersA);
   } else { crownsA = +radio('crownsA'); crownsB = +radio('crownsB'); }
   if (crownsA === 3 && crownsB === 3) throw new Error('3–3 can\'t happen. The game ends when a King Tower falls.');
-  const winner = crownsA > crownsB ? 'A' : crownsB > crownsA ? 'B' : radio('winner') || 'draw';
   let overtime = radio('overtime') === '' ? null : radio('overtime') === 'yes';
+  if (tracked && dealtA === 0 && dealtB === 0 && overtime !== true) throw new Error('Nothing\'s filled in yet. Enter the HP left on each tower (or set overtime to Yes if nobody touched a tower).');
+  let winner = crownsA > crownsB ? 'A' : crownsB > crownsA ? 'B' : radio('winner');
+  if (!winner) throw new Error('Crowns are level: pick Draw or who won on the tiebreaker.');
   if (overtime == null && crownsA === crownsB) overtime = true; // draws and tiebreakers only happen after OT
   if (overtime === false && crownsA === crownsB) throw new Error('Crowns were level, so it must have gone to overtime. Set overtime to Yes.');
   if (overtime === true && crownsA !== crownsB && !otPossible(crownsA, crownsB)) throw new Error(`A ${Math.max(crownsA, crownsB)}–${Math.min(crownsA, crownsB)} can't finish in overtime, because the first tower in OT ends the game. Check the towers or set overtime to No.`);
@@ -1148,6 +1493,9 @@ function readForm() {
   if (kingB == null && towersB && towersB.king < maxHp('king')) kingB = true;
   if (crownsB >= 1) kingA = true; if (crownsA >= 1) kingB = true; // losing any tower wakes your King
   let firstCrown = radio('first') || null;
+  if (firstCrown === 'none' && crownsA + crownsB > 0) throw new Error('Towers fell, so somebody took the first one. Pick Blue or Red.');
+  if (firstCrown === 'A' && crownsA === 0) throw new Error('Blue took no towers, so they can\'t have taken the first one.');
+  if (firstCrown === 'B' && crownsB === 0) throw new Error('Red took no towers, so they can\'t have taken the first one.');
   if (crownsA + crownsB === 0) firstCrown = 'none';
   else if (!firstCrown && crownsA === 0) firstCrown = 'B';
   else if (!firstCrown && crownsB === 0) firstCrown = 'A';
@@ -1155,7 +1503,7 @@ function readForm() {
   const when = $('#when').value;
   return { playerA, playerB, crownsA, crownsB, winner, overtime, dmgA, dmgB, kingA, kingB, firstCrown,
     towersA, towersB, dealtA, dealtB, cardsA: cards('A'), cardsB: cards('B'), notes: $('#notes').value.trim().slice(0, 400),
-    date: when ? new Date(when).toISOString() : new Date().toISOString() };
+    date: when ? new Date(when).toISOString() : nowIso(), hp: { princess: maxHp('left'), king: maxHp('king') } };
 }
 
 function updateLive() {
@@ -1163,18 +1511,19 @@ function updateLive() {
   for (const s of ['A', 'B']) {
     $('#manual' + s).hidden = tracked;
     for (const [k] of TOWERS) {
-      const inp = $(`#t${s}_${k}`); inp.disabled = !tracked; inp.placeholder = fmtN(maxHp(k)).replace(/,/g, '');
+      const inp = $(`#t${s}_${k}`); inp.disabled = !tracked; inp.placeholder = String(maxHp(k));
       $(`#tw${s}_${k}`).classList.toggle('down', tracked && inp.value.trim() === '0');
     }
   }
+  const tbA = tracked ? destroyed(readTowers('B')) : +radio('crownsA'), tbB = tracked ? destroyed(readTowers('A')) : +radio('crownsB');
+  $('#tbWrap').hidden = tbA !== tbB;
   try {
     const m = readForm();
     $('#crA').textContent = m.crownsA; $('#crB').textContent = m.crownsB;
-    $('#tbWrap').hidden = m.crownsA !== m.crownsB;
     const bits = [m.winner === 'draw' ? 'Draw' : `${nameOf(m.winner === 'A' ? m.playerA : m.playerB)} wins${m.crownsA === m.crownsB ? ' on tiebreaker' : ''}`];
     if (m.dealtA != null) bits.push(`${nameOf(m.playerA)} dealt ${fmtN(m.dealtA)}`, `${nameOf(m.playerB)} dealt ${fmtN(m.dealtB)}`);
     $('#liveLine').textContent = bits.join(' · ');
-  } catch (e) { $('#liveLine').textContent = e.message; }
+  } catch (e) { $('#crA').textContent = tbA; $('#crB').textContent = tbB; $('#liveLine').textContent = e.message; }
 }
 $('#matchForm').addEventListener('input', updateLive);
 $('#matchForm').addEventListener('change', updateLive);
@@ -1183,49 +1532,103 @@ $('#sides').addEventListener('click', (e) => {
   const inp = $('#t' + k); inp.value = inp.value.trim() === '0' ? '' : '0'; updateLive();
 });
 
-let editingId = null;
+// Fixtures the viewer can log a result for (live, no result logged yet)
+function fillFixtureSelect() {
+  const sel = $('#fxSel'), prev = sel.value;
+  const list = liveFixtures().filter((f) => !pendingForFixture(f) || (editing && editing.rec.fx === f.key));
+  sel.innerHTML = list.map((f) => `<option value="${esc(f.key)}">${esc(nameOf(f.a))} v ${esc(nameOf(f.b))} (opened ${esc(ago(Date.now() - Date.parse(f.at)))})</option>`).join('')
+    + '<option value="">No fixture (results only, no bets)</option>';
+  // first fill after a reset picks the newest fixture; after that, keep what the logger chose
+  const kept = sel.dataset.chosen === '1' && (prev === '' || list.some((f) => f.key === prev));
+  sel.value = kept ? prev : (list[0] ? list[0].key : '');
+  if (!kept && sel.value) applyFixturePlayers();
+}
+function applyFixturePlayers() {
+  const f = fixtureData().byKey[$('#fxSel').value];
+  if (f) { $('#whoA').value = f.a; $('#whoB').value = f.b; }
+}
+function applyFixtureToForm() { $('#fxSel').dataset.chosen = '1'; applyFixturePlayers(); updateLive(); }
+$('#fxSel').addEventListener('change', applyFixtureToForm);
+
+// What the open bets on a fixture need recorded, so the logger can't leave a losing bet's detail blank
+const NEEDS = { overtime: 'Overtime', dmgA: '1,000+ damage', dmgB: '1,000+ damage', kingA: 'King Tower activated', kingB: 'King Tower activated',
+  first: 'First tower', comeback: 'First tower', dealtA: 'Tower HP', dealtB: 'Tower HP' };
+function neededFields(f, m) {
+  const need = new Set();
+  for (const b of ledger()) {
+    if (b.fx !== f.key || !['open', 'locked', 'pending'].includes(b.status)) continue;
+    for (const l of b.legs || [{ market: b.market }]) {
+      const k = l.market;
+      if (k === 'overtime' && m.overtime == null) need.add(NEEDS.overtime);
+      if ((k === 'dmgA' || k === 'dmgB') && (m.dmgA == null || m.dmgB == null)) need.add(NEEDS[k]);
+      if ((k === 'kingA' || k === 'kingB') && (m.kingA == null || m.kingB == null)) need.add(NEEDS[k]);
+      if ((k === 'first' || k === 'comeback') && m.firstCrown == null) need.add(NEEDS.first);
+      if ((k === 'dealtA' || k === 'dealtB') && m.dealtA == null) need.add(NEEDS[k]);
+    }
+  }
+  return [...need];
+}
+
+let editing = null; // { coll, docId, rec } when editing a result
 const canLog = () => !readOnly && (me.admin || !!myPlayer());
-const canChange = (m) => me.admin || (!!me.uid && m.loggedBy === me.uid);
 function resetForm() {
-  editingId = null; $('#matchForm').reset(); buildSides(); renderAll();
+  editing = null; formHp = null; $('#matchForm').reset(); $('#fxSel').dataset.chosen = ''; buildSides(); renderAll();
   $('#formTitle').textContent = 'Log a triple draft'; $('#saveMatch').textContent = 'Log match'; $('#cancelEdit').hidden = true;
   updateLive();
 }
 $('#cancelEdit').onclick = resetForm;
 $('#matchForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (!canLog()) return toast('Pick your player first, then you can log matches.', true);
+  if (!canLog()) return toast(readOnly ? 'You\'re view-only.' : 'Get your player approved first, then you can log matches.', true);
   let m; try { m = readForm(); } catch (err) { return toast(err.message, true); }
-  const id = editingId || newId();
-  m.loggedBy = me.uid;
-  if (editingId) {
-    const old = store.matches.find((x) => x.id === editingId);
-    if (old && !$('#when').value) m.date = old.date;
-    if (old && old.loggedBy) m.loggedBy = old.loggedBy;
+  const f = fixtureData().byKey[$('#fxSel').value] || null;
+  if (f && !samePair(m, f.a, f.b)) return toast('Those players don\'t match the fixture you picked.', true);
+  if (f && !editing && pendingForFixture(f)) return toast('Someone already logged this fixture. Confirm or dispute theirs instead.', true);
+  m.fx = f ? f.key : null;
+  if (f && !$('#unknownOk').checked) {
+    const need = neededFields(f, m);
+    if (need.length) return toast(`Bets on this match need: ${need.join(', ')}. Fill them in, or tick "Genuinely unknown" to refund those bets.`, true);
   }
+  if (editing && !$('#when').value) m.date = editing.rec.date;
   try {
-    await put('matches', id, m);
-    toast(editingId ? 'Match updated.' : 'Match logged. Any open bets on it are now settled.');
+    // logging a fixture also locks its betting, if the logger is allowed to and hasn't yet
+    if (f && canLock(f) && !f.locks.some((l) => l.uid === me.uid)) await lockFixture(f);
+    if (me.admin) {
+      // the admin's results are final; editing a player's result stores the admin's version, which replaces theirs
+      const fromPlayer = editing && editing.coll === 'acts';
+      const id = !editing ? newId() : fromPlayer ? 'r_' + safeSeg(editing.rec.key) : editing.docId;
+      const ref = !editing ? null : fromPlayer ? editing.rec.key : editing.rec.ref || null;
+      await put('matches', id, { ...m, loggedBy: editing ? editing.rec.loggedBy || me.uid : me.uid,
+        finalAt: editing && editing.rec.finalAt ? editing.rec.finalAt : nowIso(), ...(ref ? { ref } : {}) });
+      toast(editing ? 'Result updated.' : 'Result logged. Bets on it are settled.');
+    } else {
+      const id = editing ? editing.docId : 'm_' + newId();
+      await put(`acts/${me.uid}/items`, id, { ...m, type: 'match', loggedAt: nowIso() });
+      toast(editing ? 'Result updated. The other player needs to confirm it again.' : 'Result logged. It counts once the other player confirms it.');
+    }
     resetForm();
   } catch { /* toast shown */ }
 });
-function editMatch(id) {
-  const m = store.matches.find((x) => x.id === id); if (!m) return;
-  resetForm(); editingId = id;
-  $('#whoA').value = m.playerA; $('#whoB').value = m.playerB;
-  $('#trackTowers').checked = !!m.towersA;
+function editResult(r) {
+  resetForm();
+  editing = r.byAdmin ? { coll: 'matches', docId: r.docId, rec: r } : { coll: 'acts', docId: r.docId, rec: r };
+  formHp = r.hp && r.hp.princess && r.hp.king ? r.hp : null;
+  fillFixtureSelect();
+  $('#fxSel').value = r.fx && fixtureData().byKey[r.fx] ? r.fx : ''; $('#fxSel').dataset.chosen = '1';
+  $('#whoA').value = r.playerA; $('#whoB').value = r.playerB;
+  $('#trackTowers').checked = !!r.towersA;
   for (const s of ['A', 'B']) {
-    const t = m['towers' + s];
+    const t = r['towers' + s];
     for (const [k] of TOWERS) $(`#t${s}_${k}`).value = t && t[k] !== maxHp(k) ? t[k] : '';
-    setRadio('crowns' + s, String(m['crowns' + s]));
+    setRadio('crowns' + s, String(r['crowns' + s]));
     const tri = (v) => (v == null ? '' : v ? 'yes' : 'no');
-    setRadio('dmg' + s, tri(m['dmg' + s])); setRadio('king' + s, tri(m['king' + s]));
-    $('#cards' + s).value = (m['cards' + s] || []).join(', ');
+    setRadio('dmg' + s, tri(r['dmg' + s])); setRadio('king' + s, tri(r['king' + s]));
+    $('#cards' + s).value = (r['cards' + s] || []).join(', ');
   }
-  setRadio('overtime', m.overtime == null ? '' : m.overtime ? 'yes' : 'no');
-  setRadio('first', m.firstCrown || ''); setRadio('winner', m.crownsA === m.crownsB ? m.winner : 'draw');
-  $('#notes').value = m.notes || '';
-  $('#formTitle').textContent = `Editing ${nameOf(m.playerA)} v ${nameOf(m.playerB)}`; $('#saveMatch').textContent = 'Save changes'; $('#cancelEdit').hidden = false;
+  setRadio('overtime', r.overtime == null ? '' : r.overtime ? 'yes' : 'no');
+  setRadio('first', r.firstCrown || ''); if (r.crownsA === r.crownsB) setRadio('winner', r.winner);
+  $('#notes').value = r.notes || '';
+  $('#formTitle').textContent = `Editing ${nameOf(r.playerA)} v ${nameOf(r.playerB)}`; $('#saveMatch').textContent = 'Save changes'; $('#cancelEdit').hidden = false;
   showTab('tab-log'); updateLive();
 }
 
@@ -1234,70 +1637,92 @@ function editMatch(id) {
 // ======================================================================
 const missing = (m) => m.overtime == null || m.dmgA == null || m.dmgB == null || m.firstCrown == null || m.kingA == null || m.kingB == null;
 let confirmDelete = null;
-function loggerName(m) {
-  if (!m.loggedBy) return '<span class="na">–</span>';
-  const pid = claimMaps().byUid[m.loggedBy];
-  return pid ? esc(nameOf(pid)) : '<span class="na">Unlinked account</span>';
+function isDuplicate(r, all) {
+  return all.some((x) => x.key !== r.key && samePair(x, r.playerA, r.playerB) && x.dealtA != null && r.dealtA != null
+    && JSON.stringify([x.towersA, x.towersB].map((t) => t && [t.left, t.king, t.right])) === JSON.stringify([r.towersA, r.towersB].map((t) => t && [t.left, t.king, t.right])));
 }
+function resultStatus(r) {
+  if (!r.pending) return r.byAdmin ? '<span class="pill won">Final</span>' : `<span class="pill won">Confirmed by ${esc(accountName(r.confirmedBy))}</span>${r.editedSince ? ' <span class="pill warn">Edited after confirming</span>' : ''}`;
+  if (r.disputedBy) return `<span class="pill lost">Disputed by ${esc(accountName(r.disputedBy))}</span>`;
+  if (r.noOpponent) return '<span class="pill warn">Waiting for the admin</span>';
+  return `<span class="pill warn">Waiting for ${esc(r.waitingFor.map(accountName).join(' or '))}</span>`;
+}
+const canChange = (r) => !readOnly && (me.admin ? true : r.pending && r.loggedBy === me.uid);
 function renderHistory() {
-  const list = [...store.matches].reverse();
-  $('#history').innerHTML = list.length ? `<table><thead><tr><th>When</th><th>Match</th><th class="c">OT</th><th class="c">1k before OT</th><th class="c">King woke</th><th class="c">Damage</th><th>First tower</th><th>Logged by</th><th></th></tr></thead><tbody>${list.map((m) => `
-    <tr><td class="small">${fmtDate(m.date)}${missing(m) ? '<br><span class="pill warn">missing info</span>' : ''}</td>
+  const R = resultData(), all = [...R.final, ...R.pending.map((p) => ({ ...p, pending: true }))].sort((x, y) => String(y.date).localeCompare(String(x.date)));
+  $('#history').innerHTML = all.length ? `<table><thead><tr><th>When</th><th>Result</th><th>Status</th><th class="c">OT</th><th class="c">1k before OT</th><th class="c">King woke</th><th class="c">Damage</th><th>First tower</th><th>Logged by</th><th></th></tr></thead><tbody>${all.map((m) => `
+    <tr><td class="small">${fmtDate(m.date)}${missing(m) ? '<br><span class="pill warn">missing info</span>' : ''}${me.admin && isDuplicate(m, all) ? '<br><span class="pill lost">Possible duplicate</span>' : ''}</td>
     <td><span class="${m.winner === 'A' ? 'wa' : ''}">${esc(nameOf(m.playerA))}</span> <b class="num">${m.crownsA}–${m.crownsB}</b> <span class="${m.winner === 'B' ? 'wb' : ''}">${esc(nameOf(m.playerB))}</span>
       ${m.winner === 'draw' ? ' <span class="pill">Draw</span>' : m.crownsA === m.crownsB ? ' <span class="pill">Tiebreaker</span>' : ''}${m.notes ? `<div class="small muted">${esc(m.notes)}</div>` : ''}</td>
+    <td>${resultStatus(m)}</td>
     <td class="c">${yn(m.overtime)}</td><td class="c">${yn(m.dmgA)} / ${yn(m.dmgB)}</td><td class="c">${yn(m.kingA)} / ${yn(m.kingB)}</td>
     <td class="c num small">${m.dealtA != null ? `${fmtN(m.dealtA)} / ${fmtN(m.dealtB)}` : '<span class="na">?</span>'}</td>
     <td>${m.firstCrown == null ? '<span class="na">?</span>' : m.firstCrown === 'none' ? 'Nobody' : esc(nameOf(m.firstCrown === 'A' ? m.playerA : m.playerB))}</td>
-    <td class="small">${loggerName(m)}</td>
-    <td style="white-space:nowrap">${canChange(m) ? `<button class="btn tiny" data-edit="${m.id}">Edit</button> <button class="btn tiny warn" data-del="${m.id}">${confirmDelete === m.id ? 'Confirm delete' : 'Delete'}</button>` : ''}</td></tr>`).join('')}</tbody></table>`
-    : '<div class="empty">No matches yet. Play a triple draft, then fill in the scorecard on Log match.</div>';
+    <td class="small">${m.loggedBy ? esc(accountName(m.loggedBy)) : '<span class="na">–</span>'}</td>
+    <td style="white-space:nowrap">${canChange(m) ? `<button class="btn tiny" data-edit="${esc(m.key)}">Edit</button> <button class="btn tiny warn" data-del="${esc(m.key)}">${confirmDelete === m.key ? 'Confirm delete' : 'Delete'}</button>` : ''}</td></tr>`).join('')}</tbody></table>`
+    : '<div class="empty">No results yet. Play a triple draft, then fill in the scorecard on Log match.</div>';
 }
 $('#history').addEventListener('click', async (e) => {
-  const { edit, del } = e.target.dataset;
-  const m = store.matches.find((x) => x.id === (edit || del));
-  if (!m || !canChange(m)) return;
-  if (edit) editMatch(edit);
-  if (del) {
-    if (confirmDelete !== del) { confirmDelete = del; renderHistory(); return; }
-    confirmDelete = null;
-    try { await remove('matches', del); toast('Match deleted. Bets it settled are open again.'); } catch { toast('Couldn\'t delete that match.', true); }
-  }
+  const key = e.target.dataset.edit || e.target.dataset.del; if (!key) return;
+  const R = resultData(), r = R.final.find((x) => x.key === key) || (R.pending.find((x) => x.key === key) && { ...R.pending.find((x) => x.key === key), pending: true });
+  if (!r || !canChange(r)) return;
+  if (e.target.dataset.edit) { editResult(r); return; }
+  if (confirmDelete !== key) { confirmDelete = key; renderHistory(); return; }
+  confirmDelete = null;
+  try {
+    if (r.byAdmin) await remove('matches', r.docId); else await remove(`acts/${r.loggedBy}/items`, r.docId);
+    toast('Result deleted.');
+  } catch { toast('Couldn\'t delete that result.', true); }
 });
 
 // ======================================================================
-//  Bets + leaderboard
+//  Bets, leaderboard and the house log
 // ======================================================================
-function legList(bet, st) {
-  const m = st.matchId && store.matches.find((x) => x.id === st.matchId), o = m && orientPair(m, bet.a);
-  return `<ul class="leg-list">${bet.legs.map((l) => {
+function legList(bet) {
+  const fin = bet.matchKey && finalResults().find((x) => x.key === bet.matchKey), o = fin && orientPair(fin, bet.a);
+  return `<ul class="leg-list">${(bet.legs || []).map((l) => {
     const r = o ? settleSelection(l.market, l.selection, o) : undefined;
     const tag = r === true ? '<span class="up">✓</span>' : r === false ? '<span class="down">✗</span>' : r === null ? '<span class="na">void</span>' : '';
     return `<li>${tag} ${esc(l.marketName)}: ${esc(l.label)}</li>`;
   }).join('')}</ul>`;
 }
+let voiding = null;
 function betRows(bets, showBettor) {
-  return `<table><thead><tr>${showBettor ? '<th>Bettor</th>' : ''}<th>Bet</th><th>Price</th><th>Stake</th><th>Result</th>${me.admin ? '<th></th>' : ''}</tr></thead><tbody>${bets.map((b) => {
-    const st = betState(b);
-    return `<tr>${showBettor ? `<td>${esc(nameOf(b.bettor))}</td>` : ''}<td>${esc(b.label)}${b.legs ? legList(b, st) : ''}<div class="small muted">${fmtDate(b.placedAt)}</div></td><td class="num">${esc(b.fractional)}</td><td class="num">${fmtN(b.stake)}</td>
-      <td><span class="pill ${st.status}">${st.status}</span>${st.status === 'won' ? ` <span class="num up">+${fmtN(st.payout)}</span>` : ''}</td>
-      ${me.admin ? `<td>${st.status === 'open' ? `<button class="btn tiny" data-void="${esc(b.id)}" data-uid="${esc(b.uid)}">Void</button>` : ''}</td>` : ''}</tr>`;
-  }).join('')}</tbody></table>`;
+  const pid = myPlayer();
+  return `<table><thead><tr>${showBettor ? '<th>Bettor</th>' : ''}<th>Bet</th><th>Price</th><th>Stake</th><th>Result</th>${me.admin ? '<th></th>' : ''}</tr></thead><tbody>${bets.map((b) => `
+    <tr>${showBettor ? `<td>${esc(nameOf(b.bettor))}</td>` : ''}<td>${esc(b.label)}${b.legs ? legList(b) : ''}<div class="small muted">${fmtDate(b.placedAt)}</div></td>
+    <td class="num">${esc(b.fractional)}</td><td class="num">${fmtN(b.stake)}</td>
+    <td><span class="pill ${b.status}">${b.status}</span>${b.status === 'won' ? ` <span class="num up">+${fmtN(b.payout)}</span>` : ''}${b.why ? `<div class="small muted">${esc(b.why)}</div>` : ''}</td>
+    ${me.admin ? `<td>${b.status !== 'void' && b.bettor !== pid ? (voiding === b.id
+      ? `<form class="row" data-void-form="${esc(b.id)}"><input type="text" id="voidWhy" placeholder="Reason" maxlength="80" aria-label="Reason for voiding"><button class="btn tiny warn" type="submit">Void</button></form>`
+      : `<button class="btn tiny" type="button" data-void="${esc(b.id)}">Void</button>`) : ''}</td>` : ''}</tr>`).join('')}</tbody></table>`;
 }
 function renderBets() {
-  const bets = allBets().sort((x, y) => y.placedAt.localeCompare(x.placedAt)), pid = myPlayer();
-  const ranked = store.players.map((p) => ({ ...p, coins: coinsOf(p.id), open: bets.filter((b) => b.bettor === p.id && betState(b).status === 'open').length })).sort((x, y) => y.coins - x.coins);
-  $('#leaderboard').innerHTML = ranked.length ? `<table><thead><tr><th>#</th><th>Player</th><th>Coins</th><th>Open bets</th></tr></thead><tbody>${ranked.map((p, i) => `
+  const bets = [...ledger()].sort((x, y) => String(y.placedAt).localeCompare(String(x.placedAt))), pid = myPlayer();
+  const ranked = store.players.map((p) => ({ ...p, coins: coinsOf(p.id), open: bets.filter((b) => b.bettor === p.id && ['open', 'locked', 'pending'].includes(b.status)).length })).sort((x, y) => y.coins - x.coins);
+  $('#leaderboard').innerHTML = ranked.length ? `<table><thead><tr><th>#</th><th>Player</th><th>Coins</th><th>Bets running</th></tr></thead><tbody>${ranked.map((p, i) => `
     <tr class="${p.id === pid ? 'mine' : ''}"><td>${i + 1}</td><td><b>${esc(p.name)}</b>${p.id === pid ? ' <span class="small muted">(you)</span>' : ''}</td><td class="num">${fmtN(p.coins)}</td><td class="num">${p.open}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">No players yet.</div>';
   const mine = bets.filter((b) => b.bettor === pid);
   $('#myBetsPanel').hidden = !pid;
   if (pid) $('#myBets').innerHTML = mine.length ? betRows(mine, false) : '<div class="empty">You haven\'t bet yet. Head to Odds and tap a price.</div>';
   $('#betList').innerHTML = bets.length ? betRows(bets, true) : '<div class="empty">No bets yet. Head to Odds and tap a price.</div>';
+  const log = [
+    ...houseGifts().map((g) => ({ at: g.at, text: `${g.amount >= 0 ? 'Gave' : 'Took'} ${fmtN(Math.abs(g.amount))} coins ${g.amount >= 0 ? 'to' : 'from'} ${nameOf(g.pid)}${g.reason ? ` (${g.reason})` : ''}` })),
+    ...Object.entries(store.house.voids || {}).map(([id, v]) => { const b = ledger().find((x) => x.id === id); return { at: v && v.at, text: `Voided ${b ? `${nameOf(b.bettor)}'s bet "${b.label}"` : 'a bet'}${v && v.reason ? ` (${v.reason})` : ''}` }; }),
+  ].filter((x) => typeof x.at === 'string').sort((x, y) => y.at.localeCompare(x.at));
+  $('#houseLog').innerHTML = log.length ? `<ul class="house-log">${log.map((x) => `<li><span class="small muted">${fmtDate(x.at)}</span> ${esc(x.text)}</li>`).join('')}</ul>` : '<p class="note">Nothing yet. Every coin gift and voided bet from the admin shows up here.</p>';
 }
-$('#p-bets').addEventListener('click', async (e) => {
-  const { void: id, uid } = e.target.dataset; if (!id || !me.admin) return;
-  const doc = store.betDocs.find((d) => d.id === uid); if (!doc) return;
-  const list = doc.list.map((b) => (b.id === id ? { ...b, voided: true } : b));
-  try { await put('bets', uid, { list }); toast('Bet voided and stake refunded.'); } catch { /* toast shown */ }
+$('#p-bets').addEventListener('click', (e) => {
+  const id = e.target.dataset.void; if (!id || !me.admin) return;
+  voiding = id; renderBets(); const w = $('#voidWhy'); if (w) w.focus();
+});
+$('#p-bets').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = e.target.dataset.voidForm; if (!id || !me.admin) return;
+  const reason = ($('#voidWhy').value || '').trim().slice(0, 80);
+  if (!reason) return toast('Give a reason. It goes in the house log for everyone to see.', true);
+  voiding = null;
+  try { await put('config', 'house', { ...store.house, voids: { ...(store.house.voids || {}), [id]: { reason, at: nowIso() } } }); toast('Bet voided and stake refunded.'); } catch { /* toast shown */ }
 });
 
 // ======================================================================
@@ -1305,7 +1730,7 @@ $('#p-bets').addEventListener('click', async (e) => {
 // ======================================================================
 const avg = (xs) => (xs.length ? fmtN(xs.reduce((t, x) => t + x, 0) / xs.length) : '<span class="na">–</span>');
 function renderStats() {
-  const M = store.matches;
+  const M = finalResults();
   $('#statTable').innerHTML = store.players.length ? `<table><thead><tr><th>Player</th><th>Played</th><th>W–L–D</th><th>Win</th><th>3-crown wins</th><th>Comebacks</th><th>OT</th><th>1k before OT</th><th>First tower</th><th>King woke</th><th>Avg damage dealt</th><th>Form</th></tr></thead><tbody>${store.players.map((p) => {
     const s = summarise(p.id, M);
     return `<tr><td><b>${esc(p.name)}</b></td><td class="num">${s.games}</td><td class="num">${s.wins}–${s.losses}–${s.draws}</td><td class="num">${pct(s.wins, s.games)}</td>
@@ -1335,7 +1760,7 @@ function renderStats() {
 function renderMatchup() {
   const a = $('#muA').value, b = $('#muB').value, out = $('#matchup');
   if (!a || a === b) { out.innerHTML = '<div class="empty">Pick two different players.</div>'; return; }
-  const list = store.matches.filter((m) => samePair(m, a, b)).map((m) => orient(m, a));
+  const list = finalResults().filter((m) => samePair(m, a, b)).map((m) => orient(m, a));
   if (!list.length) { out.innerHTML = '<div class="empty">These two haven\'t played each other yet.</div>'; return; }
   const A = esc(nameOf(a)), B = esc(nameOf(b)), n = (fn) => list.filter(fn).length;
   const ot = list.filter((o) => o.overtime != null);
@@ -1358,57 +1783,84 @@ $('#muA').addEventListener('change', renderMatchup);
 $('#muB').addEventListener('change', renderMatchup);
 
 // ======================================================================
-//  Admin: squad, account links, coins, settings (page owner only)
+//  Admin: link requests, results to confirm, squad, coins, settings
 // ======================================================================
 let confirmRemove = null, confirmRelease = null, renaming = null;
 async function renderAdmin() {
-  const { byPlayer } = claimMaps();
-  const uids = Object.values(byPlayer);
-  $('#squad').innerHTML = store.players.length ? `<table><thead><tr><th>Player</th><th>Linked account</th><th>Matches</th><th>Coins</th><th>Give or take coins</th><th></th></tr></thead><tbody>${store.players.map((p) => {
+  const { byPlayer, byUid } = linkMaps();
+  const requests = store.claims.filter((c) => playerById(c.playerId) && !byUid[c.id]);
+  $('#linkRequests').innerHTML = requests.length ? requests.map((c) => `<div class="confirm-row"><span><span data-uid-name="${esc(c.id)}">An account</span> wants to be <b>${esc(nameOf(c.playerId))}</b>${byPlayer[c.playerId] ? ' <span class="pill warn">already taken</span>' : ''} <span class="small muted">${fmtDate(c.at)}</span></span>
+    <span class="row">${byPlayer[c.playerId] ? '' : `<button class="btn gold tiny" type="button" data-approve="${esc(c.id)}">Approve</button>`}<button class="btn tiny warn" type="button" data-reject="${esc(c.id)}">Reject</button></span></div>`).join('')
+    : '<p class="note">No requests waiting.</p>';
+  const pend = resultData().pending;
+  $('#adminResults').innerHTML = pend.length ? pend.map((r) => `<div class="confirm-row"><span>${esc(accountName(r.loggedBy))} logged ${resultLine(r)} ${resultStatus({ ...r, pending: true })}</span>
+    <span class="row"><button class="btn gold tiny" type="button" data-aconfirm="${esc(r.key)}">Confirm as admin</button><button class="btn tiny warn" type="button" data-areject="${esc(r.key)}">Delete</button></span></div>`).join('')
+    : '<p class="note">Nothing waiting.</p>';
+  const uids = Object.values(byPlayer).concat(requests.map((c) => c.id));
+  $('#squad').innerHTML = store.players.length ? `<table><thead><tr><th>Player</th><th>Linked account</th><th>Results</th><th>Coins</th><th>Give or take coins</th><th></th></tr></thead><tbody>${store.players.map((p) => {
     const uid = byPlayer[p.id];
     return `<tr><td>${renaming === p.id ? `<form class="row" data-rename-form="${esc(p.id)}"><input type="text" id="rename-${esc(p.id)}" value="${esc(p.name)}" maxlength="30" aria-label="New name"><button class="btn tiny" type="submit">Save</button></form>` : `<b>${esc(p.name)}</b>`}</td>
       <td>${uid ? `<span data-uid-name="${esc(uid)}">Linked</span>${uid === me.uid ? ' (you)' : ''}` : '<span class="na">Nobody yet</span>'}</td>
-      <td class="num">${summarise(p.id, store.matches).games}</td><td class="num">${fmtN(coinsOf(p.id))}</td>
-      <td><form class="row" data-coins-form="${esc(p.id)}"><input class="inline-num" type="number" step="10" id="coins-${esc(p.id)}" placeholder="+100" aria-label="Coins to add or remove"><button class="btn tiny" type="submit">Apply</button></form></td>
+      <td class="num">${summarise(p.id, finalResults()).games}</td><td class="num">${fmtN(coinsOf(p.id))}</td>
+      <td><form class="row" data-coins-form="${esc(p.id)}"><input class="inline-num" type="number" step="10" id="coins-${esc(p.id)}" placeholder="+100" aria-label="Coins to add or remove"><input class="inline-text" type="text" id="coinsWhy-${esc(p.id)}" placeholder="Reason" maxlength="60" aria-label="Reason"><button class="btn tiny" type="submit">Apply</button></form></td>
       <td style="white-space:nowrap"><button class="btn tiny" data-rename="${esc(p.id)}">Rename</button>
-        ${uid ? `<button class="btn tiny" data-release="${esc(uid)}">${confirmRelease === uid ? 'Confirm unlink' : 'Unlink'}</button>` : ''}
+        ${uid ? `<button class="btn tiny" data-release="${esc(p.id)}">${confirmRelease === p.id ? 'Confirm unlink' : 'Unlink'}</button>` : ''}
         <button class="btn tiny warn" data-remove="${esc(p.id)}">${confirmRemove === p.id ? 'Confirm remove' : 'Remove'}</button></td></tr>`;
   }).join('')}</tbody></table>` : '<div class="empty">No players yet. Add the squad above.</div>';
-  const f = { setMargin: 'margin', setBuilderMargin: 'builderMargin', setCoins: 'startingCoins', setPrincess: 'princessHp', setKing: 'kingHp' };
+  const f = { setMargin: 'margin', setBuilderMargin: 'builderMargin', setCoins: 'startingCoins', setPrincess: 'princessHp', setKing: 'kingHp',
+    setMinStake: 'minStake', setMaxStake: 'maxStake', setMaxReturn: 'maxReturn', setWindow: 'betWindowMin', setExpiry: 'fixtureHours' };
   for (const [id, k] of Object.entries(f)) if (document.activeElement !== $('#' + id)) $('#' + id).value = store.settings[k];
   $('#setOwnBets').checked = !!store.settings.ownMatchBets;
-  // Account names are resolved fresh each render and never stored
+  // Account names are looked up fresh each time and never stored
   if (userApi && uids.length) {
     const ps = await userApi.profiles(uids);
     for (const el of document.querySelectorAll('[data-uid-name]')) {
       const pr = ps[el.dataset.uidName];
-      el.textContent = (pr && pr.name) || 'Linked (name hidden)';
+      if (pr && pr.name) el.textContent = pr.name;
     }
   }
 }
 const playerDoc = (p, extra) => { const { id: _id, ...rest } = p; return { ...rest, ...extra }; };
-$('#squad').addEventListener('click', async (e) => {
-  const { remove: rid, release, rename } = e.target.dataset;
-  if (rename) { renaming = rename; renderAdmin(); return; }
-  if (release) {
-    if (confirmRelease !== release) { confirmRelease = release; renderAdmin(); return; }
-    confirmRelease = null;
-    try { await remove('claims', release); toast('Account unlinked. They can pick a player again.'); } catch { toast('Couldn\'t unlink that account.', true); }
-    return;
-  }
-  if (rid) {
-    if (confirmRemove !== rid) { confirmRemove = rid; renderAdmin(); return; }
-    confirmRemove = null;
-    try { await remove('players', rid); toast('Player removed. Their old matches stay in the history.'); } catch { toast('Couldn\'t remove that player.', true); }
-  }
+$('#p-admin').addEventListener('click', async (e) => {
+  const t = e.target.dataset;
+  try {
+    if (t.approve) {
+      const c = store.claims.find((x) => x.id === t.approve); if (!c) return;
+      if (linkMaps().byPlayer[c.playerId]) return toast(`${nameOf(c.playerId)} is already linked. Unlink them first.`, true);
+      await put('links', c.playerId, { uid: c.id, at: nowIso() }); toast(`Approved: they're now ${nameOf(c.playerId)}.`);
+    }
+    if (t.reject) { await remove('claims', t.reject); toast('Request rejected.'); }
+    if (t.aconfirm) {
+      const r = resultData().pending.find((x) => x.key === t.aconfirm); if (!r) return;
+      await put('matches', 'r_' + safeSeg(r.key), { ...pickResult(r), ref: r.key, loggedBy: r.loggedBy, finalAt: nowIso() }); toast('Result confirmed. Bets on it are settled.');
+    }
+    if (t.areject) {
+      const r = resultData().pending.find((x) => x.key === t.areject); if (!r) return;
+      await remove(`acts/${r.loggedBy}/items`, r.docId); toast('Result deleted.');
+    }
+    if (t.rename) { renaming = t.rename; renderAdmin(); }
+    if (t.release) {
+      if (confirmRelease !== t.release) { confirmRelease = t.release; renderAdmin(); return; }
+      confirmRelease = null;
+      const uid = linkMaps().byPlayer[t.release];
+      await remove('links', t.release); if (uid) await remove('claims', uid).catch(() => {});
+      toast('Unlinked. That account can ask for a player again.');
+    }
+    if (t.remove) {
+      if (confirmRemove !== t.remove) { confirmRemove = t.remove; renderAdmin(); return; }
+      confirmRemove = null;
+      await remove('players', t.remove); toast('Player removed. Their old results stay in the history.');
+    }
+  } catch { /* toast shown */ }
 });
 $('#squad').addEventListener('submit', async (e) => {
   e.preventDefault();
   const cf = e.target.dataset.coinsForm, rf = e.target.dataset.renameForm;
   if (cf) {
-    const p = playerById(cf), delta = Math.round(+$('#coins-' + cf).value || 0);
-    if (!p || !delta) return toast('Type a number of coins, like 100 or -50.', true);
-    try { await put('players', p.id, playerDoc(p, { adjust: (p.adjust || 0) + delta })); toast(`${delta > 0 ? 'Gave' : 'Took'} ${fmtN(Math.abs(delta))} coins ${delta > 0 ? 'to' : 'from'} ${p.name}.`); } catch { /* toast shown */ }
+    const p = playerById(cf), amount = Math.round(+$('#coins-' + cf).value || 0), reason = ($('#coinsWhy-' + cf).value || '').trim().slice(0, 60);
+    if (!p || !amount) return toast('Type a number of coins, like 100 or -50.', true);
+    if (!reason) return toast('Give a reason. It goes in the house log for everyone to see.', true);
+    try { await put('config', 'house', { ...store.house, gifts: [...houseGifts(), { pid: p.id, amount, reason, at: nowIso() }] }); toast(`${amount > 0 ? 'Gave' : 'Took'} ${fmtN(Math.abs(amount))} coins ${amount > 0 ? 'to' : 'from'} ${p.name}.`); } catch { /* toast shown */ }
   }
   if (rf) {
     const p = playerById(rf), name = $('#rename-' + rf).value.trim();
@@ -1422,14 +1874,21 @@ $('#addPlayer').addEventListener('submit', async (e) => {
   const name = $('#newName').value.trim();
   if (!name) return toast('Type a name first.', true);
   if (store.players.some((p) => p.name.toLowerCase() === name.toLowerCase())) return toast(`${name} is already in the squad.`, true);
-  try { await put('players', newId(), { name, addedAt: new Date().toISOString() }); $('#newName').value = ''; toast(`${name} added to the squad.`); } catch { /* toast shown */ }
+  try { await put('players', newId(), { name, addedAt: nowIso() }); $('#newName').value = ''; toast(`${name} added to the squad.`); } catch { /* toast shown */ }
 });
 $('#settingsForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const s = { margin: clamp(+$('#setMargin').value || 0, 0, 40), builderMargin: clamp(+$('#setBuilderMargin').value || 0, 0, 50), startingCoins: Math.max(0, Math.floor(+$('#setCoins').value || 0)),
-    princessHp: Math.max(100, Math.floor(+$('#setPrincess').value || DEFAULT_SETTINGS.princessHp)), kingHp: Math.max(100, Math.floor(+$('#setKing').value || DEFAULT_SETTINGS.kingHp)),
-    ownMatchBets: $('#setOwnBets').checked };
-  try { await put('config', 'settings', s); toast('Settings saved.'); } catch { /* toast shown */ }
+  const int = (id, lo, hi, dflt) => clamp(Math.floor(+$('#' + id).value || dflt), lo, hi);
+  const values = {
+    margin: clamp(+$('#setMargin').value || 0, 0, 40), builderMargin: clamp(+$('#setBuilderMargin').value || 0, 0, 50),
+    startingCoins: int('setCoins', 0, 1e6, 1000), princessHp: int('setPrincess', 100, 20000, 3052), kingHp: int('setKing', 100, 20000, 4824),
+    minStake: int('setMinStake', 1, 1e6, 5), maxStake: int('setMaxStake', 1, 1e6, 250), maxReturn: int('setMaxReturn', 10, 1e7, 5000),
+    betWindowMin: int('setWindow', 1, 120, 5), fixtureHours: int('setExpiry', 1, 168, 24), ownMatchBets: $('#setOwnBets').checked,
+  };
+  if (values.minStake > values.maxStake) return toast('Minimum stake can\'t be above the maximum.', true);
+  // keep a dated copy, so bets are always judged by the settings in force when they were placed
+  const history = [...(Array.isArray(store.settings.history) ? store.settings.history : []), { at: nowIso(), values }].slice(-200);
+  try { await put('config', 'settings', { ...values, adminUid: store.settings.adminUid || me.uid, history }); toast('Settings saved.'); } catch { /* toast shown */ }
 });
 
 // boot

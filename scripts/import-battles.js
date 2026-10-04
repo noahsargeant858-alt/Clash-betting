@@ -84,7 +84,19 @@ const samePlayers = (x, y) => (x.playerA === y.playerA && x.playerB === y.player
 const towersOnly = (m, r) => m.towersA && m.towersB && (
   (eqTowers(m.towersA, r.towersA) + eqTowers(m.towersB, r.towersB) >= 5) || (eqTowers(m.towersA, r.towersB) + eqTowers(m.towersB, r.towersA) >= 5));
 
-const results = battles
+// One battle can be saved twice (once from each player's log, times a second
+// apart): same two players within 10 seconds with the score mirrored.
+const when = (t) => Date.parse(iso(t));
+const sameBattle = (x, y) => {
+  const pair = (b) => [b.team.tag, b.opponent.tag].sort().join();
+  if (pair(x) !== pair(y) || Math.abs(when(x.battleTime) - when(y.battleTime)) > 10000) return false;
+  const [ya, yb] = x.team.tag === y.team.tag ? [y.team, y.opponent] : [y.opponent, y.team];
+  return x.team.crowns === ya.crowns && x.opponent.crowns === yb.crowns;
+};
+const unique = [];
+for (const b of [...battles].sort((x, y) => x.battleTime.localeCompare(y.battleTime))) if (!unique.some((o) => sameBattle(o, b))) unique.push(b);
+
+const results = unique
   .filter((b) => playerOf[b.team.tag] && playerOf[b.opponent.tag] && /draft/i.test((b.gameMode && b.gameMode.name) || ''))
   .map(fromBattle);
 

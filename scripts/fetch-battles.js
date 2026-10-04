@@ -36,6 +36,22 @@ async function get(p) {
   return res.json();
 }
 
+// One battle shows up in both players' logs, and the two copies' times can
+// differ by a second. Same two players within 10 seconds with the score
+// mirrored = the same battle; keep the first copy.
+const when = (t) => Date.parse(t.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2}).*$/, '$1-$2-$3T$4:$5:$6Z'));
+function sameBattle(x, y) {
+  const pair = (b) => [b.team.tag, b.opponent.tag].sort().join();
+  if (pair(x) !== pair(y) || Math.abs(when(x.battleTime) - when(y.battleTime)) > 10000) return false;
+  const [ya, yb] = x.team.tag === y.team.tag ? [y.team, y.opponent] : [y.opponent, y.team];
+  return x.team.crowns === ya.crowns && x.opponent.crowns === yb.crowns;
+}
+function dedupe(list) {
+  const out = [];
+  for (const b of list.sort((x, y) => x.battleTime.localeCompare(y.battleTime))) if (!out.some((o) => sameBattle(o, b))) out.push(b);
+  return out;
+}
+
 // Everything the site can use from one side of a battle
 const side = (s) => ({
   tag: s.tag,
@@ -74,7 +90,7 @@ const side = (s) => ({
     }
   }
 
-  const list = [...battles.values()].sort((x, y) => y.battleTime.localeCompare(x.battleTime)).slice(0, MAX_BATTLES);
+  const list = dedupe([...battles.values()]).sort((x, y) => y.battleTime.localeCompare(x.battleTime)).slice(0, MAX_BATTLES);
   const next = { players, battles: list };
   const before = JSON.stringify({ players: prev.players || {}, battles: prev.battles || [] });
   if (JSON.stringify(next) !== before) {

@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d1530">
+<title>Sign in · ClashBets</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cpath d='M4 33 2 9l12 9L24 3l10 15 12-9-2 24z' fill='%23f6c544'/%3E%3Crect x='4' y='35' width='40' height='5' rx='2' fill='%23f6c544'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+:root {
+  --bg: #0d1530; --panel: #152149; --panel-2: #1c2b5a; --line: #2a3c75;
+  --fg: #eef1fb; --muted: #95a2cb; --gold: #f6c544; --gold-ink: #2a1d00;
+  --blue: #4aa3ff; --red: #ff5d6c; --green: #43d17a; --amber: #ffad42;
+  --display: "Lilita One", "Arial Rounded MT Bold", "Trebuchet MS", sans-serif;
+  --body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { background: var(--bg); }
+body { margin: 0; min-height: 100vh; min-height: 100dvh; color: var(--fg); font: 16px/1.45 var(--body);
+  background: radial-gradient(900px 420px at 50% -80px, #22357a 0%, rgb(34 53 122 / 0) 70%), var(--bg); }
+button, input { font: inherit; color: inherit; }
+
+.wrap { width: 100%; max-width: 440px; margin: 0 auto; padding: 36px 16px calc(32px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 20px; }
+.brand-block { text-align: center; display: grid; gap: 4px; justify-items: center; }
+.crown { width: 46px; height: 38px; margin-bottom: 2px; }
+.brand { margin: 0; font: 400 44px/1 var(--display); letter-spacing: .5px; }
+.brand b { color: var(--gold); font-weight: 400; }
+.sub { margin: 0; color: var(--muted); font-size: 14px; }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--gold); border-radius: 16px; padding: 18px 18px 20px; display: grid; gap: 16px; box-shadow: 0 14px 40px rgb(0 0 0 / .35); min-width: 0; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
+.tabs button { border: 0; background: none; color: var(--muted); font-weight: 700; font-size: 15px; padding: 10px 6px; border-radius: 9px; cursor: pointer; }
+.tabs button:hover { color: var(--fg); }
+.tabs button[aria-selected="true"] { background: var(--panel-2); color: var(--gold); box-shadow: inset 0 -2px 0 var(--gold); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+form { display: grid; gap: 14px; min-width: 0; }
+.field { display: grid; gap: 5px; min-width: 0; }
+.field label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.field label small { font-weight: 500; }
+.field input { width: 100%; min-width: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 13px; font-size: 16px; }
+.field input[aria-invalid="true"] { border-color: var(--red); }
+.hint { margin: 0; font-size: 12.5px; color: var(--muted); }
+.pw { position: relative; display: grid; }
+.pw input { padding-right: 68px; }
+.eye { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); border-radius: 8px; padding: 5px 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.eye:hover { color: var(--fg); border-color: var(--gold); }
+input:-webkit-autofill { -webkit-box-shadow: 0 0 0 100px var(--bg) inset; -webkit-text-fill-color: var(--fg); caret-color: var(--fg); }
+
+.err { margin: 0; background: #3a1626; border: 1px solid var(--red); color: #ffd6da; border-radius: 10px; padding: 10px 12px; font-size: 14px; overflow-wrap: anywhere; }
+.err:empty { display: none; }
+.go { background: var(--gold); color: var(--gold-ink); border: 0; border-radius: 12px; min-height: 50px; padding: 10px 16px; font: 400 20px/1 var(--display); letter-spacing: .4px; cursor: pointer; }
+.go:hover:not(:disabled) { filter: brightness(1.06); }
+.go:disabled { opacity: .6; cursor: progress; }
+.foot { margin: 0; text-align: center; color: var(--muted); font-size: 14px; text-wrap: balance; }
+noscript p { text-align: center; color: var(--amber); }
+@media (max-width: 380px) { .brand { font-size: 38px; } .card { padding: 16px 14px 18px; } }
+@media (prefers-reduced-motion: no-preference) { .go { transition: filter .15s; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="brand-block">
+    <svg class="crown" viewBox="0 0 48 40" aria-hidden="true"><path d="M4 33 2 9l12 9L24 3l10 15 12-9-2 24z" fill="#f6c544"/><rect x="4" y="35" width="40" height="5" rx="2" fill="#f6c544"/><circle cx="24" cy="25" r="3" fill="#0d1530"/><circle cx="13" cy="26" r="2" fill="#0d1530"/><circle cx="35" cy="26" r="2" fill="#0d1530"/></svg>
+    <h1 class="brand">Clash<b>Bets</b></h1>
+    <p class="sub">Triple Draft sportsbook · coins only</p>
+  </header>
+
+  <section class="card">
+    <div class="tabs" role="tablist" aria-label="Sign in or create an account">
+      <button type="button" role="tab" id="tab-in" aria-controls="panel-in" aria-selected="true">Sign in</button>
+      <button type="button" role="tab" id="tab-up" aria-controls="panel-up" aria-selected="false" tabindex="-1">Create account</button>
+    </div>
+
+    <form id="panel-in" role="tabpanel" aria-labelledby="tab-in" novalidate>
+      <div class="field">
+        <label for="in-user">Username</label>
+        <input id="in-user" name="username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="24" aria-describedby="in-err">
+      </div>
+      <div class="field">
+        <label for="in-pass">Password</label>
+        <div class="pw">
+          <input id="in-pass" name="password" type="password" autocomplete="current-password" maxlength="200" aria-describedby="in-err">
+          <button type="button" class="eye" aria-controls="in-pass" aria-pressed="false">Show</button>
+        </div>
+      </div>
+      <p class="err" id="in-err" role="alert"></p>
+      <button type="submit" class="go">Sign in</button>
+    </form>
+
+    <form id="panel-up" role="tabpanel" aria-labelledby="tab-up" novalidate hidden>
+      <div class="field">
+        <label for="up-user">Username</label>
+        <input id="up-user" name="username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="24" aria-describedby="up-user-hint up-err">
+        <p class="hint" id="up-user-hint">3 to 24 letters, numbers, dots, dashes or underscores. You sign in with this.</p>
+      </div>
+      <div class="field">
+        <label for="up-name">Your name <small>(optional)</small></label>
+        <input id="up-name" name="display" type="text" autocomplete="nickname" maxlength="30" aria-describedby="up-name-hint up-err">
+        <p class="hint" id="up-name-hint">What everyone else sees. Leave it blank to use your username.</p>
+      </div>
+      <div class="field">
+        <label for="up-pass">Password</label>
+        <div class="pw">
+          <input id="up-pass" name="password" type="password" autocomplete="new-password" maxlength="200" aria-describedby="up-pass-hint up-err">
+          <button type="button" class="eye" aria-controls="up-pass" aria-pressed="false">Show</button>
+        </div>
+        <p class="hint" id="up-pass-hint">At least 8 characters.</p>
+      </div>
+      <div class="field" id="code-field" hidden>
+        <label for="up-code">Group code</label>
+        <input id="up-code" name="code" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="100" aria-describedby="up-code-hint up-err">
+        <p class="hint" id="up-code-hint">Ask the admin for it.</p>
+      </div>
+      <p class="err" id="up-err" role="alert"></p>
+      <button type="submit" class="go">Create account</button>
+    </form>
+  </section>
+
+  <p class="foot">Got a personal link from the admin? Just open it and you're in. No sign-up needed.</p>
+  <noscript><p>ClashBets needs JavaScript switched on to sign in.</p></noscript>
+</main>
+
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+
+// Where to go afterwards: only a path on this site, never another address
+function nextUrl() {
+  const n = new URLSearchParams(location.search).get('next');
+  if (!n || n[0] !== '/' || n[1] === '/' || n[1] === '\\') return '/';
+  try {
+    const u = new URL(n, location.origin);
+    if (u.origin !== location.origin || /^\/(login|api)(\/|$)/.test(u.pathname)) return '/';
+    return u.pathname + u.search + u.hash;
+  } catch { return '/'; }
+}
+
+async function post(url, body) {
+  let res;
+  try { res = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CB': '1' }, body: JSON.stringify(body) }); }
+  catch { throw { network: true }; }
+  let data = null;
+  try { data = await res.json(); } catch { /* no body */ }
+  if (!res.ok) throw { status: res.status, message: data && typeof data.error === 'string' ? data.error : '' };
+  return data;
+}
+
+// ---------- tabs ----------
+const tabs = [$('#tab-in'), $('#tab-up')], panels = [$('#panel-in'), $('#panel-up')];
+function pick(i, focus) {
+  tabs.forEach((t, k) => { t.setAttribute('aria-selected', k === i); t.tabIndex = k === i ? 0 : -1; panels[k].hidden = k !== i; });
+  document.title = (i ? 'Create account' : 'Sign in') + ' · ClashBets';
+  if (focus) panels[i].querySelector('input').focus();
+}
+tabs.forEach((t, i) => t.addEventListener('click', () => pick(i, true)));
+$('.tabs').addEventListener('keydown', (e) => {
+  const i = tabs.indexOf(document.activeElement);
+  if (i < 0 || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+  e.preventDefault();
+  const to = e.key === 'Home' ? 0 : e.key === 'End' ? 1 : 1 - i; // two tabs, so either arrow moves to the other
+  pick(to, false); tabs[to].focus();
+});
+if (location.hash === '#create') pick(1, false);
+
+// ---------- show / hide password ----------
+for (const b of document.querySelectorAll('.eye')) b.addEventListener('click', () => {
+  const input = document.getElementById(b.getAttribute('aria-controls')), show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  b.textContent = show ? 'Hide' : 'Show'; b.setAttribute('aria-pressed', show);
+});
+
+// ---------- group code (only when the server asks for one) ----------
+function wantCode() { $('#code-field').hidden = false; }
+fetch('/api/auth/config', { credentials: 'same-origin' }).then((r) => r.json()).then((c) => { if (c && c.signupCode) wantCode(); }).catch(() => { /* the form still works without it */ });
+
+// ---------- forms ----------
+const WORDS = { 'in': { user: '#in-user', pass: '#in-pass' }, up: { user: '#up-user', display: '#up-name', pass: '#up-pass', code: '#up-code' } };
+function fail(which, text, field) {
+  const box = $('#' + which + '-err');
+  box.textContent = text;
+  for (const el of document.querySelectorAll('#panel-' + which + ' input')) el.removeAttribute('aria-invalid');
+  const el = field && $(field);
+  if (el) { el.setAttribute('aria-invalid', 'true'); el.focus(); }
+}
+// Which box a server message is about, so that one gets the red outline
+function fieldFor(which, msg) {
+  const f = WORDS[which], m = String(msg || '').toLowerCase();
+  if (/group code|code/.test(m) && f.code) return f.code;
+  if (/password/.test(m)) return f.pass;
+  if (/username|already taken|taken/.test(m)) return f.user;
+  if (/\bname\b/.test(m) && f.display) return f.display;
+  return null;
+}
+function problem(which, e) {
+  if (e.network) return fail(which, 'Couldn\'t reach ClashBets. Check your connection and try again.');
+  const msg = e.message || (e.status === 429 ? 'Too many tries. Wait a few minutes and try again.' : e.status >= 500 ? 'Something went wrong on our side. Try again in a moment.' : 'That didn\'t work. Check the details and try again.');
+  if (which === 'up' && e.status === 403 && /code/i.test(msg)) wantCode();
+  fail(which, msg, fieldFor(which, msg));
+}
+
+async function submit(which, url, body, busy) {
+  const form = $('#panel-' + which), btn = form.querySelector('.go'), label = btn.textContent;
+  btn.disabled = true; btn.textContent = busy;
+  try {
+    await post(url, body);
+    btn.textContent = 'Welcome…';
+    location.replace(nextUrl());
+  } catch (e) {
+    btn.disabled = false; btn.textContent = label;
+    problem(which, e);
+  }
+}
+// coming back to this page with the back button shouldn't leave it stuck on "Welcome…"
+window.addEventListener('pageshow', (e) => {
+  if (!e.persisted) return;
+  for (const [f, label] of [['in', 'Sign in'], ['up', 'Create account']]) { const b = $('#panel-' + f + ' .go'); b.disabled = false; b.textContent = label; }
+});
+
+$('#panel-in').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const username = $('#in-user').value.trim().toLowerCase(), password = $('#in-pass').value;
+  if (!username) return fail('in', 'Enter your username.', '#in-user');
+  if (!password) return fail('in', 'Enter your password.', '#in-pass');
+  fail('in', '');
+  submit('in', '/api/auth/login', { username, password }, 'Signing in…');
+});
+
+$('#panel-up').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const username = $('#up-user').value.trim().toLowerCase(), display = $('#up-name').value.trim(), password = $('#up-pass').value, code = $('#up-code').value.trim();
+  if (!/^[a-z0-9][a-z0-9_.-]{2,23}$/.test(username)) return fail('up', 'Pick a username of 3 to 24 letters, numbers, dots, dashes or underscores. It has to start with a letter or number.', '#up-user');
+  if (/[\u0000-\u001f\u007f]/.test(display) || display.length > 30) return fail('up', 'Keep your name to 30 characters, with no odd symbols.', '#up-name');
+  if (password.length < 8) return fail('up', 'Pick a password with at least 8 characters.', '#up-pass');
+  if (!$('#code-field').hidden && !code) return fail('up', 'Enter the group code. Ask the admin for it.', '#up-code');
+  fail('up', '');
+  const body = { username, password };
+  if (display) body.display = display;
+  if (!$('#code-field').hidden) body.code = code;
+  submit('up', '/api/auth/signup', body, 'Creating account…');
+});
+
+// a keyboard on a phone is in the way of the heading, so only grab focus where there's a real keyboard
+if (window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches) $('#in-user').focus();
+</script>
+</body>
+</html>

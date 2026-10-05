@@ -1,0 +1,30 @@
+# Render blueprint for the ClashBets website (see site/DEPLOY.md).
+# The paid "starter" plan is what gives the site a permanent disk, so accounts and bets survive restarts.
+services:
+  - type: web
+    name: clashbets
+    runtime: node
+    region: frankfurt
+    plan: starter
+    buildCommand: node site/build.js
+    startCommand: node site/server.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    disk:
+      name: clashbets-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      - key: ADMIN_USERNAME
+        value: triqqi
+      # Render asks for these two when the blueprint is created. Type them there, never in chat.
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SIGNUP_CODE
+        sync: false

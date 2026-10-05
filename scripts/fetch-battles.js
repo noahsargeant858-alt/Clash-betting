@@ -67,6 +67,8 @@ const side = (s) => ({
   const prev = PREV && fs.existsSync(PREV) ? JSON.parse(fs.readFileSync(PREV, 'utf8')) : { players: {}, battles: [] };
   const battles = new Map((prev.battles || []).map((b) => [b.key, b]));
   const players = { ...(prev.players || {}) };
+  // when each player's log was last read in full: anything they played before then is in this file
+  const checked = { ...(prev.checked || {}) };
   let added = 0, failed = 0;
 
   for (const p of squad) {
@@ -83,6 +85,7 @@ const side = (s) => ({
         battles.set(key, { key, battleTime: b.battleTime, type: b.type, gameMode: b.gameMode || null, team: side(b.team[0]), opponent: side(b.opponent[0]) });
         added++; mine++;
       }
+      checked[tag] = new Date().toISOString();
       console.log(`${p.name} (${tag}): ${log.length} battles in log, ${mine} new friendlies`);
     } catch (e) {
       failed++;
@@ -91,8 +94,8 @@ const side = (s) => ({
   }
 
   const list = dedupe([...battles.values()]).sort((x, y) => y.battleTime.localeCompare(x.battleTime)).slice(0, MAX_BATTLES);
-  const next = { players, battles: list };
-  const before = JSON.stringify({ players: prev.players || {}, battles: prev.battles || [] });
+  const next = { players, battles: list, checked };
+  const before = JSON.stringify({ players: prev.players || {}, battles: prev.battles || [], checked: prev.checked || {} });
   if (JSON.stringify(next) !== before) {
     fs.writeFileSync(OUT, JSON.stringify({ updatedAt: new Date().toISOString(), ...next }, null, 1) + '\n');
     console.log(`Saved: ${added} new friendlies, ${list.length} stored.`);

@@ -14,6 +14,7 @@
 //   db/links/<playerId>.json             (if any) which account speaks for which player
 //   db/acts/<uid>/items/<id>.json        (if any) players' own logged results in the window
 //   versions.json                        {"matches/<id>": version} for the window's results
+//                                        (and "config/importState": version, if that doc exists)
 //   window.json                          {"since": ISO, "now": ISO}
 // Writes <work-dir>/batch-1.json, batch-2.json ... (max 50 writes each) and summary.txt
 
@@ -113,9 +114,21 @@ for (const x of [...pairs.merged, ...pairs.duplicates]) {
 for (const x of pairs.mislabeled) log.push(`CHECK: hand log ${x.key} "${x.label}" has the tower HP of official "${x.official}". Left in place for the admin to look at.`);
 for (const x of pairs.unmatched) log.push(`Kept hand log ${x.key} "${x.label}": no official match (yet)`);
 
+// How far the official log is known to be complete for each player, so a series can settle
+// once its deciding game is covered (a game nobody logged by hand can't be skipped)
+const checked = read('battles.json').checked || {}, through = {};
+for (const [tag, at] of Object.entries(checked)) { const pid = playerOf[lib.normTag(tag)]; if (pid && canon(at)) through[pid] = at; }
+let coverageWrite = null; // goes in its own last batch, so it can never hold up the results
+if (Object.keys(through).length) {
+  const v = versions['config/importState'];
+  coverageWrite = { op: 'set', collection: 'config', doc_id: 'importState', file_path: saveDoc('importState', { ranAt: now, through }), ...(v ? { if_version: v } : {}) };
+  log.push(`Official log complete through: ${Object.entries(through).map(([p, t]) => `${p} ${t}`).join(', ')}`);
+}
+
 for (const f of fs.readdirSync(W)) if (/^batch-\d+\.json$/.test(f)) fs.unlinkSync(path.join(W, f));
 for (let i = 0; i < writes.length; i += 50) fs.writeFileSync(path.join(W, `batch-${i / 50 + 1}.json`), JSON.stringify(writes.slice(i, i + 50), null, 1));
-const summary = [`Window ${since} to ${now}`, `${Object.keys(official).length} official results in the window, ${writes.filter((w) => w.op === 'set' && !w.if_version).length} new`, ...log].join('\n');
+if (coverageWrite) fs.writeFileSync(path.join(W, `batch-${Math.ceil(writes.length / 50) + 1}.json`), JSON.stringify([coverageWrite], null, 1));
+const summary = [`Window ${since} to ${now}`, `${Object.keys(official).length} official results in the window, ${writes.filter((w) => w.collection === 'matches' && w.op === 'set' && !w.if_version).length} new`, ...log].join('\n');
 fs.writeFileSync(path.join(W, 'summary.txt'), summary + '\n');
 console.log(summary);
-console.log(`${Math.ceil(writes.length / 50)} batch file(s), ${writes.length} writes.`);
+console.log(`${Math.ceil(writes.length / 50) + (coverageWrite ? 1 : 0)} batch file(s), ${writes.length + (coverageWrite ? 1 : 0)} writes.`);

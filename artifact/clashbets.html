@@ -132,12 +132,26 @@ ol.legs { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
 ol.legs li { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; }
 ul.leg-list { margin: 4px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
 
+/* ---------- ladders, groups, tournament ---------- */
+.group-head { grid-column: 1 / -1; font-family: var(--display); font-weight: 400; font-size: 19px; color: var(--gold); margin: 8px 0 -4px; letter-spacing: .3px; }
+.ladder { display: grid; gap: 6px; max-height: 330px; overflow-y: auto; }
+.rung { display: grid; grid-template-columns: 58px 1fr 1fr; gap: 6px; align-items: center; }
+.rung > b { text-align: center; font-variant-numeric: tabular-nums; }
+.price.short { padding: 6px 8px; }
+.price.short .odd { font-size: 15px; }
+.rung .ph { visibility: hidden; }
+.series-row { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.series-row:last-child { border-bottom: 0; }
+.games { display: flex; flex-wrap: wrap; gap: 4px; }
+.idea { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 6px; background: var(--panel-2); }
+.idea .prices { display: flex; flex-wrap: wrap; gap: 6px; font-size: 13px; }
+
 .slip-bar { display: none; }
 @media (max-width: 820px) {
   .slip-bar:not([hidden]) { display: flex; justify-content: space-between; align-items: center; gap: 10px; position: fixed; left: 12px; right: 12px;
     bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 6; background: var(--gold); color: var(--gold-ink); border: 0; border-radius: 12px;
     padding: 12px 16px; font-family: var(--display); font-size: 17px; box-shadow: 0 6px 20px rgb(0 0 0 / .4); cursor: pointer; }
-  #p-odds { padding-bottom: 64px; }
+  #p-odds, #p-tourn { padding-bottom: 64px; }
 }
 
 /* ---------- fixtures, confirmations, house log ---------- */
@@ -186,6 +200,7 @@ tr.mine td { background: var(--panel-2); }
   </div>
   <nav role="tablist" id="tabs">
     <button role="tab" id="tab-odds" aria-controls="p-odds" aria-selected="true">Odds</button>
+    <button role="tab" id="tab-tourn" aria-controls="p-tourn" aria-selected="false">Tournament</button>
     <button role="tab" id="tab-log" aria-controls="p-log" aria-selected="false">Log match</button>
     <button role="tab" id="tab-history" aria-controls="p-history" aria-selected="false">History</button>
     <button role="tab" id="tab-bets" aria-controls="p-bets" aria-selected="false">Bets</button>
@@ -235,6 +250,33 @@ tr.mine td { background: var(--panel-2); }
     <div class="board">
       <div id="markets" class="markets"></div>
       <aside class="panel slip" id="slip" aria-live="polite"></aside>
+    </div>
+  </section>
+
+  <!-- TOURNAMENT: best-of series -->
+  <section role="tabpanel" id="p-tourn" aria-labelledby="tab-tourn" hidden>
+    <div class="panel stack">
+      <h2>Best-of series</h2>
+      <p class="note">Open a Best of 3 or Best of 5 just before you start. Everyone bets until it locks, then the whole series settles from the official battle log once it's over.</p>
+      <div id="seriesList"></div>
+      <form id="seriesForm" class="row" hidden>
+        <select id="newSrA" aria-label="Player one"></select><span id="newSrAName" class="small"></span>
+        <select id="newSrB" aria-label="Opponent"></select>
+        <div class="seg mode" role="group" aria-label="Format"><button type="button" data-sf="bo3" aria-pressed="true">Best of 3</button><button type="button" data-sf="bo5" aria-pressed="false">Best of 5</button></div>
+        <button class="btn gold" type="submit">Open series</button>
+      </form>
+    </div>
+    <div class="panel versus">
+      <select id="trA" class="a" aria-label="Left player"></select>
+      <span class="vs">VS</span>
+      <select id="trB" class="b" aria-label="Right player"></select>
+    </div>
+    <div class="row" style="justify-content:center"><div class="seg mode" role="group" aria-label="Series length" id="trFormat">
+      <button type="button" data-tf="bo3" aria-pressed="true">Best of 3</button><button type="button" data-tf="bo5" aria-pressed="false">Best of 5</button></div></div>
+    <div id="trMeta" class="small muted" style="text-align:center"></div>
+    <div class="board">
+      <div id="trMarkets" class="markets"></div>
+      <aside class="panel slip" id="trSlip" aria-live="polite"></aside>
     </div>
   </section>
 
@@ -305,6 +347,16 @@ tr.mine td { background: var(--panel-2); }
         <button class="btn gold" type="submit">Add player</button>
       </form>
       <div class="scroll" id="squad"></div>
+    </div>
+    <div class="panel stack">
+      <h2>AI bookie</h2>
+      <p class="note">Ask Claude, briefed as a Clash Royale expert, to invent new specials. The book prices them from the same simulations as everything else, and only the ones you publish go on the board. Each ask uses a little of your own Claude usage.</p>
+      <div class="row">
+        <select id="bkScope" aria-label="Specials for"><option value="game">Single game</option><option value="bo3">Best of 3</option><option value="bo5">Best of 5</option></select>
+        <button class="btn gold" type="button" id="bkAsk">Invent 6 specials</button>
+      </div>
+      <div id="bkOut" class="stack"></div>
+      <div id="bkLive" class="stack"></div>
     </div>
     <div class="panel stack">
       <h2>Settings</h2>
@@ -713,6 +765,436 @@ function settleBuilder(legs, o) {
   return rs.includes(false) ? false : rs.includes(null) ? null : true;
 }
 
+// Card facts and the market catalogue, put together by Clash Royale expert agents
+const CARDS = {
+"Archers":{"t":"troop","e":3,"r":"common"},
+"Arrows":{"t":"spell","e":3,"r":"common"},
+"Baby Dragon":{"t":"troop","e":4,"r":"epic","a":1},
+"Balloon":{"t":"troop","e":5,"r":"epic","w":1,"a":1},
+"Bandit":{"t":"troop","e":3,"r":"legendary"},
+"Barbarian Barrel":{"t":"spell","e":2,"r":"epic"},
+"Barbarian Hut":{"t":"building","e":7,"r":"rare"},
+"Barbarians":{"t":"troop","e":5,"r":"common"},
+"Bats":{"t":"troop","e":2,"r":"common","a":1},
+"Battle Healer":{"t":"troop","e":4,"r":"rare"},
+"Battle Ram":{"t":"troop","e":4,"r":"rare","w":1},
+"Bomb Tower":{"t":"building","e":4,"r":"rare"},
+"Bomber":{"t":"troop","e":2,"r":"common"},
+"Bowler":{"t":"troop","e":5,"r":"epic"},
+"Cannon":{"t":"building","e":3,"r":"common"},
+"Cannon Cart":{"t":"troop","e":5,"r":"epic"},
+"Dark Prince":{"t":"troop","e":4,"r":"epic"},
+"Dart Goblin":{"t":"troop","e":3,"r":"rare"},
+"Earthquake":{"t":"spell","e":3,"r":"rare"},
+"Electro Dragon":{"t":"troop","e":5,"r":"epic","a":1},
+"Electro Giant":{"t":"troop","e":7,"r":"epic","w":1},
+"Electro Spirit":{"t":"troop","e":1,"r":"common"},
+"Electro Wizard":{"t":"troop","e":4,"r":"legendary"},
+"Elite Barbarians":{"t":"troop","e":6,"r":"common"},
+"Elixir Collector":{"t":"building","e":6,"r":"rare"},
+"Elixir Golem":{"t":"troop","e":3,"r":"rare","w":1},
+"Executioner":{"t":"troop","e":5,"r":"epic"},
+"Fire Spirit":{"t":"troop","e":1,"r":"common"},
+"Fireball":{"t":"spell","e":4,"r":"rare"},
+"Firecracker":{"t":"troop","e":3,"r":"common"},
+"Fisherman":{"t":"troop","e":3,"r":"legendary"},
+"Flying Machine":{"t":"troop","e":4,"r":"rare","a":1},
+"Freeze":{"t":"spell","e":4,"r":"epic"},
+"Furnace":{"t":"building","e":4,"r":"rare"},
+"Giant":{"t":"troop","e":5,"r":"rare","w":1},
+"Giant Snowball":{"t":"spell","e":2,"r":"common"},
+"Goblin Barrel":{"t":"spell","e":3,"r":"epic","w":1},
+"Goblin Cage":{"t":"building","e":4,"r":"rare"},
+"Goblin Curse":{"t":"spell","e":2,"r":"epic"},
+"Goblin Demolisher":{"t":"troop","e":4,"r":"rare"},
+"Goblin Drill":{"t":"building","e":4,"r":"epic","w":1},
+"Goblin Gang":{"t":"troop","e":3,"r":"common"},
+"Goblin Giant":{"t":"troop","e":6,"r":"epic","w":1},
+"Goblin Hut":{"t":"building","e":5,"r":"rare"},
+"Goblin Machine":{"t":"troop","e":5,"r":"legendary"},
+"Goblins":{"t":"troop","e":2,"r":"common"},
+"Golem":{"t":"troop","e":8,"r":"epic","w":1},
+"Graveyard":{"t":"spell","e":5,"r":"legendary","w":1},
+"Guards":{"t":"troop","e":3,"r":"epic"},
+"Heal Spirit":{"t":"troop","e":1,"r":"rare"},
+"Hog Rider":{"t":"troop","e":4,"r":"rare","w":1},
+"Hunter":{"t":"troop","e":4,"r":"epic"},
+"Ice Golem":{"t":"troop","e":2,"r":"rare"},
+"Ice Spirit":{"t":"troop","e":1,"r":"common"},
+"Ice Wizard":{"t":"troop","e":3,"r":"legendary"},
+"Inferno Dragon":{"t":"troop","e":4,"r":"legendary","a":1},
+"Inferno Tower":{"t":"building","e":5,"r":"rare"},
+"Knight":{"t":"troop","e":3,"r":"common"},
+"Lightning":{"t":"spell","e":6,"r":"epic"},
+"Lumberjack":{"t":"troop","e":4,"r":"legendary"},
+"Magic Archer":{"t":"troop","e":4,"r":"legendary"},
+"Mega Knight":{"t":"troop","e":7,"r":"legendary"},
+"Mega Minion":{"t":"troop","e":3,"r":"rare","a":1},
+"Miner":{"t":"troop","e":3,"r":"legendary","w":1},
+"Mini P.E.K.K.A":{"t":"troop","e":4,"r":"rare"},
+"Minion Horde":{"t":"troop","e":5,"r":"common","a":1},
+"Minions":{"t":"troop","e":3,"r":"common","a":1},
+"Mortar":{"t":"building","e":4,"r":"common","w":1},
+"Mother Witch":{"t":"troop","e":4,"r":"legendary"},
+"Musketeer":{"t":"troop","e":4,"r":"rare"},
+"Night Witch":{"t":"troop","e":4,"r":"legendary"},
+"P.E.K.K.A":{"t":"troop","e":7,"r":"epic"},
+"Phoenix":{"t":"troop","e":4,"r":"legendary","a":1},
+"Poison":{"t":"spell","e":4,"r":"epic"},
+"Prince":{"t":"troop","e":5,"r":"epic"},
+"Princess":{"t":"troop","e":3,"r":"legendary"},
+"Rage":{"t":"spell","e":2,"r":"epic"},
+"Ram Rider":{"t":"troop","e":5,"r":"legendary","w":1},
+"Rascals":{"t":"troop","e":5,"r":"common"},
+"Rocket":{"t":"spell","e":6,"r":"rare"},
+"Royal Delivery":{"t":"spell","e":3,"r":"common"},
+"Royal Ghost":{"t":"troop","e":3,"r":"legendary"},
+"Royal Giant":{"t":"troop","e":6,"r":"common","w":1},
+"Royal Hogs":{"t":"troop","e":5,"r":"rare","w":1},
+"Royal Recruits":{"t":"troop","e":7,"r":"common"},
+"Skeleton Army":{"t":"troop","e":3,"r":"epic"},
+"Skeleton Barrel":{"t":"troop","e":3,"r":"common","w":1,"a":1},
+"Skeleton Dragons":{"t":"troop","e":4,"r":"common","a":1},
+"Skeletons":{"t":"troop","e":1,"r":"common"},
+"Sparky":{"t":"troop","e":6,"r":"legendary"},
+"Spear Goblins":{"t":"troop","e":2,"r":"common"},
+"Tesla":{"t":"building","e":4,"r":"common"},
+"The Log":{"t":"spell","e":2,"r":"legendary"},
+"Tombstone":{"t":"building","e":3,"r":"rare"},
+"Tornado":{"t":"spell","e":3,"r":"epic"},
+"Valkyrie":{"t":"troop","e":4,"r":"rare"},
+"Void":{"t":"spell","e":3,"r":"epic"},
+"Wall Breakers":{"t":"troop","e":2,"r":"epic","w":1},
+"Witch":{"t":"troop","e":5,"r":"epic"},
+"Wizard":{"t":"troop","e":5,"r":"rare"},
+"X-Bow":{"t":"building","e":6,"r":"epic","w":1},
+"Zap":{"t":"spell","e":2,"r":"common"},
+"Zappies":{"t":"troop","e":4,"r":"rare"}
+};
+const CATALOGUE = [
+{"id":"g.crowns-total","scope":"game","name":"Total Crowns","blurb":"From a cagey 1-0 overtime grind to a full-blown tower-toppling free-for-all, pick your rung on every crown both players bag.","kind":"ou","expr":{"stat":"crowns","side":"tot"},"lines":[0.5,1.5,2.5,3.5,4.5]},
+{"id":"g.crowns-a","scope":"game","name":"{A} Crowns","blurb":"{A}'s own crown count like a team goals line: over 0.5 means they draw blood, over 2.5 means they carry the King home in a carrier bag.","kind":"ou","expr":{"stat":"crowns","side":"A"},"lines":[0.5,1.5,2.5]},
+{"id":"g.crowns-b","scope":"game","name":"{B} Crowns","blurb":"{B}'s crown haul on its own, for punters who reckon they'll score even if they don't win.","kind":"ou","expr":{"stat":"crowns","side":"B"},"lines":[0.5,1.5,2.5]},
+{"id":"g.dmg-total","scope":"game","name":"Total Tower Damage","blurb":"Add up every bit of tower HP both players knock off and pick your rung, from a polite tickle to a full demolition job.","kind":"ou","expr":{"stat":"dealt","side":"tot"},"lines":[3000,4000,5000,6000,7000,8000,9000,10000,11000,12000,13000,14000,15000]},
+{"id":"g.dmg-a","scope":"game","name":"{A} Tower Damage","blurb":"Back the low rungs if {A} only manages a nibble that baits The Log, or the high rungs for a full Hog-cycle battering.","kind":"ou","expr":{"stat":"dealt","side":"A"},"lines":[1000,2000,3000,4000,5000,6000,7000,8000,9000]},
+{"id":"g.dmg-b","scope":"game","name":"{B} Tower Damage","blurb":"{B}'s damage ladder, so back the unders if you reckon they'll spend all game hiding behind a Cannon.","kind":"ou","expr":{"stat":"dealt","side":"B"},"lines":[1000,2000,3000,4000,5000,6000,7000,8000,9000]},
+{"id":"g.kings-both","scope":"game","name":"Both Kings Woken","blurb":"Usually only one grumpy old King gets dragged out of bed, so back both of them to be up and swinging their cannons, and somebody put the kettle on.","kind":"yn","expr":{"stat":"kings","side":"tot"},"op":">=","value":2},
+{"id":"g.leak-total","scope":"game","name":"Total Elixir Leaked","blurb":"Two grown adults, one shared hobby: watching the elixir bar hit ten and doing absolutely nothing about it.","kind":"ou","expr":{"stat":"leak","side":"tot"},"lines":[1.5,3.5,5.5,7.5,9.5,12.5,15.5,20.5,30.5]},
+{"id":"g.leak-a","scope":"game","name":"{A} Elixir Leaked","blurb":"Sitting on ten elixir admiring your hand is a lifestyle choice, and we've priced up {A}'s.","kind":"ou","expr":{"stat":"leak","side":"A"},"lines":[0.5,1.5,2.5,3.5,4.5,6.5,8.5,10.5,15.5,20.5]},
+{"id":"g.leak-b","scope":"game","name":"{B} Elixir Leaked","blurb":"Is {B} playing Clash or putting the kettle on between deploys, because the purple bar never lies.","kind":"ou","expr":{"stat":"leak","side":"B"},"lines":[0.5,1.5,2.5,3.5,4.5,6.5,8.5,10.5,15.5,20.5]},
+{"id":"g.leak-hl","scope":"game","name":"Leakiest Tap","blurb":"Back whoever you reckon spends the match admiring their own deck, with the Tie reserved for two flawless elixir monks.","kind":"hl","expr":{"stat":"leak"},"tie":true},
+{"id":"g.firecracker","scope":"game","name":"Firecracker Drafted","blurb":"The queen of chip damage turns up in about a third of drafts, so does somebody pick her and ruin everyone's Skeleton Barrel?","kind":"yn","expr":{"stat":"card","card":"Firecracker","side":"tot"},"op":">=","value":1},
+{"id":"g.megaknight","scope":"game","name":"Mega Knight Drafted","blurb":"The ladder's most hated jumper is a proper rarity in our drafts, and if he turns up someone's leaving the group chat.","kind":"yn","expr":{"stat":"card","card":"Mega Knight","side":"tot"},"op":">=","value":1},
+{"id":"g.log-hl","scope":"game","name":"Who Gets The Log?","blurb":"Rolling-wood rights are up for grabs: back {A}, back {B}, or take the Tie if nobody can be bothered to pick the plank.","kind":"hl","expr":{"stat":"card","card":"The Log"},"tie":true},
+{"id":"g.legendary-total","scope":"game","name":"Total Legendaries Drafted","blurb":"Count the gold borders across both decks: is this draft dripping in shimmer or a Poundland special?","kind":"ou","expr":{"stat":"cat","cat":"legendary","side":"tot"},"lines":[1.5,2.5,3.5,4.5,5.5,6.5]},
+{"id":"g.legendary-hl","scope":"game","name":"Legendary Hoarder","blurb":"Whoever bags more legendaries gets the bragging rights, if not necessarily the win, and level counts pay the Tie.","kind":"hl","expr":{"stat":"cat","cat":"legendary"},"tie":true},
+{"id":"g.spell-total","scope":"game","name":"Total Spells Drafted","blurb":"Log, Fireball, Poison, Freeze: how many spells get hoarded before someone remembers you need troops to actually win?","kind":"ou","expr":{"stat":"cat","cat":"spell","side":"tot"},"lines":[2.5,3.5,4.5,5.5,6.5,7.5]},
+{"id":"g.air-total","scope":"game","name":"Air Units Drafted","blurb":"Bats, Baby D, Phoenix and pals: will the skies be busier than Heathrow, or will the Musketeers be bored stiff?","kind":"ou","expr":{"stat":"cat","cat":"air","side":"tot"},"lines":[0.5,1.5,2.5,3.5,4.5]},
+{"id":"g.building-total","scope":"game","name":"Buildings Drafted","blurb":"Cannons, Tombstones and Goblin Huts make up the Triple Draft planning permission count.","kind":"ou","expr":{"stat":"cat","cat":"building","side":"tot"},"lines":[0.5,1.5,2.5,3.5,4.5]},
+{"id":"g.wincon-total","scope":"game","name":"Win Conditions Drafted","blurb":"Hog, Royal Giant, Balloon, Drill and the rest of the tower-botherers: how many end up across both decks?","kind":"ou","expr":{"stat":"cat","cat":"wincon","side":"tot"},"lines":[0.5,1.5,2.5,3.5,4.5]},
+{"id":"g.cheap-total","scope":"game","name":"Cheap Cards Drafted","blurb":"Skeletons, Ice Spirits, Logs and Snowballs at two elixir or less, and the more of these the faster the cycle and the sweatier the thumbs.","kind":"ou","expr":{"stat":"cat","cat":"cheap","side":"tot"},"lines":[0.5,1.5,2.5,3.5,4.5,5.5]},
+{"id":"g.heavy-total","scope":"game","name":"Heavy Cards Drafted","blurb":"Lightning, Golem, Royal Giant and Mega Knight are the six-plus-elixir big lads who need double elixir to babysit them.","kind":"ou","expr":{"stat":"cat","cat":"heavy","side":"tot"},"lines":[0.5,1.5,2.5,3.5]},
+{"id":"g.elixir-hl","scope":"game","name":"Heavier Deck","blurb":"Golem-and-a-prayer beatdown or Ice Spirit cycle rat: whose draft costs more elixir per card?","kind":"hl","expr":{"stat":"elixir"},"tie":true},
+{"id":"s.crowns-bo3","scope":"series","formats":["bo3"],"name":"Total Crowns (Bo3)","blurb":"Corners, but with towers: every crown pinched across the whole Best of 3 counts, so pick your rung.","kind":"ou","expr":{"stat":"crowns","side":"tot","agg":"sum"},"lines":[2.5,3.5,4.5,5.5,6.5,7.5,8.5]},
+{"id":"s.crowns-bo5","scope":"series","formats":["bo5"],"name":"Total Crowns (Bo5)","blurb":"Up to five games of chaos, so set your over/under on the tower carnage like it's corners at Anfield.","kind":"ou","expr":{"stat":"crowns","side":"tot","agg":"sum"},"lines":[3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5]},
+{"id":"s.crowns-a-bo3","scope":"series","formats":["bo3"],"name":"{A} Towers Taken (Bo3)","blurb":"Every tower {A} pockets across the Best of 3, a team-goals line for the Arena that can pay out even if they lose the series.","kind":"ou","expr":{"stat":"crowns","side":"A","agg":"sum"},"lines":[0.5,1.5,2.5,3.5,4.5]},
+{"id":"s.crowns-b-bo3","scope":"series","formats":["bo3"],"name":"{B} Towers Taken (Bo3)","blurb":"{B}'s tower haul over the Best of 3, so back the overs if you reckon they've brought a wrecking ball and not a white flag.","kind":"ou","expr":{"stat":"crowns","side":"B","agg":"sum"},"lines":[0.5,1.5,2.5,3.5,4.5]},
+{"id":"s.crowns-a-bo5","scope":"series","formats":["bo5"],"name":"{A} Towers Taken (Bo5)","blurb":"Five games is plenty of time for {A} to rack up the rubble, so how many towers end up in their trophy cabinet?","kind":"ou","expr":{"stat":"crowns","side":"A","agg":"sum"},"lines":[0.5,1.5,2.5,3.5,4.5,5.5,6.5]},
+{"id":"s.crowns-b-bo5","scope":"series","formats":["bo5"],"name":"{B} Towers Taken (Bo5)","blurb":"{B}'s tower tally over the full Best of 5, and over 4.5 means they've basically been camped on the bridge all night.","kind":"ou","expr":{"stat":"crowns","side":"B","agg":"sum"},"lines":[0.5,1.5,2.5,3.5,4.5,5.5,6.5]},
+{"id":"s.crowns-hl","scope":"series","formats":["bo3","bo5"],"name":"Most Towers Taken","blurb":"Win the series but lose the tower count and you'll never hear the end of it, with the Tie paying out if they finish level.","kind":"hl","expr":{"stat":"crowns","agg":"sum"},"tie":true},
+{"id":"s.crowns-max","scope":"series","formats":["bo3","bo5"],"name":"Highest-Scoring Game","blurb":"The most crowns in any single game of the series, and it only takes one proper shootout to land the overs.","kind":"ou","expr":{"stat":"crowns","side":"tot","agg":"max"},"lines":[1.5,2.5,3.5]},
+{"id":"s.kings-bo3","scope":"series","formats":["bo3"],"name":"King Towers Woken (Bo3)","blurb":"Every King poked awake counts, so how many grumpy monarchs get their nap ruined over the Best of 3?","kind":"ou","expr":{"stat":"kings","side":"tot","agg":"sum"},"lines":[2.5,3.5,4.5,5.5]},
+{"id":"s.kings-bo5","scope":"series","formats":["bo5"],"name":"King Towers Woken (Bo5)","blurb":"Over 3.5 Kings woken is the bread-and-butter bet, and over 8.5 means the royal family gets no sleep at all.","kind":"ou","expr":{"stat":"kings","side":"tot","agg":"sum"},"lines":[3.5,4.5,5.5,6.5,7.5,8.5]},
+{"id":"s.kings-hl","scope":"series","formats":["bo3","bo5"],"name":"Whose King Wakes Up More?","blurb":"Back the player whose King keeps getting dragged out of bed, with the Tie if both royals are equally sleep-deprived.","kind":"hl","expr":{"stat":"kings","agg":"sum"},"tie":true},
+{"id":"s.dmg-bo3","scope":"series","formats":["bo3"],"name":"Total Tower Damage (Bo3)","blurb":"Every HP knocked off every tower across the series gets added up, Sparky zaps and all.","kind":"ou","expr":{"stat":"dealt","side":"tot","agg":"sum"},"lines":[10000,12000,14000,16000,18000,20000,22000,24000,26000,28000,30000,32000]},
+{"id":"s.dmg-bo5","scope":"series","formats":["bo5"],"name":"Total Tower Damage (Bo5)","blurb":"Long series, big numbers, so back the overs if you reckon there's a Rocket cycle merchant in the building.","kind":"ou","expr":{"stat":"dealt","side":"tot","agg":"sum"},"lines":[18000,20000,22000,24000,26000,28000,30000,32000,34000,36000,38000,40000,42000,44000]},
+{"id":"s.dmg-hl","scope":"series","formats":["bo3","bo5"],"name":"Series Damage Dealer","blurb":"Lose the series but knock more HP off towers than your mate and you can still claim the ultimate moral victory.","kind":"hl","expr":{"stat":"dealt","agg":"sum"},"tie":false},
+{"id":"s.dmg-max","scope":"series","formats":["bo3","bo5"],"name":"Biggest Bombardment","blurb":"The highest combined damage in any one game of the series, for punters who live for chaos.","kind":"ou","expr":{"stat":"dealt","side":"tot","agg":"max"},"lines":[7000,8000,9000,10000,11000,12000,13000,14000,15000,16000]},
+{"id":"s.leak-bo3","scope":"series","formats":["bo3"],"name":"Total Elixir Leaked (Bo3)","blurb":"The official AFK index for the series: every drop of wasted elixir from both players, added up and judged.","kind":"ou","expr":{"stat":"leak","side":"tot","agg":"sum"},"lines":[5.5,10.5,15.5,20.5,25.5,30.5,40.5,50.5]},
+{"id":"s.leak-bo5","scope":"series","formats":["bo5"],"name":"Total Elixir Leaked (Bo5)","blurb":"Five games is a long time to concentrate, so back the overs if you think someone's checking the footy scores mid-push.","kind":"ou","expr":{"stat":"leak","side":"tot","agg":"sum"},"lines":[10.5,15.5,20.5,25.5,30.5,35.5,40.5,50.5,60.5]},
+{"id":"s.leak-hl","scope":"series","formats":["bo3","bo5"],"name":"Series Leakiest Tap","blurb":"Over the whole series, who's the bigger elixir waster, with a dead heat paying the Tie?","kind":"hl","expr":{"stat":"leak","agg":"sum"},"tie":true},
+{"id":"s.afk","scope":"series","formats":["bo3","bo5"],"name":"AFK Alert","blurb":"If any game sees 15+ elixir leaked between them, someone was clearly at the door signing for a Deliveroo.","kind":"yn","expr":{"stat":"leak","side":"tot","agg":"games","min":15},"op":">=","value":1},
+{"id":"s.three-any","scope":"series","formats":["bo3","bo5"],"name":"Three-Crown in the Series","blurb":"Only about one game in fifteen ends with a King Tower in rubble, so will anyone go full wrecking ball at least once?","kind":"yn","expr":{"stat":"three","side":"tot","agg":"games"},"op":">=","value":1},
+{"id":"s.tiebreak","scope":"series","formats":["bo3","bo5"],"name":"Any Game Won on Tiebreaker","blurb":"Crowns level at the buzzer and decided by whose tower has a sliver more HP: the penalty shoot-out of Clash.","kind":"yn","expr":{"stat":"tb","side":"tot","agg":"games"},"op":">=","value":1},
+{"id":"s.distance","scope":"series","formats":["bo3","bo5"],"name":"Goes the Distance","blurb":"All square going into the decider, game 3 of a Bo3 or game 5 of a Bo5, and it's proper squeaky-bum time.","kind":"yn","expr":{"stat":"distance","side":"tot"},"op":">=","value":1},
+{"id":"s.sweep","scope":"series","formats":["bo3","bo5"],"name":"Whitewash","blurb":"Either player wins the series without dropping a game: clean sweep, cheeky emote, no rematch.","kind":"yn","expr":{"stat":"sweep","side":"tot"},"op":">=","value":1},
+{"id":"s.reverse-a","scope":"series","formats":["bo3","bo5"],"name":"{A} Reverse Sweep","blurb":"Lose the opener (the first two in a Bo5) and still win the lot: {A} pulling off Istanbul 2005 with a Witch and a dream.","kind":"yn","expr":{"stat":"reverse","side":"A"},"op":">=","value":1},
+{"id":"s.reverse-b","scope":"series","formats":["bo3","bo5"],"name":"{B} Reverse Sweep","blurb":"{B} has to lose the start and still win the war, a proper long shot and a group-chat legend if it lands.","kind":"yn","expr":{"stat":"reverse","side":"B"},"op":">=","value":1},
+{"id":"s.cleansheet-a","scope":"series","formats":["bo3","bo5"],"name":"{A} Series Clean Sheet","blurb":"{B} doesn't take a single tower all series, so it's a Mourinho-grade bus parked at both bridges.","kind":"yn","expr":{"stat":"crowns","side":"B","agg":"sum"},"op":"==","value":0},
+{"id":"s.cleansheet-b","scope":"series","formats":["bo3","bo5"],"name":"{B} Series Clean Sheet","blurb":"Not one tower for {A} all series long means {B} has defended like peak Ice Spirit, Cannon and pray.","kind":"yn","expr":{"stat":"crowns","side":"A","agg":"sum"},"op":"==","value":0},
+{"id":"s.firecracker-games","scope":"series","formats":["bo3","bo5"],"name":"Firecracker Drafted: Games","blurb":"Over 0.5 means she's in a deck in 1+ games and over 1.5 means 2+, because the pocket rocket loves a repeat booking.","kind":"ou","expr":{"stat":"card","card":"Firecracker","side":"tot","agg":"games"},"lines":[0.5,1.5,2.5]},
+{"id":"s.fireball-games","scope":"series","formats":["bo3","bo5"],"name":"Fireball Drafted: Games","blurb":"The most drafted card in the house, so how many games see somebody's Musketeer get cooked?","kind":"ou","expr":{"stat":"card","card":"Fireball","side":"tot","agg":"games"},"lines":[0.5,1.5,2.5]},
+{"id":"s.log-games","scope":"series","formats":["bo3","bo5"],"name":"The Log Drafted: Games","blurb":"The plank that never goes out of fashion, so how many games of the series see it rolling Goblin Gangs into next week?","kind":"ou","expr":{"stat":"card","card":"The Log","side":"tot","agg":"games"},"lines":[0.5,1.5,2.5]},
+{"id":"s.megaknight","scope":"series","formats":["bo3","bo5"],"name":"Mega Knight Shows Up","blurb":"One sighting of the big jumping man in any game of the series and this lands, so pack your earplugs for the shouting.","kind":"yn","expr":{"stat":"card","card":"Mega Knight","side":"tot","agg":"games"},"op":">=","value":1},
+{"id":"s.legendary-bo3","scope":"series","formats":["bo3"],"name":"Total Legendaries (Bo3)","blurb":"Add up every legendary in every deck, because a Log here and a Magic Archer there soon mounts up.","kind":"ou","expr":{"stat":"cat","cat":"legendary","side":"tot","agg":"sum"},"lines":[4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5]},
+{"id":"s.legendary-bo5","scope":"series","formats":["bo5"],"name":"Total Legendaries (Bo5)","blurb":"Five games of shimmering gold borders could get silly, so pick your line and pray for Phoenixes.","kind":"ou","expr":{"stat":"cat","cat":"legendary","side":"tot","agg":"sum"},"lines":[8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5,16.5,17.5]},
+{"id":"s.legendary-hl","scope":"series","formats":["bo3","bo5"],"name":"Series Legendary Hoarder","blurb":"Over the whole series, who's the magpie grabbing every shiny card going, with level totals paying the Tie?","kind":"hl","expr":{"stat":"cat","cat":"legendary","agg":"sum"},"tie":true},
+{"id":"s.spell-bo3","scope":"series","formats":["bo3"],"name":"Total Spells Drafted (Bo3)","blurb":"Every Fireball, Poison, Freeze and Royal Delivery across the Best of 3 counts: spell-cycle heaven or a troops-only fistfight?","kind":"ou","expr":{"stat":"cat","cat":"spell","side":"tot","agg":"sum"},"lines":[6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5]},
+{"id":"s.spell-bo5","scope":"series","formats":["bo5"],"name":"Total Spells Drafted (Bo5)","blurb":"Five drafts' worth of Logs, Fireballs and Snowballs, so back the overs if both of these treat the spell row like a sweet shop.","kind":"ou","expr":{"stat":"cat","cat":"spell","side":"tot","agg":"sum"},"lines":[12.5,13.5,14.5,15.5,16.5,17.5,18.5,19.5,20.5,21.5,22.5]},
+{"id":"s.air","scope":"series","formats":["bo3","bo5"],"name":"Air Units Drafted (Series)","blurb":"Total flying troops across every deck in the series, so the Arrows are going to be busy.","kind":"ou","expr":{"stat":"cat","cat":"air","side":"tot","agg":"sum"},"lines":[1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5]}
+];
+
+// ======================================================================
+//  Simulation engine: prop ladders, deck markets and Best-of series.
+//  The joint model above prices one game exactly. For everything else
+//  (damage and elixir totals, drafted cards, whole series) the book plays
+//  the game thousands of times from that same model and counts. The dice
+//  are seeded from the match and the results in force, so every phone
+//  draws exactly the same games and agrees on every price.
+// ======================================================================
+const hash32 = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+function seeded(seed) { // mulberry32: integer maths only
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+// Inverse of the standard normal CDF (Acklam's rational approximation)
+function invPhi(p) {
+  p = clamp(p, 1e-12, 1 - 1e-12);
+  const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239];
+  const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572];
+  const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+  const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+  const lo = 0.02425;
+  if (p < lo) { const q = Math.sqrt(-2 * Math.log(p)); return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  if (p > 1 - lo) { const q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  const q = p - 0.5, r = q * q;
+  return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+}
+
+// ---------- Cards ----------
+// What each card is, for the deck markets (spells drafted, average elixir, legendaries...).
+// Rarity comes from the battle log when it has it; the table covers hand-logged decks too.
+const cardInfo = (name) => CARDS[name] || null;
+const CATS = ['spell', 'building', 'troop', 'wincon', 'air', 'legendary', 'epic', 'rare', 'common', 'champion', 'cheap', 'heavy'];
+function inCat(name, cat) {
+  const c = cardInfo(name); if (!c) return false;
+  switch (cat) {
+    case 'spell': case 'building': case 'troop': return c.t === cat;
+    case 'wincon': return !!c.w;
+    case 'air': return !!c.a;
+    case 'legendary': case 'epic': case 'rare': case 'common': case 'champion': return c.r === cat;
+    case 'cheap': return Number.isFinite(c.e) && c.e <= 2;
+    case 'heavy': return Number.isFinite(c.e) && c.e >= 6;
+    default: return false;
+  }
+}
+const catCount = (deck, cat) => (deck ? deck.filter((n) => inCat(n, cat)).length : null);
+function avgElixir(cards) {
+  if (!cards) return null;
+  const xs = cards.map((n) => (cardInfo(n) || {}).e).filter((e) => Number.isFinite(e));
+  return xs.length ? Math.round((xs.reduce((t, e) => t + e, 0) / xs.length) * 100) / 100 : null;
+}
+
+// ---------- Per-game stats (the market language) ----------
+// A game, seen from the bet's player A: a, b crowns; winner A/B/D; overtime; firstCrown;
+// dmgA/B; kingA/B (that player's own King woke); dealtA/B; leakA/B; deckA/B (8 card names).
+const b01 = (v) => (v == null ? null : v ? 1 : 0);
+function gameStat(g, x) {
+  const S = x.side || 'tot';
+  const two = (va, vb) => (S === 'A' ? va : S === 'B' ? vb : va == null || vb == null ? null : va + vb);
+  switch (x.stat) {
+    case 'crowns': return two(g.a, g.b);
+    case 'kings': return two(b01(g.kingA), b01(g.kingB));
+    case 'three': { const tA = +(g.winner === 'A' && g.a === 3), tB = +(g.winner === 'B' && g.b === 3); return S === 'A' ? tA : S === 'B' ? tB : Math.max(tA, tB); }
+    case 'win': return S === 'tot' ? null : +(g.winner === S);
+    case 'ot': return S === 'tot' ? b01(g.overtime) : null;
+    case 'tb': return S === 'tot' ? +(g.winner !== 'D' && g.a === g.b) : null;
+    case 'first': return S === 'tot' || g.firstCrown == null ? null : +(g.firstCrown === S);
+    case 'clean': return S === 'A' ? +(g.b === 0) : S === 'B' ? +(g.a === 0) : null;
+    case 'dmg1k': return two(b01(g.dmgA), b01(g.dmgB));
+    case 'dealt': return two(g.dealtA, g.dealtB);
+    case 'leak': return two(g.leakA, g.leakB);
+    case 'card': {
+      const has = (d) => (d ? +d.includes(x.card) : null), hA = has(g.deckA), hB = has(g.deckB);
+      return S === 'A' ? hA : S === 'B' ? hB : hA == null || hB == null ? null : Math.max(hA, hB);
+    }
+    case 'cat': return two(catCount(g.deckA, x.cat), catCount(g.deckB, x.cat));
+    case 'elixir': return S === 'A' ? avgElixir(g.deckA) : S === 'B' ? avgElixir(g.deckB) : g.deckA && g.deckB ? avgElixir([...g.deckA, ...g.deckB]) : null;
+    default: return null;
+  }
+}
+const GAME_STATS = ['crowns', 'kings', 'three', 'win', 'ot', 'tb', 'first', 'clean', 'dmg1k', 'dealt', 'leak', 'card', 'cat', 'elixir'];
+const SERIES_STATS = ['seriesWins', 'games', 'sweep', 'distance', 'reverse', 'g1win'];
+const sideOk = (stat, side) => {
+  if (['win', 'first', 'clean', 'seriesWins', 'reverse', 'g1win'].includes(stat)) return side === 'A' || side === 'B';
+  if (['ot', 'tb', 'games', 'distance'].includes(stat)) return side === 'tot';
+  return ['A', 'B', 'tot'].includes(side);
+};
+
+// A series: its games in order (each seen from A), wins, and the target (2 for Bo3, 3 for Bo5)
+function seriesOf(games, N) {
+  let wa = 0, wb = 0; const used = [];
+  for (const g of games) { if (wa >= N || wb >= N) break; used.push(g); if (g.winner === 'A') wa++; else if (g.winner === 'B') wb++; }
+  return { games: used, winsA: wa, winsB: wb, N, winner: wa >= N ? 'A' : wb >= N ? 'B' : null };
+}
+function seriesStat(S, x) {
+  const side = x.side || 'tot';
+  switch (x.stat) {
+    case 'seriesWins': return side === 'A' ? S.winsA : side === 'B' ? S.winsB : null;
+    case 'games': return S.games.length;
+    case 'sweep': { const sA = +(S.winner === 'A' && S.winsB === 0), sB = +(S.winner === 'B' && S.winsA === 0); return side === 'A' ? sA : side === 'B' ? sB : Math.max(sA, sB); }
+    case 'distance': return +(S.winsA + S.winsB === 2 * S.N - 1);
+    case 'reverse': {
+      const dec = S.games.filter((g) => g.winner !== 'D').map((g) => g.winner), other = side === 'A' ? 'B' : 'A';
+      return +(S.winner === side && dec.slice(0, S.N - 1).every((w) => w === other) && dec.length === 2 * S.N - 1);
+    }
+    case 'g1win': return S.games.length ? +(S.games[0].winner === side) : null;
+    default: {
+      const vals = S.games.map((g) => gameStat(g, x));
+      if (!vals.length || vals.some((v) => v == null)) return null;
+      if (x.agg === 'games') return vals.filter((v) => v >= (Number.isFinite(x.min) ? x.min : 1)).length;
+      if (x.agg === 'max') return Math.max(...vals);
+      return Math.round(vals.reduce((t, v) => t + v, 0) * 100) / 100;
+    }
+  }
+}
+
+// ---------- Market specs ----------
+// {id, scope:'game'|'series', formats?, name, blurb, kind:'ou'|'yn'|'hl'|'score'|'hcp', expr, lines?, op?, value?, tie?}
+function specOk(m) {
+  if (!m || typeof m !== 'object' || typeof m.id !== 'string' || !/^[A-Za-z0-9._-]{2,60}$/.test(m.id)) return false;
+  if (!['game', 'series'].includes(m.scope) || typeof m.name !== 'string' || !m.name || m.name.length > 90) return false;
+  if (m.formats != null && !(Array.isArray(m.formats) && m.formats.length && m.formats.every((f) => f === 'bo3' || f === 'bo5'))) return false;
+  if (m.kind === 'score' || m.kind === 'hcp') return m.scope === 'series';
+  const x = m.expr; if (!x || typeof x !== 'object') return false;
+  const statOk = GAME_STATS.includes(x.stat) || (m.scope === 'series' && SERIES_STATS.includes(x.stat));
+  if (!statOk) return false;
+  if (m.kind !== 'hl' && !sideOk(x.stat, x.side || 'tot')) return false;
+  if (m.kind === 'hl' && !sideOk(x.stat, 'A')) return false;
+  if (x.stat === 'card' && !(typeof x.card === 'string' && cardInfo(x.card))) return false;
+  if (x.stat === 'cat' && !CATS.includes(x.cat)) return false;
+  if (x.agg != null && !(m.scope === 'series' && ['sum', 'games', 'max'].includes(x.agg))) return false;
+  if (m.kind === 'ou') return Array.isArray(m.lines) && m.lines.length >= 1 && m.lines.length <= 30 && m.lines.every((l) => Number.isFinite(l));
+  if (m.kind === 'yn') return ['>=', '<=', '=='].includes(m.op) && Number.isFinite(m.value);
+  if (m.kind === 'hl') return true;
+  return false;
+}
+const forFormat = (m, format) => m.scope === (format ? 'series' : 'game') && (!format || !m.formats || m.formats.includes(format));
+const fill = (s, nA, nB) => String(s).replace(/\{A\}/g, nA).replace(/\{B\}/g, nB);
+// Every selection a market offers (for a series, what the format allows)
+function specSels(m, format) {
+  const N = format === 'bo3' ? 2 : 3;
+  if (m.kind === 'ou') return m.lines.flatMap((l) => [{ key: 'over:' + l, l, dir: 'over' }, { key: 'under:' + l, l, dir: 'under' }]);
+  if (m.kind === 'yn') return [{ key: 'yes' }, { key: 'no' }];
+  if (m.kind === 'hl') return [{ key: 'A' }, { key: 'B' }, ...(m.tie ? [{ key: 'tie' }] : [])];
+  if (m.kind === 'score') { const out = []; for (let l = 0; l < N; l++) out.push({ key: `${N}-${l}` }, { key: `${l}-${N}` }); return out; }
+  if (m.kind === 'hcp') return (N === 2 ? [1.5] : [1.5, 2.5]).flatMap((h) => [{ key: `A:-${h}` }, { key: `B:+${h}` }, { key: `B:-${h}` }, { key: `A:+${h}` }]);
+  return [];
+}
+// Does selection `sel` of market `m` win? Builds the test once; it then takes a game (or, for a
+// series market, a series) and answers true / false / null (couldn't be settled: void).
+function specTest(m, sel, format) {
+  if (!specSels(m, format).some((x) => x.key === sel)) return () => null;
+  const ex = (side) => ({ ...m.expr, ...(side ? { side } : {}) }), xs = m.expr ? ex() : null, xa = m.expr ? ex('A') : null, xb = m.expr ? ex('B') : null;
+  const val = (it, x) => (format ? seriesStat(it, x) : gameStat(it, x));
+  if (m.kind === 'ou') { const [dir, l] = sel.split(':'), L = +l; return (it) => { const v = val(it, xs); return v == null ? null : dir === 'over' ? v > L : v <= L; }; }
+  if (m.kind === 'yn') {
+    return (it) => { const v = val(it, xs); if (v == null) return null; const hit = m.op === '>=' ? v >= m.value : m.op === '<=' ? v <= m.value : v === m.value; return sel === 'yes' ? hit : !hit; };
+  }
+  if (m.kind === 'hl') {
+    return (it) => { const va = val(it, xa), vb = val(it, xb); if (va == null || vb == null) return null; if (va === vb && !m.tie) return null; return sel === 'A' ? va > vb : sel === 'B' ? vb > va : va === vb; };
+  }
+  if (m.kind === 'score') return (S) => (S.winner ? sel === `${S.winsA}-${S.winsB}` : null);
+  if (m.kind === 'hcp') { const [side, h] = sel.split(':'); return (S) => (S.winner ? (side === 'A' ? S.winsA - S.winsB : S.winsB - S.winsA) + +h > 0 : null); }
+  return () => null;
+}
+
+// ---------- The simulator ----------
+// Decks: in this draft mode the two decks never share a card, so each simulated game first
+// draws a 16-card pool (cards weighted to how often the group really drafts them), then splits
+// it 8/8 leaning towards each player's own habits.
+function deckModel(a, b, res) {
+  const seen = new Map(); let G = 0;
+  for (const r of res) {
+    const ca = cardsOf(r.cardsA), cb = cardsOf(r.cardsB);
+    if (ca.length !== 8 || cb.length !== 8) continue;
+    G++;
+    for (const [cards, pid] of [[ca, r.playerA], [cb, r.playerB]]) for (const c of cards) {
+      const e = seen.get(c) || { g: 0, A: 0, B: 0 }; e.g++; if (pid === a) e.A++; if (pid === b) e.B++; seen.set(c, e);
+    }
+  }
+  for (const n of Object.keys(CARDS)) if (!seen.has(n)) seen.set(n, { g: 0, A: 0, B: 0 });
+  const names = [...seen.keys()].sort(), K = names.length, prior = 16 / K, k = 4;
+  let t = names.map((n) => (seen.get(n).g + k * prior) / (G + k));
+  const sum = t.reduce((x, y) => x + y, 0);
+  t = t.map((x) => Math.min(0.95, (x * 16) / sum));
+  return { names, w: t.map((x) => -Math.log(1 - x)), tilt: names.map((n) => { const e = seen.get(n), p = (e.A + 1) / (e.A + e.B + 2); return Math.log(p / (1 - p)); }) };
+}
+function drawDecks(dm, rand) {
+  const keys = dm.w.map((w, i) => [-Math.log(rand() || 1e-12) / w, i]).sort((x, y) => x[0] - y[0]).slice(0, 16);
+  const split = keys.map(([, i]) => { const u = clamp(rand(), 1e-9, 1 - 1e-9); return [dm.tilt[i] + Math.log(u / (1 - u)), i]; }).sort((x, y) => y[0] - x[0]);
+  return [split.slice(0, 8).map(([, i]) => dm.names[i]).sort(), split.slice(8).map(([, i]) => dm.names[i]).sort()];
+}
+// Elixir leaked: resample real games, mostly that player's own, some from everyone
+function leakModel(pid, res) {
+  const own = [], all = [];
+  for (const r of res) for (const [p, v] of [[r.playerA, r.elixirLeakedA], [r.playerB, r.elixirLeakedB]]) if (Number.isFinite(v) && v >= 0) { all.push(v); if (p === pid) own.push(v); }
+  own.sort((x, y) => x - y); all.sort((x, y) => x - y);
+  return { own, all, w: own.length / (own.length + 6) };
+}
+function drawLeak(lm, rand) {
+  const pool = lm.own.length && rand() < lm.w ? lm.own : lm.all;
+  if (!pool.length) return Math.round(Math.exp(0.8 + rand() * 1.4) * 100) / 100 - 1; // no data yet: roughly 1 to 8
+  return pool[Math.floor(rand() * pool.length)];
+}
+// Damage dealt, consistent with the state of the game (same floor/cap rules as dealtOver)
+function drawDealt(J, side, o, rand) {
+  const d = J.dealt[side], crowns = side === 'A' ? o.a : o.b, dmg = side === 'A' ? o.dmgA : o.dmgB;
+  const floor = Math.max(crowns === 3 ? J.hp.king : crowns * J.hp.princess, dmg ? 1000 : 0);
+  const cap = !o.overtime && !dmg ? 999 : 2 * J.hp.princess + J.hp.king;
+  if (floor >= cap) return floor;
+  const mu = d.mu + d.slope * (crowns - d.ea), lo = phi((floor - mu) / d.sd), hi = phi((cap - mu) / d.sd);
+  if (hi - lo < 1e-9) return mu < floor ? floor : cap;
+  return Math.round(clamp(mu + d.sd * invPhi(lo + rand() * (hi - lo)), floor, cap));
+}
+const SIM_GAMES = 8000, SIM_SERIES = 4000, SIM_DECKS = 1500;
+let SIM_CACHE = new Map();
+function versionsAt(cutoff) { return resultData().versions.filter((r) => r.finalAt <= cutoff && !(r.until && r.until <= cutoff)); }
+function bookIndex(cutoff) { const M = resultData().marks; let lo = 0, hi = M.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (M[mid] <= cutoff) lo = mid + 1; else hi = mid; } return lo; }
+// Simulated games (or series) for a pair, as things stood at `cutoff`
+function simBook(a, b, cutoff, s, format) {
+  const key = [a, b, bookIndex(cutoff), format || 'game', s.princessHp, s.kingHp].join('|');
+  if (SIM_CACHE.has(key)) { const v = SIM_CACHE.get(key); SIM_CACHE.delete(key); SIM_CACHE.set(key, v); return v; }
+  const { J } = bookAt(a, b, cutoff, s), res = versionsAt(cutoff);
+  const dm = deckModel(a, b, res), lA = leakModel(a, res), lB = leakModel(b, res);
+  const rand = seeded(hash32(key));
+  const cum = []; let total = 0; for (const st of J.states) { total += st.p; cum.push(total); }
+  const decks = Array.from({ length: SIM_DECKS }, () => drawDecks(dm, rand));
+  const game = () => {
+    const u = rand() * total; let lo = 0, hi = cum.length - 1;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (cum[mid] < u) lo = mid + 1; else hi = mid; }
+    const o = J.states[lo].o, dk = decks[Math.floor(rand() * decks.length)];
+    return { ...o, dealtA: drawDealt(J, 'A', o, rand), dealtB: drawDealt(J, 'B', o, rand), leakA: drawLeak(lA, rand), leakB: drawLeak(lB, rand), deckA: dk[0], deckB: dk[1] };
+  };
+  let out;
+  if (!format) out = { games: Array.from({ length: SIM_GAMES }, game) };
+  else {
+    const N = format === 'bo3' ? 2 : 3, series = [];
+    for (let i = 0; i < SIM_SERIES; i++) {
+      const gs = []; let wa = 0, wb = 0;
+      while (wa < N && wb < N && gs.length < 4 * N) { const g = game(); gs.push(g); if (g.winner === 'A') wa++; else if (g.winner === 'B') wb++; }
+      series.push(seriesOf(gs, N));
+    }
+    out = { series, format };
+  }
+  if (SIM_CACHE.size >= 10) SIM_CACHE.delete(SIM_CACHE.keys().next().value);
+  SIM_CACHE.set(key, out);
+  return out;
+}
+// One leg as a test on a simulated (or real) game or series
+function legTest(l, format, at) {
+  const m = marketById(l.market, format, at);
+  if (m) return specTest(m, l.selection, format);
+  if (format) return () => null; // series legs must come from the series markets
+  return (it) => settleSelection(l.market, l.selection, it);
+}
+function simProb(book, legs, format, at) {
+  const tests = legs.map((l) => legTest(l, format, at)), items = format ? book.series : book.games;
+  let hit = 0;
+  for (const it of items) { let ok = true; for (const t of tests) if (t(it) !== true) { ok = false; break; } if (ok) hit++; }
+  return hit / items.length;
+}
+
 // ======================================================================
 //  Data. Shared store (db capability), with an on-device practice copy as
 //  fallback. The database rules decide who may write where:
@@ -728,7 +1210,8 @@ function settleBuilder(legs, o) {
 const DEFAULT_SETTINGS = { margin: 5, builderMargin: 10, startingCoins: 1000, princessHp: 3052, kingHp: 4824, ownMatchBets: false,
   minStake: 5, maxStake: 250, maxReturn: 5000, betWindowMin: 5, fixtureHours: 24, history: [] };
 const SETTING_KEYS = ['margin', 'builderMargin', 'startingCoins', 'princessHp', 'kingHp', 'ownMatchBets', 'minStake', 'maxStake', 'maxReturn', 'betWindowMin', 'fixtureHours'];
-const store = { players: [], matches: [], claims: [], links: [], betDocs: [], acts: {}, house: { gifts: [], voids: {} }, settings: { ...DEFAULT_SETTINGS }, ready: false };
+const store = { players: [], matches: [], claims: [], links: [], betDocs: [], acts: {}, house: { gifts: [], voids: {} }, settings: { ...DEFAULT_SETTINGS },
+  specials: { list: [] }, importState: {}, ready: false };
 const me = { uid: null, admin: false, skippedJoin: false };
 let db = null, userApi = null, mode = 'connecting', readOnly = false, gen = 0;
 const LOCAL_KEY = 'clashbets-local-v3';
@@ -742,8 +1225,8 @@ function loadLocal() {
 }
 function saveLocal() {
   try {
-    const { players, matches, claims, links, betDocs, acts, house, settings } = store;
-    localStorage.setItem(LOCAL_KEY, JSON.stringify({ players, matches, claims, links, betDocs, acts, house, settings }));
+    const { players, matches, claims, links, betDocs, acts, house, settings, specials } = store;
+    localStorage.setItem(LOCAL_KEY, JSON.stringify({ players, matches, claims, links, betDocs, acts, house, settings, specials }));
   } catch { /* storage blocked */ }
 }
 function localList(coll) {
@@ -767,6 +1250,8 @@ async function put(coll, id, data) {
   }
   if (coll === 'config') {
     if (id === 'settings') store.settings = { ...DEFAULT_SETTINGS, ...data };
+    else if (id === 'specials') store.specials = { list: [], ...data };
+    else if (id === 'importState') store.importState = { ...data };
     else store.house = { gifts: [], voids: {}, ...data };
   } else {
     const list = localList(coll), uid = coll.startsWith('acts/') ? coll.split('/')[1] : null;
@@ -789,7 +1274,8 @@ async function connect() {
     mode = 'local'; me.uid = 'local'; me.admin = true;
     const l = loadLocal();
     Object.assign(store, { players: l.players || [], matches: l.matches || [], claims: l.claims || [], links: l.links || [], betDocs: l.betDocs || [],
-      acts: l.acts || {}, house: { gifts: [], voids: {}, ...(l.house || {}) }, settings: { ...DEFAULT_SETTINGS, ...(l.settings || {}), adminUid: 'local' }, ready: true });
+      acts: l.acts || {}, house: { gifts: [], voids: {}, ...(l.house || {}) }, settings: { ...DEFAULT_SETTINGS, ...(l.settings || {}), adminUid: 'local' },
+      specials: { list: [], ...(l.specials || {}) }, ready: true });
     if (!store.players.length) store.players = ['Nizz', 'triqqi', 'zac', 'jamie', 'sek', 'caleb', 'rishi', 'rocky', 'ethan', 'johnny'].map((name, i) => ({ id: newId() + i, name, addedAt: new Date(Date.now() + i).toISOString() }));
     $('#localBanner').hidden = false;
     changed(); renderAll(); return;
@@ -802,8 +1288,9 @@ async function connect() {
     if (!me.admin && (await userApi.can('data.write')) === false) { readOnly = true; $('#readonlyBanner').hidden = false; }
   }
   try { me.skippedJoin = me.admin && sessionStorage.getItem('clashbets-skip') === '1'; } catch { /* ignore */ }
-  const pending = new Set(['players', 'matches', 'claims', 'links', 'bets', 'settings', 'house']);
-  const done = (k) => { pending.delete(k); store.ready = pending.size === 0; resetBooks(); changed(); if (store.ready) { watchActs(); adminChores(); } renderAll(); };
+  const pending = new Set(['players', 'matches', 'claims', 'links', 'bets', 'settings', 'house', 'specials', 'importState']);
+  // the odds only depend on results, links, players and settings, so bets and claims don't reset them
+  const done = (k) => { pending.delete(k); store.ready = pending.size === 0; if (k !== 'bets' && k !== 'claims') resetBooks(); changed(); if (store.ready) { watchActs(); adminChores(); } renderAll(); };
   const onErr = () => { $('#syncState').textContent = 'Lost connection. Reload to retry.'; };
   const watch = (name, key) => db.collection(name).onSnapshot((snap) => {
     store[key] = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
@@ -813,6 +1300,8 @@ async function connect() {
   watch('players', 'players'); watch('matches', 'matches'); watch('claims', 'claims'); watch('links', 'links'); watch('bets', 'betDocs');
   db.doc('config/settings').onSnapshot((d) => { store.settings = { ...DEFAULT_SETTINGS, ...(d.exists ? d.data() : {}) }; done('settings'); }, onErr);
   db.doc('config/house').onSnapshot((d) => { store.house = { gifts: [], voids: {}, ...(d.exists ? d.data() : {}) }; done('house'); }, onErr);
+  db.doc('config/specials').onSnapshot((d) => { store.specials = { list: [], ...(d.exists ? d.data() : {}) }; done('specials'); }, onErr);
+  db.doc('config/importState').onSnapshot((d) => { store.importState = d.exists ? d.data() : {}; done('importState'); }, onErr);
 }
 
 // Each linked account (and the admin) keeps their fixtures, locks, results and confirmations in their own folder
@@ -907,7 +1396,7 @@ const fixtureData = memo(() => {
   for (const [uid, items] of Object.entries(store.acts)) for (const x of items) {
     if (x.type !== 'fixture' || !canon(x.at) || !playerById(x.a) || !playerById(x.b) || x.a === x.b) continue;
     if (!(isAdminUid(uid) || speaksFor(uid, x.a, x.at) || speaksFor(uid, x.b, x.at))) continue;
-    const f = { key: `${uid}~${x.id}`, docId: x.id, owner: uid, a: x.a, b: x.b, at: x.at };
+    const f = { key: `${uid}~${x.id}`, docId: x.id, owner: uid, a: x.a, b: x.b, at: x.at, format: ['bo3', 'bo5'].includes(x.format) ? x.format : null };
     list.push(f); byKey[f.key] = f;
   }
   for (const f of list) {
@@ -950,6 +1439,7 @@ const clean = (m) => ({
   ...m, overtime: bool(m.overtime), dmgA: bool(m.dmgA), dmgB: bool(m.dmgB), kingA: bool(m.kingA), kingB: bool(m.kingB),
   firstCrown: ['A', 'B', 'none'].includes(m.firstCrown) ? m.firstCrown : null, towersA: towersOf(m.towersA), towersB: towersOf(m.towersB),
   dealtA: numOr(m.dealtA), dealtB: numOr(m.dealtB), cardsA: cardsOf(m.cardsA), cardsB: cardsOf(m.cardsB),
+  elixirLeakedA: numOr(m.elixirLeakedA), elixirLeakedB: numOr(m.elixirLeakedB),
   notes: typeof m.notes === 'string' ? m.notes.slice(0, 400) : '', fx: typeof m.fx === 'string' ? m.fx : null,
   hp: m.hp && Number.isFinite(m.hp.princess) && Number.isFinite(m.hp.king) ? { princess: m.hp.princess, king: m.hp.king } : null,
 });
@@ -1026,7 +1516,7 @@ const resultData = memo(() => {
   // One result per fixture. Only a record for the fixture's two players, about a game played
   // after it opened and logged before it expired, can settle it. Final results come first,
   // then results waiting for confirmation, then lone copies; within each, the first logged.
-  const claims = (r) => { const f = F[r.fx]; return !!f && samePair(r, f.a, f.b) && ms(r.date) >= ms(f.at) - LOCK_GRACE && ms(r.loggedAt) >= ms(f.at) - LOCK_GRACE && ms(r.loggedAt) <= f.expiresAt; };
+  const claims = (r) => { const f = F[r.fx]; return !!f && !f.format && samePair(r, f.a, f.b) && ms(r.date) >= ms(f.at) - LOCK_GRACE && ms(r.loggedAt) >= ms(f.at) - LOCK_GRACE && ms(r.loggedAt) <= f.expiresAt; };
   const rank = (r) => (r.final ? 0 : r.claim ? 2 : 1);
   const settles = {};
   for (const r of [...current, ...pending].filter(claims).sort((p, q) => rank(p) - rank(q) || p.loggedAt.localeCompare(q.loggedAt) || p.key.localeCompare(q.key))) settles[r.fx] ||= r;
@@ -1043,8 +1533,8 @@ const resultForFixture = (f) => { const r = resultData().settles[f.key]; return 
 const pendingForFixture = (f) => { const r = resultData().settles[f.key]; return r && !r.final ? r : null; };
 
 // The odds as they stood when a bet was placed: the result versions in force then, settings in force then
-let BOOK_CACHE = new Map();
-const resetBooks = () => { BOOK_CACHE = new Map(); };
+let BOOK_CACHE = new Map(), PRICE_MEMO = new Map();
+const resetBooks = () => { BOOK_CACHE = new Map(); SIM_CACHE = new Map(); PRICE_MEMO = new Map(); };
 function bookAt(a, b, cutoff, s) {
   const R = resultData();
   let lo = 0, hi = R.marks.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (R.marks[mid] <= cutoff) lo = mid + 1; else hi = mid; }
@@ -1063,22 +1553,38 @@ const legsOk = (legs) => Array.isArray(legs) && legs.length >= 2 && legs.length 
 // A bet only counts if its price is no better than the book offered (5% leeway on the winnings;
 // also checked against the book three minutes earlier, so a little clock difference can't void it)
 function priceOk(b, s) {
+  const f = fixtureData().byKey[b.fx], format = (f && f.format) || null;
   const legs = b.legs ? b.legs : [{ market: b.market, selection: b.selection }];
   if (b.legs ? !legsOk(legs) : typeof b.market !== 'string' || typeof b.selection !== 'string' || b.market === 'builder') return false;
+  // every pick has to be a market the board offered at the time
+  if (!legs.every((l) => (format ? !!marketById(l.market, format, b.placedAt) : CLASSIC.has(l.market) || !!marketById(l.market, null, b.placedAt)))) return false;
+  const sim = !!format || legs.some((l) => !CLASSIC.has(l.market));
+  const memoKey = betKey(b.uid, b.fx, b.id) + JSON.stringify(CORE.map((k) => b[k] ?? null));
+  if (PRICE_MEMO.has(memoKey)) return PRICE_MEMO.get(memoKey);
   const earlier = new Date(ms(b.placedAt) - 3 * 60000).toISOString();
-  return [b.placedAt, earlier].some((cut) => {
+  const ok = [b.placedAt, earlier].some((cut) => {
     const { m, J } = bookAt(b.a, b.b, cut, s);
-    if (legs.some((l) => l.market.startsWith('dealt') && !['over:', 'under:'].map((d) => d + dealtLine(m, l.market.slice(5))).includes(l.selection))) return false;
-    const q = jointProb(J, legs);
-    if (q < 1e-9 || (b.legs && q < 0.002)) return false;
+    if (legs.some((l) => l.market.startsWith('dealt') && CLASSIC.has(l.market) && !['over:', 'under:'].map((d) => d + dealtLine(m, l.market.slice(5))).includes(l.selection))) return false;
+    if (!sim) {
+      const q = jointProb(J, legs);
+      if (q < 1e-9 || (b.legs && q < 0.002)) return false;
+      const fair = b.legs ? price(q, s.builderMargin, 1).decimal : price(q, s.margin).decimal;
+      return b.odds - 1 <= (fair - 1) * 1.05 + 1e-9;
+    }
+    // simulated markets: same board limits, and one rung of leeway for the simulation's own wobble
+    const q = simProb(simBook(b.a, b.b, cut, s, format), legs, format, b.placedAt);
+    if (b.legs ? q < 0.002 : q < 0.004 || q > 0.985) return false;
     const fair = b.legs ? price(q, s.builderMargin, 1).decimal : price(q, s.margin).decimal;
-    return b.odds - 1 <= (fair - 1) * 1.05 + 1e-9;
+    return b.odds <= rungAbove(fair) + 1e-9;
   });
+  PRICE_MEMO.set(memoKey, ok);
+  return ok;
 }
+const rungAbove = (dec) => { const r = LADDER.find((x) => x.x > dec - 1 + 1e-9); return r ? Math.round((1 + r.x) * 100) / 100 : dec; };
 function ownBetProblem(b, s) {
   if (b.bettor !== b.a && b.bettor !== b.b) return '';
   if (!s.ownMatchBets) return 'Bet on their own match';
-  if (b.legs || b.market !== 'result' || b.selection !== (b.bettor === b.a ? 'A' : 'B')) return 'On your own match you can only back yourself to win';
+  if (b.legs || !['result', 's.winner'].includes(b.market) || b.selection !== (b.bettor === b.a ? 'A' : 'B')) return 'On your own match you can only back yourself to win';
   return '';
 }
 
@@ -1144,12 +1650,22 @@ function judge(b) {
   if (!priceOk(b, s)) return voidIt('Price check failed');
   // no lock made inside the window: nothing proves when bets were placed, so they're refunded
   if (!f.primary) return Date.now() > f.windowEnds + LOCK_GRACE ? voidIt('Betting wasn\'t locked before the game') : { status: 'open', payout: 0, matchKey: undefined };
-  const fin = resultForFixture(f);
-  if (fin) {
-    const o = orientPair(fin, b.a), r = b.legs ? settleBuilder(b.legs, o) : settleSelection(b.market, b.selection, o);
-    if (r === null) return { ...voidIt('A detail this bet needed wasn\'t recorded'), matchKey: fin.key };
-    return r ? { status: 'won', payout: Math.round(b.stake * b.odds), matchKey: fin.key } : { status: 'lost', payout: 0, matchKey: fin.key };
+  const legs = b.legs || [{ market: b.market, selection: b.selection }];
+  const settle = (it, format, key) => {
+    const rs = legs.map((l) => legTest(l, format, b.placedAt)(it)), r = rs.includes(false) ? false : rs.includes(null) ? null : true;
+    if (r === null) return { ...voidIt('A detail this bet needed wasn\'t recorded'), matchKey: key };
+    return r ? { status: 'won', payout: Math.round(b.stake * b.odds), matchKey: key } : { status: 'lost', payout: 0, matchKey: key };
+  };
+  if (f.format) {
+    const st = seriesState()[f.key];
+    if (st.status === 'final') return settle(seriesOf(st.games.map((r) => gameFrom(r, b.a)), st.N), f.format, 'series:' + f.key);
+    if (st.status === 'void') return voidIt('The series wasn\'t finished in time');
+    if (st.status === 'provisional') return { status: 'pending', payout: 0, why: 'Series over. Waiting for the official battle log to confirm it', matchKey: undefined };
+    if (st.status === 'live') return { status: 'pending', payout: 0, why: `Series in progress: ${st.S.winsA}–${st.S.winsB}`, matchKey: undefined };
+    return { status: Date.now() > f.closesAt ? 'locked' : 'open', payout: 0, matchKey: undefined };
   }
+  const fin = resultForFixture(f);
+  if (fin) return settle(gameFrom(fin, b.a), null, fin.key);
   if (pendingForFixture(f)) return { status: 'pending', payout: 0, why: 'Result waiting for confirmation', matchKey: undefined };
   if (Date.now() > f.expiresAt) return voidIt('Not played in time');
   return { status: Date.now() > f.closesAt ? 'locked' : 'open', payout: 0, matchKey: undefined };
@@ -1162,10 +1678,120 @@ function coinsOf(pid) {
   for (const b of ledger()) if (b.bettor === pid) c += (b.payout || 0) - b.stake;
   return c;
 }
+// ---------- The market list ----------
+// Series basics, then the catalogue our Clash experts designed, then the admin's AI-bookie specials
+const SERIES_CORE = [
+  { id: 's.winner', scope: 'series', name: 'Series winner', blurb: 'Simple as it gets: who walks off with the bragging rights and the group-chat crown?', kind: 'hl', expr: { stat: 'seriesWins' } },
+  { id: 's.score', scope: 'series', name: 'Correct series score', blurb: 'The final games tally, winner first.', kind: 'score' },
+  { id: 's.hcp', scope: 'series', name: 'Series handicap', blurb: 'Games won minus games lost, after the handicap. -1.5 means winning by two clear games.', kind: 'hcp' },
+  { id: 's.games3', scope: 'series', formats: ['bo3'], name: 'Total games played', blurb: 'Does it go the distance? Drawn games count as played.', kind: 'ou', expr: { stat: 'games', side: 'tot' }, lines: [2.5] },
+  { id: 's.games5', scope: 'series', formats: ['bo5'], name: 'Total games played', blurb: 'A quick 3–0 or a five-game war. Drawn games count as played.', kind: 'ou', expr: { stat: 'games', side: 'tot' }, lines: [3.5, 4.5] },
+  { id: 's.g1', scope: 'series', name: 'Game 1 winner', blurb: 'First blood of the series. Void if game 1 is a draw.', kind: 'hl', expr: { stat: 'g1win' } },
+];
+const catalogueFor = memo(() => {
+  const seen = new Set(), out = [];
+  for (const m of [...SERIES_CORE, ...CATALOGUE]) if (specOk(m) && !seen.has(m.id)) { seen.add(m.id); out.push(m); }
+  return out;
+});
+// The admin's specials: kept forever once published (hidden ones stay valid for bets already placed)
+const specialsList = memo(() => (Array.isArray(store.specials.list) ? store.specials.list : [])
+  .filter((x) => x && specOk(x) && /^x\./.test(x.id) && canon(x.createdAt)));
+function marketById(id, format, at) {
+  const fromCat = catalogueFor().find((m) => m.id === id && forFormat(m, format));
+  if (fromCat) return fromCat;
+  const sp = specialsList().find((m) => m.id === id && forFormat(m, format));
+  return sp && (!at || sp.createdAt <= at) ? sp : null;
+}
+const CLASSIC = new Set(marketDefs('A', 'B').map((d) => d.key));
+const GROUPS = [['Series', ['seriesWins', 'games', 'sweep', 'distance', 'reverse', 'g1win']], ['Crowns & towers', ['crowns', 'three', 'clean', 'first', 'win']],
+  ['King Towers', ['kings']], ['Damage', ['dealt', 'dmg1k']], ['Overtime & tiebreakers', ['ot', 'tb']], ['Elixir', ['leak']], ['The draft', ['card', 'cat', 'elixir']]];
+const groupOf = (m) => (/^x\./.test(m.id) ? 'Bookie\'s specials' : !m.expr ? 'Series' : (GROUPS.find(([, stats]) => stats.includes(m.expr.stat)) || ['Specials'])[0]);
+const lineLabel = (m, l) => (['dealt'].includes(m.expr.stat) ? fmtN(l) : ['leak', 'elixir'].includes(m.expr.stat) ? String(l) : String(l));
+
+// Price every selection of the simulation markets for one board (game or series)
+function simMarkets(a, b, format) {
+  const now = nowIso(), s = settingsAt(now), nA = nameOf(a), nB = nameOf(b);
+  const key = ['board', a, b, format || 'game', bookIndex(now), s.margin, s.princessHp, s.kingHp, specialsList().length].join('|');
+  if (SIM_CACHE.has(key)) return SIM_CACHE.get(key);
+  const book = simBook(a, b, now, s, format), items = format ? book.series : book.games;
+  const list = [...catalogueFor(), ...specialsList().filter((x) => !x.hidden)].filter((m) => forFormat(m, format));
+  const out = [];
+  for (const m of list) {
+    const ok = (p) => p >= 0.004 && p <= 0.985;
+    const sel = (key, label, p) => ({ key, label, p, ...price(p, s.margin) });
+    let sels = [];
+    if (m.kind === 'ou') {
+      const vals = items.map((it) => (format ? seriesStat(it, m.expr) : gameStat(it, m.expr))).filter((v) => v != null);
+      for (const l of m.lines) {
+        const pOver = vals.filter((v) => v > l).length / Math.max(1, vals.length);
+        if (ok(pOver)) sels.push({ ...sel('over:' + l, `Over ${lineLabel(m, l)}`, pOver), line: l, dir: 'over' });
+        if (ok(1 - pOver)) sels.push({ ...sel('under:' + l, `Under ${lineLabel(m, l)}`, 1 - pOver), line: l, dir: 'under' });
+      }
+    } else {
+      const names = { yes: 'Yes', no: 'No', A: nA, B: nB, tie: 'Tie' };
+      for (const x of specSels(m, format)) {
+        const p = simProb(book, [{ market: m.id, selection: x.key }], format);
+        let label = names[x.key];
+        if (m.kind === 'score') { const [wa, wb] = x.key.split('-').map(Number); label = wa > wb ? `${nA} ${wa}–${wb}` : `${nB} ${wb}–${wa}`; }
+        if (m.kind === 'hcp') { const [side, h] = x.key.split(':'); label = `${side === 'A' ? nA : nB} ${h}`; }
+        if (ok(p)) sels.push(sel(x.key, label, p));
+      }
+    }
+    if (sels.length) out.push({ key: m.id, name: fill(m.name, nA, nB), blurb: fill(m.blurb || '', nA, nB), kind: m.kind, group: groupOf(m), sels });
+  }
+  const order = [...GROUPS.map(([g]) => g), 'Specials', 'Bookie\'s specials'];
+  out.sort((x, y) => order.indexOf(x.group) - order.indexOf(y.group)); // stable: catalogue order within a group
+  if (SIM_CACHE.size >= 10) SIM_CACHE.delete(SIM_CACHE.keys().next().value);
+  SIM_CACHE.set(key, out);
+  return out;
+}
+
+// ---------- Series results ----------
+// A series is settled from the results of its two players after it opened, in order, until one
+// side has the wins it needs. It settles only on official (or admin) results, once the official
+// battle log is known to cover the deciding game, so a game nobody logged can't be skipped.
+// The admin can seal a series to settle it on what's there.
+const coverage = (a, b) => {
+  const th = store.importState && store.importState.through;
+  if (!th || typeof th !== 'object' || !canon(th[a]) || !canon(th[b])) return null;
+  return th[a] < th[b] ? th[a] : th[b];
+};
+const sealFor = (f) => (store.acts[adminUid()] || []).find((x) => x.type === 'seal' && x.fx === f.key && canon(x.at)) || null;
+const seriesState = memo(() => {
+  const out = {}, byDate = (p, q) => p.date.localeCompare(q.date) || p.key.localeCompare(q.key);
+  for (const f of fixtureData().list) {
+    if (!f.format) continue;
+    const N = f.format === 'bo3' ? 2 : 3, from = ms(f.at) - LOCK_GRACE;
+    const inWin = (r) => samePair(r, f.a, f.b) && ms(r.date) >= from && ms(r.date) <= f.expiresAt;
+    const games = finalResults().filter(inWin).sort(byDate);
+    const S = seriesOf(games.map((r) => gameFrom(r, f.a)), N), used = games.slice(0, S.games.length);
+    const waiting = resultData().pending.filter(inWin).length;
+    const sealed = sealFor(f), cov = coverage(f.a, f.b);
+    const official = used.every((r) => r.byAdmin);
+    const last = used.length ? used[used.length - 1].date : null;
+    let status = used.length ? 'live' : 'waiting';
+    if (S.winner) status = sealed || (official && cov && cov >= last) ? 'final' : 'provisional';
+    else if (sealed || (cov && ms(cov) >= f.expiresAt)) status = 'void';
+    out[f.key] = { status, games: used, S, N, waiting, sealed: !!sealed };
+  }
+  return out;
+});
+// A result as a game seen from player `a`
+function gameFrom(r, a) {
+  const o = orientPair(r, a), mine = r.playerA === a ? 'A' : 'B', opp = mine === 'A' ? 'B' : 'A';
+  const deck = (cs) => (Array.isArray(cs) && cs.length === 8 ? cs : null);
+  return { ...o, leakA: numOr(r['elixirLeaked' + mine]), leakB: numOr(r['elixirLeaked' + opp]), deckA: deck(r['cards' + mine]), deckB: deck(r['cards' + opp]) };
+}
+const seriesStarted = (f) => { const st = seriesState()[f.key]; return !!st && (st.games.length > 0 || st.waiting > 0); };
+
 // Betting is open from when a fixture opens (a minute's leeway for clocks) until its window ends or it locks
-const isOpen = (f) => Date.now() >= Date.parse(f.at) - LOCK_GRACE && Date.now() < f.closesAt && Date.now() < f.expiresAt && !resultForFixture(f) && !pendingForFixture(f);
-const liveFixtures = () => fixtureData().list.filter((f) => !resultForFixture(f) && Date.now() < f.expiresAt);
-const openFixtureFor = (a, b) => fixtureData().list.find((f) => ((f.a === a && f.b === b) || (f.a === b && f.b === a)) && isOpen(f)) || null;
+const isOpen = (f) => Date.now() >= Date.parse(f.at) - LOCK_GRACE && Date.now() < f.closesAt && Date.now() < f.expiresAt
+  && (f.format ? !seriesStarted(f) : !resultForFixture(f) && !pendingForFixture(f));
+// single-game fixtures (the Odds tab); series live on the Tournament tab
+const liveFixtures = () => fixtureData().list.filter((f) => !f.format && !resultForFixture(f) && Date.now() < f.expiresAt);
+const openFixtureFor = (a, b) => fixtureData().list.find((f) => !f.format && ((f.a === a && f.b === b) || (f.a === b && f.b === a)) && isOpen(f)) || null;
+const liveSeries = () => fixtureData().list.filter((f) => f.format && (() => { const st = seriesState()[f.key]; return !['final', 'void'].includes(st.status) || Date.now() < f.expiresAt; })());
+const openSeriesFor = (a, b, format) => fixtureData().list.find((f) => f.format === format && ((f.a === a && f.b === b) || (f.a === b && f.b === a)) && isOpen(f)) || null;
 
 // ======================================================================
 //  UI helpers
@@ -1211,7 +1837,7 @@ function renderAll() {
   $('#noIdBanner').hidden = !(mode === 'shared' && store.ready && !me.uid);
   $('#tab-admin').hidden = !me.admin;
   for (const t of tabs) document.getElementById(t.getAttribute('aria-controls')).hidden = joining || t.getAttribute('aria-selected') !== 'true';
-  if (joining || $('#p-odds').hidden) $('#slipBar').hidden = true;
+  if (joining || ($('#p-odds').hidden && $('#p-tourn').hidden)) $('#slipBar').hidden = true;
   renderConfirmBox(joining);
   if (joining) { renderJoin(); return; }
   if (mode !== 'connecting' && !me.admin && $('#tab-admin').getAttribute('aria-selected') === 'true') { showTab('tab-odds'); return; }
@@ -1222,6 +1848,7 @@ function renderAll() {
   $('#cardNames').innerHTML = [...cards].sort().map((c) => `<option value="${esc(c)}">`).join('');
   const sel = tabs.find((t) => t.getAttribute('aria-selected') === 'true').id;
   if (sel === 'tab-odds') renderOdds();
+  if (sel === 'tab-tourn') renderTourn();
   if (sel === 'tab-history') renderHistory();
   if (sel === 'tab-bets') renderBets();
   if (sel === 'tab-stats') renderStats();
@@ -1364,6 +1991,7 @@ setInterval(() => {
   if (mode === 'connecting') return;
   changed(); renderMe(); autoLock();
   if (!$('#p-odds').hidden) { renderFixtures(); renderSlip(); }
+  if (!$('#p-tourn').hidden) { renderSeriesList(); renderTSlip(); }
 }, 15000);
 
 // ======================================================================
@@ -1390,9 +2018,12 @@ function buildMarkets(a, b) {
       def.blurb = `Damage dealt to the other player's towers over the whole game. Expected about ${fmtN(dm.mu)}.`;
       sels = [{ key: 'over:' + line, label: `${fmtN(line)} or more`, ...price(pOver, s.margin) }, { key: 'under:' + line, label: `Under ${fmtN(line)}`, ...price(1 - pOver, s.margin) }];
     } else sels = def.sels.map((x) => ({ key: x.key, label: x.label, ...price(jointProb(J, [{ market: def.key, selection: x.key }]), s.margin) }));
-    return { key: def.key, name: def.name, blurb: def.blurb, sels };
+    return { key: def.key, name: def.name, blurb: def.blurb, sels, group: 'Main markets' };
   });
-  return { a, b, nA, nB, sample: m.sample, h2h: m.h2h, markets, model: m, J };
+  // the simulated ladders and props; their full crowns ladder replaces the three old total-crowns markets
+  const extra = simMarkets(a, b, null);
+  const hasLadder = catalogueFor().some((x) => x.scope === 'game' && x.kind === 'ou' && x.expr.stat === 'crowns' && (x.expr.side || 'tot') === 'tot');
+  return { a, b, nA, nB, sample: m.sample, h2h: m.h2h, markets: [...markets.filter((x) => !(hasLadder && /^total/.test(x.key))), ...extra], model: m, J };
 }
 function renderOdds() {
   renderFixtures();
@@ -1405,11 +2036,7 @@ function renderOdds() {
   const conf = s.h2h >= 10 ? 'high' : s.a + s.b >= 15 ? 'medium' : 'low';
   const n = (k) => `${k} result${k === 1 ? '' : 's'}`;
   $('#oddsMeta').innerHTML = `Built from ${n(s.a)} for ${esc(book.nA)}, ${n(s.b)} for ${esc(book.nB)} and ${s.h2h} head to head (${book.h2h.a}–${book.h2h.b}–${book.h2h.d}). Confidence <span class="conf ${conf}">${conf}</span>`;
-  box.innerHTML = book.markets.map((mk) => `<div class="panel market"><h3>${esc(mk.name)}</h3><p>${esc(mk.blurb)}</p><div class="sels">${mk.sels.map((x) => {
-    const on = slipMode === 'builder' ? isLeg(mk.key, x.key) : !!slip && slip.a === a && slip.b === b && slip.market === mk.key && slip.selection === x.key;
-    return `<button type="button" class="price" aria-pressed="${on}" data-m="${esc(mk.key)}" data-mn="${esc(mk.name)}" data-s="${esc(x.key)}" data-l="${esc(x.label)}" data-d="${x.decimal}" data-f="${x.fractional}">
-      <span>${esc(x.label)}</span><span class="odd num">${x.fractional}<small>${x.decimal.toFixed(2)} · ${(x.p * 100).toFixed(1)}%</small></span></button>`;
-  }).join('')}</div></div>`).join('');
+  box.innerHTML = boardHtml(book.markets, (mk, sel) => (slipMode === 'builder' ? isLeg(mk, sel) : !!slip && slip.a === a && slip.b === b && slip.market === mk && slip.selection === sel));
   renderSlip();
 }
 $('#oddsA').addEventListener('change', renderOdds);
@@ -1452,7 +2079,7 @@ function toggleLeg(btn) {
 function builderQuote() {
   const legs = builder.legs;
   if (!currentBook || legs.length < 2) return null;
-  const p = jointProb(currentBook.J, legs);
+  const p = legsProb(currentBook.a, currentBook.b, legs, null);
   if (p < 1e-6) return { impossible: true, why: 'These picks can\'t all happen in the same match. Swap one out.' };
   // below 1 in 500 the model is mostly guessing, so the book won't take it
   if (p < 0.002) return { impossible: true, why: 'That combo is too much of a long shot for the book to price. Swap a pick out.' };
@@ -1516,7 +2143,7 @@ function renderSlip() {
     $('#slipPlace').onclick = placeBet;
   }
 }
-$('#slipBar').addEventListener('click', () => $('#slip').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }));
+$('#slipBar').addEventListener('click', () => $($('#p-tourn').hidden ? '#slip' : '#trSlip').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }));
 $('#slip').addEventListener('click', (e) => {
   const m = e.target.closest('[data-mode]');
   if (m) { slipMode = m.dataset.mode; renderOdds(); return; }
@@ -1560,6 +2187,305 @@ async function placeBet() {
   } catch { /* toast shown */ }
   betBusy = false; renderOdds();
 }
+
+// ======================================================================
+//  Boards: market cards, grouped, with ladders shown as Over / Under rows
+// ======================================================================
+function priceBtn(mk, x, on, short) {
+  return `<button type="button" class="price${short ? ' short' : ''}" aria-pressed="${on}" data-m="${esc(mk.key)}" data-mn="${esc(mk.name)}" data-s="${esc(x.key)}" data-l="${esc(x.label)}" data-d="${x.decimal}" data-f="${x.fractional}"${short ? ` aria-label="${esc(mk.name)}: ${esc(x.label)}"` : ''}>
+    <span>${esc(short ? (x.dir === 'over' ? 'Over' : 'Under') : x.label)}</span><span class="odd num">${x.fractional}<small>${x.decimal.toFixed(2)} · ${(x.p * 100).toFixed(1)}%</small></span></button>`;
+}
+function ladderHtml(mk, isOn) {
+  const lines = [...new Set(mk.sels.map((x) => x.line))];
+  return `<div class="ladder">${lines.map((l) => {
+    const o = mk.sels.find((x) => x.line === l && x.dir === 'over'), u = mk.sels.find((x) => x.line === l && x.dir === 'under');
+    const cell = (x) => (x ? priceBtn(mk, x, isOn(mk.key, x.key), true) : '<span class="ph"></span>');
+    return `<div class="rung"><b>${esc((o || u).label.replace(/^(Over|Under) /, ''))}</b>${cell(o)}${cell(u)}</div>`;
+  }).join('')}</div>`;
+}
+function boardHtml(markets, isOn) {
+  let html = '', group = null;
+  for (const mk of markets) {
+    if (mk.group && mk.group !== group) { group = mk.group; html += `<h3 class="group-head">${esc(group)}</h3>`; }
+    html += `<div class="panel market"><h3>${esc(mk.name)}</h3>${mk.blurb ? `<p>${esc(mk.blurb)}</p>` : ''}${mk.kind === 'ou'
+      ? ladderHtml(mk, isOn) : `<div class="sels">${mk.sels.map((x) => priceBtn(mk, x, isOn(mk.key, x.key))).join('')}</div>`}</div>`;
+  }
+  return html;
+}
+// Chance that every leg lands: exact for the classic single-game markets, simulated otherwise
+function legsProb(a, b, legs, format) {
+  const now = nowIso(), s = settingsAt(now);
+  if (!format && legs.every((l) => CLASSIC.has(l.market))) return jointProb(bookAt(a, b, now, s).J, legs);
+  return simProb(simBook(a, b, now, s, format), legs, format, now);
+}
+
+// ======================================================================
+//  Tournament: Best of 3 / Best of 5 series
+// ======================================================================
+const T = { format: 'bo3', newFormat: 'bo3', mode: 'single', slip: null, legs: [], key: '', stake: 50, busy: false, shown: null, markets: [] };
+const fmtName = (f) => (f === 'bo3' ? 'Best of 3' : 'Best of 5');
+function renderTourn() {
+  const pid = myPlayer();
+  fillPlayers($('#trA'), 0); fillPlayers($('#trB'), 1); fillPlayers($('#newSrA'), 0); fillPlayers($('#newSrB'), 1);
+  for (const btn of document.querySelectorAll('[data-tf]')) btn.setAttribute('aria-pressed', btn.dataset.tf === T.format);
+  for (const btn of document.querySelectorAll('[data-sf]')) btn.setAttribute('aria-pressed', btn.dataset.sf === T.newFormat);
+  const form = $('#seriesForm');
+  form.hidden = readOnly || !(pid || me.admin);
+  $('#newSrA').hidden = !me.admin;
+  $('#newSrAName').textContent = me.admin ? 'v' : pid ? `I'm playing ${nameOf(pid)} v` : '';
+  renderSeriesList();
+  const a = $('#trA').value, b = $('#trB').value, key = [a, b, T.format].join('|');
+  if (key !== T.key) { T.key = key; T.legs = []; T.slip = null; }
+  const box = $('#trMarkets');
+  if (store.players.length < 2 || a === b) { box.innerHTML = '<div class="panel empty">Pick two different players.</div>'; $('#trMeta').textContent = ''; T.markets = []; renderTSlip(); return; }
+  T.markets = simMarkets(a, b, T.format);
+  const m = bookAt(a, b, nowIso(), settingsAt(nowIso())).m;
+  $('#trMeta').innerHTML = `${fmtName(T.format)}: first to ${T.format === 'bo3' ? 2 : 3} wins. Each price comes from ${fmtN(SIM_SERIES)} simulated series, built on ${m.sample.a} results for ${esc(nameOf(a))}, ${m.sample.b} for ${esc(nameOf(b))} and ${m.sample.h2h} head to head.`;
+  box.innerHTML = boardHtml(T.markets, (mk, sel) => (T.mode === 'builder' ? T.legs.some((l) => l.market === mk && l.selection === sel) : !!T.slip && T.slip.market === mk && T.slip.selection === sel));
+  renderTSlip();
+}
+function seriesStatus(f, st) {
+  const now = Date.now();
+  if (isOpen(f)) return `<span class="pill open">Betting open · closes in ${left(f.closesAt - now)}</span>`;
+  if (!f.primary && now > f.windowEnds + LOCK_GRACE && st.status !== 'final') return '<span class="pill lost">Never locked: bets refunded</span>';
+  if (st.status === 'final') return `<span class="pill won">${esc(nameOf(st.S.winner === 'A' ? f.a : f.b))} wins ${Math.max(st.S.winsA, st.S.winsB)}–${Math.min(st.S.winsA, st.S.winsB)}</span>`;
+  if (st.status === 'provisional') return '<span class="pill warn">Over. Waiting for the official log</span>';
+  if (st.status === 'void') return '<span class="pill lost">Not finished in time: bets refunded</span>';
+  if (st.status === 'live') return `<span class="pill open">In play · ${st.S.winsA}–${st.S.winsB}</span>`;
+  return f.primary ? '<span class="pill">Locked · waiting for game 1</span>' : '<span class="pill">Betting closed</span>';
+}
+function renderSeriesList() {
+  const now = Date.now(), all = fixtureData().list.filter((f) => f.format && now < f.expiresAt + 2 * 86400000);
+  $('#seriesList').innerHTML = all.length ? all.map((f) => {
+    const st = seriesState()[f.key], open = isOpen(f), nBets = ledger().filter((b) => b.fx === f.key).length;
+    const games = st.games.map((r, i) => { const g = gameFrom(r, f.a); return `<span class="chip">G${i + 1} ${g.winner === 'D' ? 'draw' : esc(nameOf(g.winner === 'A' ? f.a : f.b))} ${g.a}–${g.b}</span>`; }).join('');
+    const canSeal = me.admin && !readOnly && !['final', 'void'].includes(st.status) && (st.status === 'provisional' || now > f.windowEnds);
+    return `<div class="series-row"><div><b>${esc(nameOf(f.a))}</b> v <b>${esc(nameOf(f.b))}</b> · ${fmtName(f.format)} ${seriesStatus(f, st)}
+      <div class="small muted">Opened ${ago(now - Date.parse(f.at))} · ${nBets} bet${nBets === 1 ? '' : 's'}${st.waiting ? ` · ${st.waiting} game${st.waiting === 1 ? '' : 's'} waiting for confirmation` : ''}</div></div>
+      ${games ? `<div class="games">${games}</div>` : ''}
+      <div class="row">${open ? `<button class="btn tiny" type="button" data-srbet="${esc(f.key)}">Bet on this</button>` : ''}
+        ${open && canLock(f) && !f.primary ? `<button class="btn tiny warn" type="button" data-fxlock="${esc(f.key)}">Lock: series starting</button>` : ''}
+        ${canSeal ? `<button class="btn tiny" type="button" data-seal="${esc(f.key)}">${T.sealing === f.key ? `Settle on these ${st.games.length} games?` : 'Settle now'}</button>` : ''}</div>
+      ${open && canLock(f) && !f.primary ? '<div class="small">Tap Lock as game 1 starts. If nobody in the series locks it before betting closes, every bet on it is refunded.</div>' : ''}</div>`;
+  }).join('') : '<p class="note">No series on. Open one below when you\'re about to play.</p>';
+}
+$('#seriesList').addEventListener('click', async (e) => {
+  const t = e.target.dataset, f = fixtureData().byKey[t.srbet || t.fxlock || t.seal]; if (!f) return;
+  if (t.srbet) { $('#trA').value = f.a; $('#trB').value = f.b; T.format = f.format; renderTourn(); $('#trMarkets').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  if (t.fxlock) { try { await lockFixture(f); toast('Betting locked. Good luck in the series.'); } catch { /* toast shown */ } }
+  if (t.seal) {
+    if (T.sealing !== f.key) { T.sealing = f.key; renderSeriesList(); return; }
+    T.sealing = null;
+    try { await put(`acts/${me.uid}/items`, 's_' + safeSeg(f.key), { type: 'seal', fx: f.key, at: nowIso() }); toast('Series settled on the games logged.'); } catch { /* toast shown */ }
+  }
+});
+document.querySelector('#seriesForm .seg').addEventListener('click', (e) => { const b = e.target.closest('[data-sf]'); if (b) { T.newFormat = b.dataset.sf; renderTourn(); } });
+$('#trFormat').addEventListener('click', (e) => { const b = e.target.closest('[data-tf]'); if (b) { T.format = b.dataset.tf; renderTourn(); } });
+$('#trA').addEventListener('change', renderTourn);
+$('#trB').addEventListener('change', renderTourn);
+$('#seriesForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const a = me.admin ? $('#newSrA').value : myPlayer(), b = $('#newSrB').value;
+  if (!a || !b || a === b) return toast('Pick two different players.', true);
+  if (fixtureData().list.some((f) => f.format && ((f.a === a && f.b === b) || (f.a === b && f.b === a)) && Date.now() < f.expiresAt && !['final', 'void'].includes(seriesState()[f.key].status)))
+    return toast('Those two already have a series on.', true);
+  try {
+    await put(`acts/${me.uid}/items`, 'f_' + newId(), { type: 'fixture', a, b, at: nowIso(), format: T.newFormat });
+    $('#trA').value = a; $('#trB').value = b; T.format = T.newFormat;
+    toast(`${fmtName(T.newFormat)} open: ${nameOf(a)} v ${nameOf(b)}. Betting closes in ${num(store.settings.betWindowMin)} minutes or when you lock it.`);
+    renderTourn();
+  } catch { /* toast shown */ }
+});
+$('#trMarkets').addEventListener('click', (e) => {
+  const btn = e.target.closest('.price'); if (!btn) return;
+  const leg = { market: btn.dataset.m, marketName: btn.dataset.mn, selection: btn.dataset.s, label: btn.dataset.l };
+  if (T.mode === 'builder') {
+    const i = T.legs.findIndex((l) => l.market === leg.market);
+    if (i >= 0 && T.legs[i].selection === leg.selection) T.legs.splice(i, 1);
+    else if (i >= 0) T.legs[i] = leg;
+    else if (T.legs.length >= MAX_LEGS) return toast(`Bet Builder takes up to ${MAX_LEGS} picks.`, true);
+    else T.legs.push(leg);
+  } else T.slip = { ...leg, decimal: +btn.dataset.d, fractional: btn.dataset.f };
+  renderTourn();
+});
+function tBlock(a, b, single) {
+  const pid = myPlayer(), s = store.settings;
+  if (mode === 'shared' && !me.uid) return 'Sign in to bet.';
+  if (readOnly) return 'You\'re view-only. Ask the admin to invite your email as an Editor to bet.';
+  if (!pid) return me.admin ? 'Link yourself to a player (reload and pick one) to bet.' : 'Your player link is waiting for the admin\'s approval.';
+  if (!openSeriesFor(a, b, T.format)) return `No ${fmtName(T.format)} open for these two. One of them opens it on this tab just before they start.`;
+  if (pid === a || pid === b) {
+    if (!s.ownMatchBets) return 'You\'re playing in this one, so no betting on it.';
+    if (!single || single.market !== 's.winner' || single.selection !== (pid === a ? 'A' : 'B')) return 'In your own series you can only back yourself to win it.';
+  }
+  return '';
+}
+function tQuote() {
+  const a = $('#trA').value, b = $('#trB').value;
+  if (T.legs.length < 2) return null;
+  const p = legsProb(a, b, T.legs, T.format);
+  if (p < 0.002) return { impossible: true, why: p < 1e-6 ? 'These picks can\'t all happen in the same series. Swap one out.' : 'That combo is too much of a long shot for the book to price. Swap a pick out.' };
+  const single = (l) => { const mk = T.markets.find((x) => x.key === l.market), x = mk && mk.sels.find((y) => y.key === l.selection); return x ? x.decimal : 1; };
+  return { p, acca: T.legs.reduce((t, l) => t * single(l), 1), ...price(p, store.settings.builderMargin, 1) };
+}
+function renderTSlip() {
+  const el = $('#trSlip'), pid = myPlayer(), a = $('#trA').value, b = $('#trB').value;
+  if (document.activeElement && document.activeElement.id === 'tStake') return;
+  const who = pid ? `<div class="small">Betting as <b>${esc(nameOf(pid))}</b> · <span class="num">${fmtN(coinsOf(pid))}</span> coins</div>` : '';
+  const sw = `<div class="seg mode" role="group" aria-label="Bet type"><button type="button" data-tmode="single" aria-pressed="${T.mode === 'single'}">Single</button><button type="button" data-tmode="builder" aria-pressed="${T.mode === 'builder'}">Bet Builder</button></div>`;
+  const stake = (dec, block, label) => `${block ? `<p class="note">${esc(block)}</p>` : `<label class="field">Stake (coins)<input type="number" id="tStake" min="1" step="5" value="${T.stake}"></label>
+    <div class="small muted num" id="tReturn" data-dec="${dec}"></div>${limitsNote()}`}
+    <div class="row">${block ? '' : `<button class="btn gold" type="button" id="tPlace" ${T.busy ? 'disabled' : ''}>${label}</button>`}<button class="btn" type="button" id="tClear">Clear</button></div>`;
+  let body;
+  if (T.mode === 'builder') {
+    const q = tQuote(); T.shown = q && !q.impossible ? q.decimal : null;
+    body = `<p class="note">Combine 2 to ${MAX_LEGS} picks across the whole ${fmtName(T.format)}. They're priced together from the same simulated series, so linked picks pay like they're linked.</p>
+      ${T.legs.length ? `<ol class="legs">${T.legs.map((l, i) => `<li><span><b>${esc(l.label)}</b><br><span class="small muted">${esc(l.marketName)}</span></span><button type="button" class="btn tiny" data-tunleg="${i}">Remove</button></li>`).join('')}</ol>` : '<p class="muted small" style="margin:0">Tap prices on the board to add picks.</p>'}
+      ${q && !q.impossible ? `<div><div class="big-odd num">${q.fractional} <span class="small muted">${q.decimal.toFixed(2)}</span></div><div class="small muted num">As separate picks multiplied: ${q.acca.toFixed(2)}</div></div>` : ''}
+      ${T.legs.length >= 2 ? who + stake(q && !q.impossible ? q.decimal : 0, q && q.impossible ? q.why : tBlock(a, b, null), 'Place Bet Builder') : ''}`;
+  } else if (!T.slip) body = '<p class="muted small" style="margin:0">Tap any price to add it here. Betting is open from when a series is opened until it locks.</p>';
+  else body = `<div><div class="pick">${esc(T.slip.label)}</div><div class="small muted">${esc(nameOf(a))} v ${esc(nameOf(b))} · ${fmtName(T.format)} · ${esc(T.slip.marketName)}</div></div>
+      <div class="big-odd num">${T.slip.fractional} <span class="small muted">${T.slip.decimal.toFixed(2)}</span></div>${who}${stake(T.slip.decimal, tBlock(a, b, T.slip), 'Place bet')}`;
+  el.innerHTML = `<div class="row" style="justify-content:space-between"><h3>Series slip</h3>${sw}</div>${body}`;
+  // on a phone the slip sits under the board, so a bar at the bottom jumps to it
+  const bar = $('#slipBar'), q = T.mode === 'builder' ? tQuote() : null;
+  const barText = T.mode === 'builder' ? (T.legs.length ? `Bet Builder · ${T.legs.length} pick${T.legs.length > 1 ? 's' : ''}${q && !q.impossible ? ` · ${q.fractional}` : ''}` : '')
+    : T.slip ? `${T.slip.label} · ${T.slip.fractional}` : '';
+  bar.hidden = $('#p-tourn').hidden || !barText;
+  if (barText && !$('#p-tourn').hidden) bar.innerHTML = `<span>${esc(barText)}</span><span>View slip</span>`;
+  const st = $('#tStake');
+  if (st) {
+    const upd = () => { $('#tReturn').textContent = `Returns ${fmtN((+st.value || 0) * +$('#tReturn').dataset.dec)} coins if it lands`; };
+    st.addEventListener('input', () => { T.stake = +st.value || 0; upd(); }); upd();
+    $('#tPlace').onclick = placeTBet;
+  }
+  const clr = $('#tClear'); if (clr) clr.onclick = () => { T.legs = []; T.slip = null; renderTourn(); };
+}
+$('#trSlip').addEventListener('click', (e) => {
+  const m = e.target.closest('[data-tmode]'); if (m) { T.mode = m.dataset.tmode; renderTourn(); return; }
+  const u = e.target.closest('[data-tunleg]'); if (u) { T.legs.splice(+u.dataset.tunleg, 1); renderTourn(); }
+});
+async function placeTBet() {
+  if (T.busy) return;
+  const a = $('#trA').value, b = $('#trB').value, isB = T.mode === 'builder', s = store.settings, pid = myPlayer(), stake = Math.floor(T.stake);
+  const block = tBlock(a, b, isB ? null : T.slip); if (block) return toast(block, true);
+  const f = openSeriesFor(a, b, T.format);
+  T.markets = simMarkets(a, b, T.format);
+  let odds, fractional;
+  if (isB) {
+    const q = tQuote();
+    if (!q || q.impossible) return toast('That Bet Builder can\'t be priced. Check your picks.', true);
+    if (q.decimal !== T.shown) { renderTSlip(); return toast(`The price moved to ${q.fractional}. Tap Place again to take it.`, true); }
+    ({ decimal: odds, fractional } = q);
+  } else {
+    const mk = T.markets.find((x) => x.key === T.slip.market), sel = mk && mk.sels.find((x) => x.key === T.slip.selection);
+    if (!sel) { T.slip = null; renderTourn(); return toast('That selection isn\'t on the board any more.', true); }
+    if (sel.decimal !== T.slip.decimal) { Object.assign(T.slip, { decimal: sel.decimal, fractional: sel.fractional }); renderTSlip(); return toast(`The price moved to ${sel.fractional}. Tap Place again to take it.`, true); }
+    ({ decimal: odds, fractional } = sel);
+  }
+  if (!(stake >= s.minStake)) return toast(`Minimum stake is ${fmtN(s.minStake)} coins.`, true);
+  if (stake > s.maxStake) return toast(`Maximum stake is ${fmtN(s.maxStake)} coins.`, true);
+  if (stake * odds > s.maxReturn) return toast(`Max return is ${fmtN(s.maxReturn)} coins, so the most you can stake at ${fractional} is ${fmtN(Math.floor(s.maxReturn / odds))}.`, true);
+  if (stake > coinsOf(pid)) return toast(`You only have ${fmtN(coinsOf(pid))} coins.`, true);
+  const head = `${nameOf(a)} v ${nameOf(b)} (${fmtName(T.format)})`;
+  const bet = { id: newId(), bettor: pid, fx: f.key, a, b, odds, fractional, stake, placedAt: nowIso(),
+    ...(isB ? { market: 'builder', selection: 'builder', legs: T.legs.map(({ market, selection, label, marketName }) => ({ market, selection, label, marketName })), label: `${head}: Bet Builder, ${T.legs.length} picks` }
+      : { market: T.slip.market, selection: T.slip.selection, label: `${head}: ${T.slip.marketName}, ${T.slip.label}` }) };
+  const mine = store.betDocs.find((d) => d.id === me.uid);
+  T.busy = true; renderTSlip();
+  try {
+    await put('bets', me.uid, { list: [...((mine && Array.isArray(mine.list) && mine.list) || []), bet] });
+    toast(`Bet placed: ${stake} coins at ${fractional}.`);
+    if (isB) T.legs = []; else T.slip = null;
+  } catch { /* toast shown */ }
+  T.busy = false; renderTourn();
+}
+
+// ======================================================================
+//  AI bookie: Claude, briefed as a Clash Royale expert, invents specials
+//  in the same market language; the book prices them and the admin
+//  decides what goes on the board.
+// ======================================================================
+const BK = { busy: false, ideas: [], scope: 'game' };
+function bookieBrief(format) {
+  const M = finalResults(), n = M.length || 1;
+  const one = M.filter((r) => r.crownsA + r.crownsB === 1).length, three = M.filter((r) => Math.max(r.crownsA, r.crownsB) === 3).length;
+  const decks = M.flatMap((r) => [r.cardsA, r.cardsB]).filter((d) => d && d.length === 8), counts = {};
+  for (const d of decks) for (const c of d) counts[c] = (counts[c] || 0) + 1;
+  const top = Object.entries(counts).sort((x, y) => y[1] - x[1]).slice(0, 40).map(([c, k]) => `${c} (${Math.round((k / Math.max(1, decks.length)) * 100)}% of decks)`).join(', ');
+  const existing = [...catalogueFor(), ...specialsList()].filter((m) => forFormat(m, format)).map((m) => m.name).join('; ');
+  return `You are a Clash Royale expert and a cheeky British bookmaker. Invent 6 NEW betting specials for ${format ? `a ${fmtName(format)} series (first to ${format === 'bo3' ? 2 : 3} wins) of` : 'a single game of'} Clash Royale Triple Draft between two mates, {A} and {B}. Coins only, just for fun.
+Every special MUST be written in this JSON market language, because a computer prices and settles it from the official battle log:
+- per-game stats (with "side": "A", "B" or "tot"): crowns (towers taken; A/B 0-3, tot 0-5), kings (that side's own King Tower woke; tot 0-2), three (won with 3 crowns), win (A/B only), ot (tot only: overtime), tb (tot only: crowns level, won on tiebreaker), first (A/B: took the first tower), clean (A/B: lost no towers), dmg1k (1,000+ damage before overtime), dealt (tower damage dealt, 0-10928 per player), leak (elixir leaked, decimal), card (needs "card": exact card name; 1 if drafted by that side, tot = either deck; the two decks never share a card), cat (needs "cat": one of ${CATS.join(', ')}; how many deck cards are in it), elixir (average elixir cost of the deck).
+${format ? `- series stats: seriesWins (A/B), games (tot), sweep (A/B/tot), distance (tot: reached the last possible game), reverse (A/B: lost the first ${format === 'bo3' ? 'game' : 'two games'} and won), g1win (A/B). Per-game stats in a series need "agg": "sum" (total over the series), "games" (number of games where the value is at least "min", default 1) or "max" (best single game).` : ''}
+- kinds: "ou" with "lines" (over/under ladder, over wins when value > line; use .5 lines for whole-number stats), "yn" with "op" (">=", "<=", "==") and "value" (yes/no), "hl" with optional "tie": true (who has more, {A} or {B}).
+NOT recorded, so never use: cards actually played or how often, troop counts, emotes, game length, elixir spent.
+Real data from ${n} games: ${Math.round((one / n) * 100)}% ended with exactly 1 crown in total, ${Math.round((three / n) * 100)}% had a 3-crown. Damage dealt per player has a median of about 3,400. Elixir leaked per player has a median of about 2.3 and the top 10% leak over 10. Most drafted cards: ${top}.
+Don't repeat these existing markets: ${existing}.
+Make them funny, Clash-flavoured and fair: lines where both sides get action. Names under 50 characters and may use {A}/{B}. Each blurb is one sentence of banter.
+Reply with JSON only: {"markets":[{"name":"...","blurb":"...","kind":"ou|yn|hl","expr":{"stat":"...","side":"...","card":"...","cat":"...","agg":"...","min":1},"lines":[...],"op":">=","value":1,"tie":false}]}`;
+}
+async function askBookie() {
+  if (BK.busy) return;
+  const sample = window.claude && window.claude.use ? await window.claude.use('sample') : null;
+  if (!sample) return toast('The AI bookie only works on the shared site in claude.ai.', true);
+  const scope = $('#bkScope').value, format = scope === 'game' ? null : scope;
+  BK.busy = true; BK.scope = scope; BK.ideas = []; renderBookie();
+  try {
+    const res = await sample.json(bookieBrief(format), { modelTier: 'default' });
+    const raw = res && Array.isArray(res.markets) ? res.markets.slice(0, 10) : [];
+    BK.ideas = raw.map((m) => {
+      const x = m && m.expr && typeof m.expr === 'object' ? m.expr : {};
+      const spec = { id: 'x.' + String(m.name || 'special').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 28) + '-' + newId().slice(-5),
+        scope: format ? 'series' : 'game', ...(format ? { formats: [format] } : {}), name: String(m.name || '').slice(0, 60), blurb: String(m.blurb || '').slice(0, 200), kind: m.kind,
+        expr: Object.fromEntries(['stat', 'side', 'card', 'cat', 'agg', 'min'].filter((k) => x[k] != null && x[k] !== '').map((k) => [k, x[k]])),
+        ...(m.kind === 'ou' ? { lines: (Array.isArray(m.lines) ? m.lines : []).map(Number).filter(Number.isFinite).slice(0, 16) } : {}),
+        ...(m.kind === 'yn' ? { op: m.op, value: Number(m.value) } : {}), ...(m.kind === 'hl' ? { tie: !!m.tie } : {}) };
+      return { spec, ok: specOk(spec), pick: specOk(spec) };
+    });
+    if (!BK.ideas.some((i) => i.ok)) toast('The bookie came back with nothing the book can price. Try again.', true);
+  } catch (e) {
+    toast(e && e.code === 'not_granted' ? 'You said no to the AI bookie, so it can\'t help this time.' : e && e.code === 'rate_limited' ? 'The AI bookie is busy. Try again in a minute.' : 'The AI bookie didn\'t answer. Try again.', true);
+  }
+  BK.busy = false; renderBookie();
+}
+// What a special would pay for the players picked on the Odds tab, before it goes live
+function previewSpecial(spec, format) {
+  const a = $('#oddsA').value, b = $('#oddsB').value;
+  if (!a || !b || a === b) return '';
+  const now = nowIso(), s = settingsAt(now), book = simBook(a, b, now, s, format), items = format ? book.series : book.games;
+  const sels = specSels(spec, format).slice(0, 8).map((x) => {
+    const t = specTest(spec, x.key, format), p = items.filter((it) => t(it) === true).length / items.length;
+    return `<span class="chip">${esc(x.key.replace('over:', 'Over ').replace('under:', 'Under '))} ${p < 0.004 || p > 0.985 ? '–' : price(p, s.margin).fractional}</span>`;
+  }).join('');
+  return `<div class="prices">${esc(nameOf(a))} v ${esc(nameOf(b))}: ${sels}</div>`;
+}
+function renderBookie() {
+  if (!$('#bkOut')) return;
+  $('#bkAsk').disabled = BK.busy; $('#bkAsk').textContent = BK.busy ? 'Thinking…' : 'Invent 6 specials';
+  const format = BK.scope === 'game' ? null : BK.scope;
+  $('#bkOut').innerHTML = BK.ideas.length ? `${BK.ideas.map((i, k) => `<label class="idea"><span class="check"><input type="checkbox" data-bkpick="${k}" ${i.pick ? 'checked' : ''} ${i.ok ? '' : 'disabled'}> <b>${esc(i.spec.name || 'Unnamed')}</b></span>
+      <span class="small muted">${esc(i.spec.blurb)}</span>${i.ok ? previewSpecial(i.spec, format) : '<span class="small down">Can\'t be priced or settled, so it can\'t go on the board.</span>'}</label>`).join('')}
+    <div class="row"><button class="btn gold" type="button" id="bkPublish">Put the ticked ones on the board</button></div>` : '';
+  const live = specialsList();
+  $('#bkLive').innerHTML = live.length ? `<h3>On the board</h3>${live.map((m) => `<div class="confirm-row"><span><b>${esc(m.name)}</b> <span class="small muted">${m.scope === 'game' ? 'Single game' : fmtName(m.formats ? m.formats[0] : 'bo3')}</span>${m.hidden ? ' <span class="pill">hidden</span>' : ''}</span>
+      <button class="btn tiny" type="button" data-bkhide="${esc(m.id)}">${m.hidden ? 'Show' : 'Hide'}</button></div>`).join('')}` : '';
+}
+$('#bkAsk').addEventListener('click', askBookie);
+$('#bkOut').addEventListener('change', (e) => { const k = e.target.dataset.bkpick; if (k != null) BK.ideas[+k].pick = e.target.checked; });
+$('#bkOut').addEventListener('click', async (e) => {
+  if (e.target.id !== 'bkPublish' || !me.admin) return;
+  const chosen = BK.ideas.filter((i) => i.ok && i.pick).map((i) => ({ ...i.spec, createdAt: nowIso() }));
+  if (!chosen.length) return toast('Tick at least one special.', true);
+  const list = Array.isArray(store.specials.list) ? store.specials.list : [];
+  if (list.length + chosen.length > 200) return toast('That\'s 200 specials already. Hide some instead of adding more.', true);
+  try { await put('config', 'specials', { list: [...list, ...chosen] }); BK.ideas = []; toast(`${chosen.length} special${chosen.length === 1 ? '' : 's'} on the board.`); renderBookie(); } catch { /* toast shown */ }
+});
+$('#bkLive').addEventListener('click', async (e) => {
+  const id = e.target.dataset.bkhide; if (!id || !me.admin) return;
+  const list = (Array.isArray(store.specials.list) ? store.specials.list : []).map((m) => (m && m.id === id ? { ...m, hidden: !m.hidden } : m));
+  try { await put('config', 'specials', { list }); } catch { /* toast shown */ }
+});
 
 // ======================================================================
 //  Scorecard
@@ -1862,11 +2788,14 @@ async function deleteResult(r) {
 //  Bets, leaderboard and the house log
 // ======================================================================
 function legList(bet) {
-  const fin = bet.matchKey && finalResults().find((x) => x.key === bet.matchKey), o = fin && orientPair(fin, bet.a);
+  const f = fixtureData().byKey[bet.fx];
+  let it = null, format = null;
+  if (f && f.format) { const st = seriesState()[f.key]; if (st.status === 'final') { it = seriesOf(st.games.map((r) => gameFrom(r, bet.a)), st.N); format = f.format; } }
+  else { const fin = bet.matchKey && finalResults().find((x) => x.key === bet.matchKey); if (fin) it = gameFrom(fin, bet.a); }
   return `<ul class="leg-list">${(Array.isArray(bet.legs) ? bet.legs : []).map((l) => {
-    const r = o ? settleSelection(l.market, l.selection, o) : undefined;
+    const r = it && l && typeof l.market === 'string' ? legTest(l, format, bet.placedAt)(it) : undefined;
     const tag = r === true ? '<span class="up">✓</span>' : r === false ? '<span class="down">✗</span>' : r === null ? '<span class="na">void</span>' : '';
-    return `<li>${tag} ${esc(l.marketName)}: ${esc(l.label)}</li>`;
+    return `<li>${tag} ${esc(l && l.marketName)}: ${esc(l && l.label)}</li>`;
   }).join('')}</ul>`;
 }
 let voiding = null;
@@ -1995,6 +2924,7 @@ async function renderAdmin() {
     setMinStake: 'minStake', setMaxStake: 'maxStake', setMaxReturn: 'maxReturn', setWindow: 'betWindowMin', setExpiry: 'fixtureHours' };
   for (const [id, k] of Object.entries(f)) if (document.activeElement !== $('#' + id)) $('#' + id).value = store.settings[k];
   $('#setOwnBets').checked = !!store.settings.ownMatchBets;
+  renderBookie();
   // Account names are looked up fresh each time and never stored
   if (userApi && uids.length) {
     const ps = await userApi.profiles(uids);

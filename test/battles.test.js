@@ -94,3 +94,19 @@ test('daily import: only the players\' own, untouched logs can attach a fixture'
   assert.strictEqual(run([['u_ann', 'm1', log]], { r1: { ref: 'u_ann~m1', deletedAt: '2026-10-04T13:00:00.000Z', date: '2026-10-04T12:04:00.000Z' } }).fx, null); // admin overruled it
   assert.strictEqual(run([['u_ann', 'm1', { ...log, loggedAt: '2026-10-04T11:50:00.000Z' }]]).loggedAt, '2026-10-04T12:00:00.000Z'); // never before the game
 });
+
+test('daily import: records how far the official log is complete for each player', () => {
+  const fs = require('fs'), os = require('os'), path = require('path'), { execFileSync } = require('child_process');
+  const W = fs.mkdtempSync(path.join(os.tmpdir(), 'import-'));
+  const put = (f, v) => { fs.mkdirSync(path.dirname(path.join(W, f)), { recursive: true }); fs.writeFileSync(path.join(W, f), JSON.stringify(v)); };
+  put('battles.json', { battles: [], checked: { '#AAA': '2026-10-05T07:23:00.000Z', '#BBB': '2026-10-05T07:23:01.000Z', '#ZZZ': '2026-10-05T07:23:02.000Z' } });
+  put('squad.json', [{ tag: '#AAA', name: 'ann' }, { tag: '#BBB', name: 'bob' }]);
+  put('db/players/ann.json', { name: 'ann' }); put('db/players/bob.json', { name: 'bob' });
+  put('versions.json', { 'config/importState': 4 });
+  put('window.json', { since: '2026-09-28T00:00:00.000Z', now: '2026-10-05T08:54:00.000Z' });
+  execFileSync(process.execPath, [path.join(__dirname, '../scripts/daily-import.js'), W], { stdio: 'pipe' });
+  const [w] = JSON.parse(fs.readFileSync(path.join(W, 'batch-1.json'), 'utf8'));
+  assert.deepStrictEqual([w.collection, w.doc_id, w.if_version], ['config', 'importState', 4]);
+  assert.deepStrictEqual(JSON.parse(fs.readFileSync(w.file_path, 'utf8')), { ranAt: '2026-10-05T08:54:00.000Z', through: { ann: '2026-10-05T07:23:00.000Z', bob: '2026-10-05T07:23:01.000Z' } });
+  fs.rmSync(W, { recursive: true, force: true });
+});

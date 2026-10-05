@@ -33,11 +33,11 @@ button, input { font: inherit; color: inherit; }
 .brand b { color: var(--gold); font-weight: 400; }
 .sub { margin: 0; color: var(--muted); font-size: 14px; }
 
-.card { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--gold); border-radius: 16px; padding: 18px 18px 20px; display: grid; gap: 16px; box-shadow: 0 14px 40px rgb(0 0 0 / .35); min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 21px 18px 20px; display: grid; gap: 16px; box-shadow: inset 0 3px 0 var(--gold), 0 14px 40px rgb(0 0 0 / .35); min-width: 0; }
 .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
 .tabs button { border: 0; background: none; color: var(--muted); font-weight: 700; font-size: 15px; padding: 10px 6px; border-radius: 9px; cursor: pointer; }
 .tabs button:hover { color: var(--fg); }
-.tabs button[aria-selected="true"] { background: var(--panel-2); color: var(--gold); box-shadow: inset 0 -2px 0 var(--gold); }
+.tabs button[aria-selected="true"] { background: var(--panel-2); color: var(--gold); box-shadow: inset 0 0 0 1px rgb(246 197 68 / .45); }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 form { display: grid; gap: 14px; min-width: 0; }
@@ -60,7 +60,7 @@ input:-webkit-autofill { -webkit-box-shadow: 0 0 0 100px var(--bg) inset; -webki
 .go:disabled { opacity: .6; cursor: progress; }
 .foot { margin: 0; text-align: center; color: var(--muted); font-size: 14px; text-wrap: balance; }
 noscript p { text-align: center; color: var(--amber); }
-@media (max-width: 380px) { .brand { font-size: 38px; } .card { padding: 16px 14px 18px; } }
+@media (max-width: 380px) { .brand { font-size: 38px; } .card { padding: 19px 14px 18px; } }
 @media (prefers-reduced-motion: no-preference) { .go { transition: filter .15s; } }
 </style>
 </head>

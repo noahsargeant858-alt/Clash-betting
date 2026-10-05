@@ -102,6 +102,7 @@ class GithubSnapshot {
     this.lastDigest = null;   // what the branch holds, so identical data is never pushed twice
     this.lastPush = 0;
     this.pending = false;
+    this.retryAt = 0;         // after a failed push, wait before trying again
     this.timer = null;
     this.running = null;
     this.disabled = false;    // set when a restore failed: never overwrite a backup we couldn't read
@@ -196,35 +197,40 @@ class GithubSnapshot {
     if (this.disabled || this.closing) return;
     this.pending = true;
     if (this.timer || this.running) return;
-    const wait = Math.max(0, this.lastPush + this.intervalMs - Date.now());
+    const wait = Math.max(0, this.lastPush + this.intervalMs - Date.now(), this.retryAt - Date.now());
     this.timer = setTimeout(() => { this.timer = null; this.pushNow().catch(() => {}); }, wait);
     this.timer.unref();
   }
 
-  async pushNow() {
-    if (this.disabled) return false;
+  pushNow() {
+    if (this.disabled) return Promise.resolve(false);
     if (this.running) return this.running;
     this.pending = false;
-    this.running = (async () => {
-      try {
-        const files = this.readFiles();
-        const digest = sha256(JSON.stringify(files));
-        if (digest === this.lastDigest) return false;
-        await this.put(await this.encrypt(files));
-        this.lastDigest = digest;
-        this.log('[snapshot] backed up.');
-        return true;
-      } catch (e) {
-        this.log(`[snapshot] backup failed: ${e.message}`);
-        this.pending = true;
-        return false;
-      } finally {
-        this.lastPush = Date.now();
-        this.running = null;
-        if (this.pending && !this.closing) this.notify();
-      }
-    })();
-    return this.running;
+    const run = this._push().finally(() => {
+      this.lastPush = Date.now();
+      this.running = null;
+      if (this.pending && !this.closing) this.notify();
+    });
+    this.running = run;
+    return run;
+  }
+
+  async _push() {
+    try {
+      const files = this.readFiles();
+      const digest = sha256(JSON.stringify(files));
+      if (digest === this.lastDigest) return false;
+      await this.put(await this.encrypt(files));
+      this.lastDigest = digest;
+      this.retryAt = 0;
+      this.log('[snapshot] backed up.');
+      return true;
+    } catch (e) {
+      this.log(`[snapshot] backup failed: ${e.message}`);
+      this.pending = true;
+      this.retryAt = Date.now() + 30000;
+      return false;
+    }
   }
 
   async put(text) {
@@ -260,13 +266,18 @@ class GithubSnapshot {
     if (made.status !== 201 && made.status !== 422) throw new Error(`GitHub said ${this.why(made)}`);
   }
 
-  // shutdown: one last push, but never hang the exit
+  // shutdown: one last push of the latest data (after any push already in flight, which may be older),
+  // but never hang the exit
   async close(timeoutMs = 8000) {
     this.closing = true;
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
     if (this.disabled) return;
     let t;
-    await Promise.race([this.pushNow(), new Promise((resolve) => { t = setTimeout(resolve, timeoutMs); })]);
+    const last = (async () => {
+      if (this.running) await this.running.catch(() => {});
+      await this.pushNow();
+    })();
+    await Promise.race([last, new Promise((resolve) => { t = setTimeout(resolve, timeoutMs); })]);
     clearTimeout(t);
   }
 }

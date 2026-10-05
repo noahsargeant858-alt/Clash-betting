@@ -8,10 +8,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "seed": "node scripts/seed-demo.js",
-    "test": "node --test test/*.test.js site/test/*.test.js",
-    "site": "node site/server.js"
+    "site": "node site/server.js",
+    "test": "node --test test/*.test.js site/test/*.test.js"
   },
-  "engines": {
-    "node": ">=18"
-  }
+  "engines": { "node": ">=18" }
 }

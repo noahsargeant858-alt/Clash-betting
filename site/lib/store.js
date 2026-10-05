@@ -12,9 +12,9 @@ const MAX_DOC_BYTES = 256 * 1024;
 const MAX_DEPTH = 32;
 const MAX_DOCS = 25000;
 const MAX_LOG = 5000;
-const MAX_TOTAL_BYTES = 192 * 1024 * 1024;
-const OWNER_DOCS = 2000;            // what one ordinary account may keep in its own folders
-const OWNER_BYTES = 8 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 128 * 1024 * 1024;
+const OWNER_DOCS = 1000;            // what one ordinary account may keep in its own folders
+const OWNER_BYTES = 2 * 1024 * 1024;
 
 class StoreError extends Error {
   constructor(status, message) { super(message); this.status = status; }

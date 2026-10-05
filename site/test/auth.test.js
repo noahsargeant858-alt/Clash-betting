@@ -444,3 +444,20 @@ test('me shows the linked player; sign-in works for the admin; admin flag only f
   assert.strictEqual(linked.json.playerId, 'p1');
   assert.strictEqual(linked.json.admin, false);
 }));
+
+test('the number of accounts is capped, for signups and for invites, without half-finished links', async (t) => {
+  const app = await boot({ maxAccounts: 3 });
+  t.after(() => app.close());
+  const admin = await loginAdmin(app);
+  assert.strictEqual((await client(app).post('/api/auth/signup', { username: 'one', password: 'correct horse 1' })).status, 200);
+  assert.strictEqual((await client(app).post('/api/auth/signup', { username: 'two', password: 'correct horse 1' })).status, 200);
+  const full = await client(app).post('/api/auth/signup', { username: 'three', password: 'correct horse 1' });
+  assert.strictEqual(full.status, 507);
+  assert.match(full.json.error, /limit on accounts/);
+  await admin.set('players/p1', { name: 'Jamie' });
+  const inv = (await admin.post('/api/admin/invites', { playerId: 'p1' })).json;
+  const r = await client(app).post('/api/auth/redeem', { token: inv.token });
+  assert.strictEqual(r.status, 507);
+  assert.strictEqual(app.store.get('links/p1'), undefined, 'no link was written for an account that was not made');
+  assert.strictEqual(app.auth.invites.get(inv.id).usedAt, null);
+});

@@ -53,12 +53,14 @@ function resolveConfig(opts) {
     cookieSecure,
     sessionDays: num(pick('sessionDays', 'SESSION_DAYS', 90), 90),
     inviteDays: num(pick('inviteDays', 'INVITE_DAYS', 14), 14),
+    maxAccounts: num(pick('maxAccounts', 'MAX_ACCOUNTS', 1000), 1000),
     battlesUrl: pick('battlesUrl', 'BATTLES_URL', BATTLES_URL),
     importIntervalMin: num(pick('importIntervalMin', 'IMPORT_INTERVAL_MIN', 20), 20),
     publicDir: opts.publicDir || path.join(__dirname, 'public'),
     seedFile: opts.seedFile || path.join(__dirname, 'seed', 'seed.json'),
     repoRoot: opts.repoRoot || path.join(__dirname, '..'),
     debounceMs: opts.debounceMs === undefined ? 1000 : opts.debounceMs,
+    bodyTimeoutMs: opts.bodyTimeoutMs || 15000,
     scryptN: opts.scryptN,
     limits: opts.limits,
     storeLimits: opts.storeLimits || {},
@@ -166,7 +168,7 @@ async function startServer(opts = {}) {
   // --- request plumbing
   const needUser = (ctx) => { if (!ctx.user) throw new HttpError(401, 'Please sign in.'); return ctx.user; };
   const needAdmin = (ctx) => { if (!ctx.user || !ctx.user.admin) throw new HttpError(403, 'Only the admin can do that.'); return ctx.user; };
-  const body = async (ctx) => H.parseJsonObject(await H.readBody(ctx.req, BODY_LIMIT, 15000));
+  const body = async (ctx) => H.parseJsonObject(await H.readBody(ctx.req, BODY_LIMIT, cfg.bodyTimeoutMs));
   const json = (ctx, obj, status = 200) => H.sendJson(ctx.res, status, obj);
   const secure = (ctx) => (cfg.cookieSecure !== undefined ? cfg.cookieSecure : ctx.https);
   const maxAge = () => Math.floor(auth.sessionMs / 1000);
@@ -191,6 +193,7 @@ async function startServer(opts = {}) {
     const problem = auth.passwordProblem(b.password, username);
     if (problem) throw new HttpError(400, problem);
     if (auth.byName.has(username)) throw new HttpError(409, 'That username is taken.');
+    if (auth.users.size >= cfg.maxAccounts) throw new HttpError(507, 'This site has reached its limit on accounts. Ask the admin.');
     const pass = await auth.hasher.hash(b.password);
     const user = auth.createUser({ username, display, pass, via: 'signup' }); // checks the name again: someone may have taken it while we hashed
     startSession(ctx, user.uid);
@@ -265,6 +268,7 @@ async function startServer(opts = {}) {
     const oldUid = link && typeof link.data.uid === 'string' ? link.data.uid : null;
     const holder = oldUid ? auth.users.get(oldUid) : null;
     if (holder && !holder.disabled) throw new HttpError(409, PLAYER_ALREADY);
+    if (!me && auth.users.size >= cfg.maxAccounts) throw new HttpError(507, 'This site has reached its limit on accounts. Ask the admin.');
 
     // all synchronous from here: two taps on the same link can't both win
     const now = new Date().toISOString();
@@ -540,6 +544,7 @@ async function startServer(opts = {}) {
     server.once('error', reject);
     server.listen(cfg.port, cfg.host, resolve);
   });
+  server.on('error', (e) => log(`[server] ${e.message}`)); // e.g. out of file handles: report it, keep serving
   importer.start();
 
   let closing = null;

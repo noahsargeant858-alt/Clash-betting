@@ -9,7 +9,10 @@ const os = require('os');
 const path = require('path');
 const { startServer } = require('../server');
 
-const tmp = (prefix) => fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+// temp folders are removed when the test process ends
+const made = [];
+process.on('exit', () => { for (const d of made) { try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ } } });
+const tmp = (prefix) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); made.push(d); return d; };
 
 // stand-ins for the browser builder's files, so these tests don't depend on them
 function makePublic(files) {

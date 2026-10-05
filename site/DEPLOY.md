@@ -1,0 +1,78 @@
+# Putting ClashBets on the internet (Render)
+
+ClashBets is a small Node server (no dependencies to install). Render runs it for you, gives it a web address,
+and keeps its data on a disk that survives restarts.
+
+## What it costs
+
+About **$7 a month** (Render's "Starter" web service) plus about **$0.25 a month** for the 1 GB disk that holds the
+accounts and bets. You pay Render directly. Cancel any time by deleting the service.
+
+## Deploy (about five minutes)
+
+1. Sign in to <https://dashboard.render.com> with GitHub and allow it to see the **Clash-betting** repository.
+2. Click **+** → **Blueprint**, pick the repository and the branch `claude/clash-royale-betting-odds-tffx5v`, leave the path as `render.yaml`.
+3. Render lists one service, `clashbets (Starter)`, and asks for two values. Type them **into Render's boxes, never into a chat**:
+   * `ADMIN_PASSWORD`: the password for your admin account. Make it long.
+   * `SIGNUP_CODE`: a word or short phrase friends type when they create an account. It keeps strangers who find the link from making accounts.
+4. Click **Deploy Blueprint**. The first build takes a few minutes. When the service says **Live**, open its address (it looks like `https://clashbets.onrender.com`).
+5. Sign in as **triqqi** with the admin password. The starter data (players, 110 results, settings) is already loaded and you are already linked to `triqqi`.
+
+## Getting your friends in
+
+Two ways, and you can mix them:
+
+* **Personal link (easiest for them):** Admin tab → **Invite links** → pick the player → **Create invite link**. Send that link to that friend, privately.
+  They tap it, tap **Join as …**, and they are in as that player with their coins. No sign-up, no password. A link works once.
+  They can set a username and password later from the **Account** button, so they can sign in on another phone.
+* **They make their own account:** send them the site address and the group code. They create an account, then tap their name
+  ("Ask to be jamie") or type their name if they are not on the list. You approve them under **Admin → Player link requests**.
+
+## Coins
+
+Admin tab → **Squad and accounts** → the **Give or take coins** box on the player's row (add a short reason; it shows in the house log).
+Everyone starts with the starting coins in Settings (1,000).
+
+## Looking after it
+
+* **Locked-out friend:** Admin tab → **Website accounts** → **Reset password** (you get a one-time temporary password to send them), or just make them a new invite link for the same player after switching their old account off.
+* **Switch someone off:** the same table has **Switch off** (signs them out everywhere and stops them signing in).
+* **Change your own admin password:** change `ADMIN_PASSWORD` in Render (Environment tab) and let the service restart. The variable is applied every time the server starts.
+* **Official Clash results** arrive on their own: the server looks at the battle feed (refreshed hourly by the GitHub Action) every 20 minutes and adds new games.
+  The old claude.ai routine that did this is no longer needed.
+* **Backups:** Render keeps daily snapshots of the disk on paid plans. For an extra copy off Render, see the optional encrypted backup below.
+* **If friends often see "Too many attempts":** the server is counting everyone as one person. In Render → Environment set `TRUST_PROXY` to `2` and redeploy.
+
+## Settings (Render → Environment)
+
+| variable | what it does |
+|---|---|
+| `ADMIN_USERNAME` | your username (set to `triqqi` by the blueprint) |
+| `ADMIN_PASSWORD` | your password (always applied at start) |
+| `SIGNUP_CODE` | group code for creating accounts; leave empty to allow anyone with the link (not recommended) |
+| `PUBLIC_URL` | optional: the address to put in invite links, e.g. `https://clashbets.onrender.com` (otherwise taken from the request) |
+| `IMPORT_INTERVAL_MIN` | how often to look for new battles (default 20; `0` turns it off) |
+| `INVITE_DAYS` | how long a personal link stays valid (default 14) |
+
+## Optional: a free plan with an encrypted backup instead of a disk
+
+Render's free web service has no disk, so its files vanish whenever it restarts. The site can keep an **encrypted** copy of its data
+on a branch of this GitHub repository and restore it on start. To use that instead of paying for a disk:
+
+1. In `render.yaml` change `plan: starter` to `plan: free`, delete the `disk:` block, and change `DATA_DIR` to `/tmp/clashbets`.
+2. Create a GitHub fine-grained token with **Contents: read and write** on this repository only, and make up a random key of 24+ characters.
+3. In Render → Environment add `SNAPSHOT_REPO` = `noahsargeant858-alt/Clash-betting`, `SNAPSHOT_BRANCH` = `site-data`, `SNAPSHOT_TOKEN` = the token, `SNAPSHOT_KEY` = the key.
+   (Keep the key safe: without it the backup cannot be read. The data on the branch is encrypted, so the public repo is fine.)
+
+The trade-offs: the free service sleeps after 15 minutes without visitors (the first tap after that takes about a minute), and a crash can lose up to
+10 minutes of bets. For a betting site people check at all hours, the $7 plan is the better deal.
+
+## Running it on your own computer
+
+```bash
+ADMIN_PASSWORD='something long' SIGNUP_CODE=gold node site/server.js
+# then open http://localhost:3000  (data goes in ./site-data, which git ignores)
+```
+
+After changing `artifact/clashbets.html`, run `node site/build.js` to regenerate `site/public/app.html`, which is what the website serves.
+Tests: `npm test`.

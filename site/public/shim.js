@@ -446,7 +446,7 @@
 
   const CSS = `
 #siteAdmin { display: grid; gap: 14px; min-width: 0; }
-.cbx-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; word-break: break-all; }
+.cbx-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; word-break: break-all; user-select: all; }
 .cbx-link { flex: 1 1 220px; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
 .cbx-msg { margin: 0; font-size: 13px; color: var(--muted, #95a2cb); }
 .cbx-msg:empty { display: none; }

@@ -1,3 +1,6 @@
 node_modules/
 .env
 data/
+
+# website data (accounts, bets): never commit
+site-data/

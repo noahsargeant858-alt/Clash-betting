@@ -360,25 +360,34 @@ test('GitHub snapshot: a wrong key or a tampered file is never overwritten', asy
   await hostile.close();
 });
 
-test('GitHub snapshot: conflicts and an unknown sha are retried', async (t) => {
+test('GitHub snapshot: an unknown sha and a conflict are both retried', async (t) => {
   const gh = await mockGithub();
   t.after(() => gh.close());
   const a = await boot({ snapshot: snapOpts(gh) });
   await signup(a, 'first');
   await a.close();
-  const putsAfterFirst = gh.st.puts;
+  let puts = gh.st.puts;
 
-  // restored host does not know the file's sha: GitHub says 422, we look it up and retry
+  // a restored host does not know the file's sha: GitHub says 422 ("sha wasn't supplied"), we look it up and retry
   const b = await boot({ snapshot: snapOpts(gh) });
   await signup(b, 'second');
-  gh.st.conflictOnce = true; // and a 409 for good measure
   await b.close();
-  assert.ok(gh.st.puts >= putsAfterFirst + 3, `retried (${gh.st.puts - putsAfterFirst} puts)`);
+  assert.strictEqual(gh.st.puts - puts, 2, 'one refused (422), one accepted');
   assert.match(b.logs.join('\n'), /backed up/);
   assert.ok(!/backup failed/.test(b.logs.join('\n')));
+  puts = gh.st.puts;
+
+  // somebody else changed the file in the meantime: 409, look up the sha again, retry
   const c = await boot({ dataDir: tmp('cb-fresh-'), snapshot: snapOpts(gh) });
-  t.after(() => c.close());
-  assert.ok(c.auth.userByName('second'), 'the retried push is what was stored');
+  await signup(c, 'third');
+  gh.st.conflictOnce = true;
+  await c.close();
+  assert.ok(gh.st.puts - puts >= 2, `retried after the conflict (${gh.st.puts - puts} puts)`);
+  assert.ok(!/backup failed/.test(c.logs.join('\n')));
+
+  const d = await boot({ dataDir: tmp('cb-fresh-'), snapshot: snapOpts(gh) });
+  t.after(() => d.close());
+  assert.ok(d.auth.userByName('first') && d.auth.userByName('second') && d.auth.userByName('third'), 'the retried push is what was stored');
 });
 
 test('GitHub snapshot: unchanged data is not pushed twice, and a dead network does not hang or crash', async (t) => {
@@ -386,13 +395,17 @@ test('GitHub snapshot: unchanged data is not pushed twice, and a dead network do
   const a = await boot({ snapshot: snapOpts(gh) });
   await signup(a, 'someone');
   const snap = a.persist.snapshot;
-  assert.strictEqual(await snap.pushNow(), true);
+  a.persist.flush();
+  // (a push may already be in flight from boot, carrying older data: keep going until there is nothing left to push)
+  for (let i = 0; i < 5 && (await snap.pushNow()); i++);
+  assert.ok(gh.st.puts >= 1);
   const puts = gh.st.puts;
   assert.strictEqual(await snap.pushNow(), false, 'same bytes, nothing to do');
   assert.strictEqual(gh.st.puts, puts);
   await signup(a, 'another');
   a.persist.flush();
-  assert.strictEqual(await snap.pushNow(), true);
+  assert.strictEqual((await snap.pushNow()) || (await snap.pushNow()), true);
+  assert.ok(gh.st.puts > puts);
   await a.close();
   await gh.close();
   // GitHub is gone: closing still finishes quickly and the data is safe on disk

@@ -84,7 +84,7 @@ function readBody(req, limit, timeoutMs) {
       if (size <= limit) chunks.push(c); else chunks.length = 0;
     });
     req.on('end', () => (size > limit ? finish(reject, new HttpError(413, 'That request is too big.')) : finish(resolve, Buffer.concat(chunks))));
-    req.on('error', (e) => finish(reject, e));
+    req.on('error', () => finish(reject, new HttpError(400, 'The connection closed early.'))); // a client that hangs up mid-upload
     req.on('close', () => finish(reject, new HttpError(400, 'The connection closed early.')));
   });
 }

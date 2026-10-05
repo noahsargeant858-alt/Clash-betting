@@ -218,6 +218,14 @@
   async function pollLoop() {
     let bad = 0;
     for (;;) {
+      // after an outage, find out the server is back before holding a long poll that would hide it
+      if (!online) {
+        try { await request('GET', '/api/auth/me'); setOnline(true); bad = 0; } catch (e) {
+          if (e.code === 'unauthenticated') return;
+          bad++; await idle(Math.min(15000, 1000 * 2 ** Math.min(bad, 4)));
+          continue;
+        }
+      }
       pollCtl = new AbortController();
       const timer = setTimeout(() => { abortWhy = 'timeout'; pollCtl.abort(); }, 40000);
       const t0 = Date.now();
@@ -248,6 +256,7 @@
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) restartPoll(); });
   window.addEventListener('online', restartPoll);
+  window.addEventListener('offline', () => { setOnline(false, true); restartPoll(); });
   window.addEventListener('pageshow', (e) => { if (e.persisted) restartPoll(); });
 
   // ---------- online / offline indicator ----------

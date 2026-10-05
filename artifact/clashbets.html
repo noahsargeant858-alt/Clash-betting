@@ -210,8 +210,8 @@ tr.mine td { background: var(--panel-2); }
 </header>
 
 <main>
-  <div id="localBanner" class="banner" hidden>You're not signed in, so this is a practice copy that only saves on this device. Sign in to claude.ai and open the link again to join the real book.</div>
-  <div id="readonlyBanner" class="banner" hidden>You're in view-only mode, so you can see the odds but can't pick a player, bet or log matches. Ask the admin to invite your email as an Editor, then open the link from that invite.</div>
+  <div id="localBanner" class="banner" hidden>You're not signed in, so this is a practice copy that only saves on this device. Sign in and open the link again to join the real book.</div>
+  <div id="readonlyBanner" class="banner" hidden>You're in view-only mode, so you can see the odds but can't pick a player, bet or log matches. Ask the admin to give you access.</div>
   <div id="noIdBanner" class="banner" hidden>This view doesn't know who you are, so you can browse the odds but can't pick a player or bet.</div>
 
   <section id="confirmBox" class="panel stack" hidden aria-live="polite"></section>
@@ -222,6 +222,10 @@ tr.mine td { background: var(--panel-2); }
     <p class="note">Pick your player. The admin approves it, then your bets and coins are yours. Only the admin can change it afterwards.</p>
     <p id="joinMsg" class="banner" hidden></p>
     <div class="join-grid" id="joinGrid"></div>
+    <form id="joinNew" class="row" autocomplete="off">
+      <input type="text" id="joinNewName" maxlength="30" placeholder="Not on the list? Type your name" aria-label="Your name, if you're not on the list">
+      <button class="btn" type="submit">Ask to join as new</button>
+    </form>
     <div class="row" id="joinConfirm" hidden>
       <button class="btn gold" type="button" id="joinYes"></button>
       <button class="btn" type="button" id="joinBack">Back</button>
@@ -338,6 +342,7 @@ tr.mine td { background: var(--panel-2); }
   <!-- ADMIN (owner only) -->
   <section role="tabpanel" id="p-admin" aria-labelledby="tab-admin" hidden>
     <div class="panel stack"><h2>Player link requests</h2><div id="linkRequests" class="stack"></div></div>
+    <div id="siteAdmin" class="stack"></div>
     <div class="panel stack"><h2>Results to confirm</h2><p class="note">A player's result counts once their opponent confirms it. You can confirm anything here, for example when the opponent hasn't joined yet.</p><div id="adminResults" class="stack"></div></div>
     <div class="panel stack">
       <h2>Squad and accounts</h2>
@@ -348,7 +353,7 @@ tr.mine td { background: var(--panel-2); }
       </form>
       <div class="scroll" id="squad"></div>
     </div>
-    <div class="panel stack">
+    <div class="panel stack" id="bookiePanel">
       <h2>AI bookie</h2>
       <p class="note">Ask Claude, briefed as a Clash Royale expert, to invent new specials. The book prices them from the same simulations as everything else, and only the ones you publish go on the board. Each ask uses a little of your own Claude usage.</p>
       <div class="row">
@@ -1233,7 +1238,7 @@ const SETTING_KEYS = ['margin', 'builderMargin', 'startingCoins', 'princessHp', 
 const store = { players: [], matches: [], claims: [], links: [], betDocs: [], acts: {}, house: { gifts: [], voids: {} }, settings: { ...DEFAULT_SETTINGS },
   specials: { list: [] }, importState: {}, ready: false };
 const me = { uid: null, admin: false, skippedJoin: false };
-let db = null, userApi = null, mode = 'connecting', readOnly = false, gen = 0;
+let db = null, userApi = null, mode = 'connecting', readOnly = false, gen = 0, hasSample = null;
 const LOCAL_KEY = 'clashbets-local-v3';
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const nowIso = () => new Date().toISOString();
@@ -1255,12 +1260,12 @@ function localList(coll) {
 }
 
 async function put(coll, id, data) {
-  if (readOnly) { toast('You\'re view-only, so this can\'t be saved. Ask the admin to invite you as an Editor.', true); throw new Error('read only'); }
+  if (readOnly) { toast('You\'re view-only, so this can\'t be saved. Ask the admin to give you access.', true); throw new Error('read only'); }
   if (db) {
     try { await db.collection(coll).doc(id).set(data); }
     catch (e) {
       if (e && e.code === 'invalid_argument' && /^(claims|bets|acts)/.test(coll)) {
-        readOnly = true; $('#readonlyBanner').hidden = false; toast('You\'re view-only, so this can\'t be saved. Ask the admin to invite you as an Editor.', true);
+        readOnly = true; $('#readonlyBanner').hidden = false; toast('You\'re view-only, so this can\'t be saved. Ask the admin to give you access.', true);
       } else if (e && e.code === 'invalid_argument') toast('Only the admin can change that.', true);
       else if (e && e.code === 'quota_exceeded') toast('Storage is full. The admin needs to delete some old records.', true);
       else toast('Couldn\'t save. Check your connection and try again.', true);
@@ -1303,6 +1308,7 @@ async function connect() {
   }
   db = api; mode = 'shared';
   try { userApi = await window.claude.use('user'); } catch { userApi = null; }
+  try { hasSample = !!(await window.claude.use('sample')); } catch { hasSample = false; }
   if (userApi) {
     me.uid = await userApi.id(); me.admin = await userApi.isOwner();
     // false = this account can only view (e.g. opened through a public link); null = not told, let a save decide
@@ -1935,11 +1941,16 @@ function renderMe() {
 //  Join: ask to be linked to a player; the admin approves
 // ======================================================================
 let joinPick = null;
+// A request to join as someone new: the name asked for, tidied (nothing else in the request is trusted)
+const cleanName = (x) => String(x == null ? '' : x).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 30);
+const newNameOf = (c) => (c && !c.playerId && typeof c.newName === 'string' ? cleanName(c.newName) : '');
 function renderJoin() {
   const { byPlayer } = linkMaps(), claim = myClaim(), msg = $('#joinMsg');
-  const waiting = claim && playerById(claim.playerId) && !byPlayer[claim.playerId];
+  const newReq = claim ? newNameOf(claim) : '';
+  const waiting = newReq || (claim && playerById(claim.playerId) && !byPlayer[claim.playerId]);
   msg.hidden = !claim;
-  if (claim) msg.textContent = waiting ? `You've asked to be ${nameOf(claim.playerId)}. Waiting for the admin to approve it. You can change your pick below.`
+  if (claim) msg.textContent = newReq ? `You've asked to join as "${newReq}". Waiting for the admin to approve it. You can change your pick below.`
+    : waiting ? `You've asked to be ${nameOf(claim.playerId)}. Waiting for the admin to approve it. You can change your pick below.`
     : `${nameOf(claim.playerId)} went to someone else. Pick again, or tell the admin if that's wrong.`;
   if (joinPick && byPlayer[joinPick]) joinPick = null;
   $('#joinGrid').innerHTML = store.players.map((p) => {
@@ -1956,6 +1967,17 @@ $('#joinGrid').addEventListener('click', (e) => {
 });
 $('#joinBack').onclick = () => { joinPick = null; renderJoin(); };
 $('#joinSkip').onclick = () => { me.skippedJoin = true; try { sessionStorage.setItem('clashbets-skip', '1'); } catch { /* ignore */ } renderAll(); };
+$('#joinNew').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = cleanName($('#joinNewName').value);
+  if (!name || !me.uid) return toast('Type your name first.', true);
+  if (store.players.some((p) => String(p.name).toLowerCase() === name.toLowerCase())) return toast(`${name} is already on the list. Tap their name above.`, true);
+  try {
+    if (me.admin) { const pid = newId(); await put('players', pid, { name, addedAt: nowIso() }); await put('links', pid, { uid: me.uid, at: nowIso(), former: [] }); toast(`You're ${name}.`); }
+    else { await put('claims', me.uid, { playerId: null, newName: name, at: nowIso() }); toast(`Asked to join as ${name}. The admin will approve it.`); }
+    $('#joinNewName').value = ''; renderAll();
+  } catch { /* toast shown */ }
+});
 $('#joinYes').onclick = async () => {
   const pid = joinPick; if (!pid || !me.uid) return;
   try {
@@ -2119,7 +2141,7 @@ $('#markets').addEventListener('click', (e) => {
 function betBlock(a, b, single) {
   const pid = myPlayer(), s = store.settings;
   if (mode === 'shared' && !me.uid) return 'Sign in to bet.';
-  if (readOnly) return 'You\'re view-only. Ask the admin to invite your email as an Editor to bet.';
+  if (readOnly) return 'You\'re view-only. Ask the admin to give you access to bet.';
   if (!pid) return me.admin ? 'Link yourself to a player (reload and pick one) to bet.' : 'Your player link is waiting for the admin\'s approval.';
   const f = openFixtureFor(a, b);
   if (!f) return liveFixtures().some((x) => (x.a === a && x.b === b) || (x.a === b && x.b === a))
@@ -2383,7 +2405,7 @@ $('#trMarkets').addEventListener('click', (e) => {
 function tBlock(a, b, single) {
   const pid = myPlayer(), s = store.settings;
   if (mode === 'shared' && !me.uid) return 'Sign in to bet.';
-  if (readOnly) return 'You\'re view-only. Ask the admin to invite your email as an Editor to bet.';
+  if (readOnly) return 'You\'re view-only. Ask the admin to give you access to bet.';
   if (!pid) return me.admin ? 'Link yourself to a player (reload and pick one) to bet.' : 'Your player link is waiting for the admin\'s approval.';
   if (!openSeriesFor(a, b, T.format)) return `No ${fmtName(T.format)} open for these two. One of them opens it on this tab just before they start.`;
   if (pid === a || pid === b) return 'You\'re playing in this one, so no betting on it.';
@@ -2498,7 +2520,7 @@ Reply with JSON only: {"markets":[{"name":"...","blurb":"...","kind":"ou|yn|hl",
 async function askBookie() {
   if (BK.busy) return;
   const sample = window.claude && window.claude.use ? await window.claude.use('sample') : null;
-  if (!sample) return toast('The AI bookie only works on the shared site in claude.ai.', true);
+  if (!sample) return toast('The AI bookie isn\'t switched on here.', true);
   const scope = $('#bkScope').value, format = scope === 'game' ? null : scope;
   BK.busy = true; BK.scope = scope; BK.ideas = []; renderBookie();
   try {
@@ -2980,9 +3002,13 @@ $('#muB').addEventListener('change', renderMatchup);
 let confirmRemove = null, confirmRelease = null, renaming = null;
 async function renderAdmin() {
   const { byPlayer, byUid } = linkMaps();
-  const requests = store.claims.filter((c) => playerById(c.playerId) && !byUid[c.id]);
-  $('#linkRequests').innerHTML = requests.length ? requests.map((c) => `<div class="confirm-row"><span><span data-uid-name="${esc(c.id)}">An account</span> wants to be <b>${esc(nameOf(c.playerId))}</b>${byPlayer[c.playerId] ? ' <span class="pill warn">already taken</span>' : ''} <span class="small muted">${fmtDate(c.at)}</span></span>
-    <span class="row">${byPlayer[c.playerId] ? '' : `<button class="btn gold tiny" type="button" data-approve="${esc(c.id)}">Approve</button>`}<button class="btn tiny warn" type="button" data-reject="${esc(c.id)}">Reject</button></span></div>`).join('')
+  const requests = store.claims.filter((c) => !byUid[c.id] && (playerById(c.playerId) || newNameOf(c)));
+  const nameTaken = (n) => store.players.some((p) => String(p.name).toLowerCase() === n.toLowerCase());
+  $('#linkRequests').innerHTML = requests.length ? requests.map((c) => {
+    const nn = playerById(c.playerId) ? '' : newNameOf(c), taken = nn ? nameTaken(nn) : !!byPlayer[c.playerId];
+    return `<div class="confirm-row"><span><span data-uid-name="${esc(c.id)}">An account</span> wants to ${nn ? `join as a new player called <b>${esc(nn)}</b>` : `be <b>${esc(nameOf(c.playerId))}</b>`}${taken ? ` <span class="pill warn">${nn ? 'name already used' : 'already taken'}</span>` : ''} <span class="small muted">${fmtDate(c.at)}</span></span>
+    <span class="row">${taken ? '' : `<button class="btn gold tiny" type="button" data-approve="${esc(c.id)}">Approve</button>`}<button class="btn tiny warn" type="button" data-reject="${esc(c.id)}">Reject</button></span></div>`;
+  }).join('')
     : '<p class="note">No requests waiting.</p>';
   const pend = resultData().pending;
   $('#adminResults').innerHTML = pend.length ? pend.map((r) => `<div class="confirm-row"><span>${esc(accountName(r.loggedBy))} logged ${resultLine(r)} ${resultStatus({ ...r, pending: true })}</span>
@@ -3003,6 +3029,7 @@ async function renderAdmin() {
     setMinStake: 'minStake', setMaxStake: 'maxStake', setMaxReturn: 'maxReturn', setWindow: 'betWindowMin', setExpiry: 'fixtureHours' };
   for (const [id, k] of Object.entries(f)) if (document.activeElement !== $('#' + id)) $('#' + id).value = store.settings[k];
   $('#setOwnBets').checked = !!store.settings.ownMatchBets;
+  $('#bookiePanel').hidden = hasSample === false;
   renderBookie();
   // Account names are looked up fresh each time and never stored
   if (userApi && uids.length) {
@@ -3019,8 +3046,17 @@ $('#p-admin').addEventListener('click', async (e) => {
   try {
     if (t.approve) {
       const c = store.claims.find((x) => x.id === t.approve); if (!c) return;
-      if (linkMaps().byPlayer[c.playerId]) return toast(`${nameOf(c.playerId)} is already linked. Unlink them first.`, true);
-      await put('links', c.playerId, { uid: c.id, at: nowIso(), former: formerOf(c.playerId) }); toast(`Approved: they're now ${nameOf(c.playerId)}.`);
+      const nn = playerById(c.playerId) ? '' : newNameOf(c);
+      if (nn) {
+        // someone new: add them to the squad, then link their account
+        if (store.players.some((p) => String(p.name).toLowerCase() === nn.toLowerCase())) return toast(`There's already a player called ${nn}. Reject this and ask them to tap that name instead.`, true);
+        const pid = newId();
+        await put('players', pid, { name: nn, addedAt: nowIso() });
+        await put('links', pid, { uid: c.id, at: nowIso(), former: [] }); toast(`Approved: ${nn} is in.`);
+      } else {
+        if (linkMaps().byPlayer[c.playerId]) return toast(`${nameOf(c.playerId)} is already linked. Unlink them first.`, true);
+        await put('links', c.playerId, { uid: c.id, at: nowIso(), former: formerOf(c.playerId) }); toast(`Approved: they're now ${nameOf(c.playerId)}.`);
+      }
     }
     if (t.reject) { await remove('claims', t.reject); toast('Request rejected.'); }
     if (t.aconfirm) {

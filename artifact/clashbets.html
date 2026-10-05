@@ -135,10 +135,10 @@ ul.leg-list { margin: 4px 0 0; padding: 0; list-style: none; font-size: 13px; co
 /* ---------- ladders, groups, tournament ---------- */
 .group-head { grid-column: 1 / -1; font-family: var(--display); font-weight: 400; font-size: 19px; color: var(--gold); margin: 8px 0 -4px; letter-spacing: .3px; }
 .ladder { display: grid; gap: 6px; max-height: 330px; overflow-y: auto; }
-.rung { display: grid; grid-template-columns: 58px 1fr 1fr; gap: 6px; align-items: center; }
+.rung { display: grid; grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr); gap: 6px; align-items: center; }
 .rung > b { text-align: center; font-variant-numeric: tabular-nums; }
-.price.short { padding: 6px 8px; }
-.price.short .odd { font-size: 15px; }
+.price.short { padding: 6px 8px; gap: 6px; min-width: 0; }
+.price.short .odd { font-size: 15px; white-space: normal; }
 .rung .ph { visibility: hidden; }
 .series-row { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .series-row:last-child { border-bottom: 0; }
@@ -438,6 +438,7 @@ function orient(m, id) {
 }
 function orientPair(m, a) {
   const o = orient(m, a);
+  if (!o) return null;
   return {
     a: o.myCrowns, b: o.oppCrowns, winner: o.result === 'D' ? 'D' : o.result === 'W' ? 'A' : 'B',
     overtime: o.overtime, firstCrown: o.firstCrown == null ? null : o.firstCrown === 'none' ? 'none' : o.firstCrown === 'me' ? 'A' : 'B',
@@ -915,7 +916,6 @@ const CATALOGUE = [
 {"id":"s.leak-hl","scope":"series","formats":["bo3","bo5"],"name":"Series Leakiest Tap","blurb":"Over the whole series, who's the bigger elixir waster, with a dead heat paying the Tie?","kind":"hl","expr":{"stat":"leak","agg":"sum"},"tie":true},
 {"id":"s.afk","scope":"series","formats":["bo3","bo5"],"name":"AFK Alert","blurb":"If any game sees 15+ elixir leaked between them, someone was clearly at the door signing for a Deliveroo.","kind":"yn","expr":{"stat":"leak","side":"tot","agg":"games","min":15},"op":">=","value":1},
 {"id":"s.three-any","scope":"series","formats":["bo3","bo5"],"name":"Three-Crown in the Series","blurb":"Only about one game in fifteen ends with a King Tower in rubble, so will anyone go full wrecking ball at least once?","kind":"yn","expr":{"stat":"three","side":"tot","agg":"games"},"op":">=","value":1},
-{"id":"s.tiebreak","scope":"series","formats":["bo3","bo5"],"name":"Any Game Won on Tiebreaker","blurb":"Crowns level at the buzzer and decided by whose tower has a sliver more HP: the penalty shoot-out of Clash.","kind":"yn","expr":{"stat":"tb","side":"tot","agg":"games"},"op":">=","value":1},
 {"id":"s.distance","scope":"series","formats":["bo3","bo5"],"name":"Goes the Distance","blurb":"All square going into the decider, game 3 of a Bo3 or game 5 of a Bo5, and it's proper squeaky-bum time.","kind":"yn","expr":{"stat":"distance","side":"tot"},"op":">=","value":1},
 {"id":"s.sweep","scope":"series","formats":["bo3","bo5"],"name":"Whitewash","blurb":"Either player wins the series without dropping a game: clean sweep, cheeky emote, no rematch.","kind":"yn","expr":{"stat":"sweep","side":"tot"},"op":">=","value":1},
 {"id":"s.reverse-a","scope":"series","formats":["bo3","bo5"],"name":"{A} Reverse Sweep","blurb":"Lose the opener (the first two in a Bo5) and still win the lot: {A} pulling off Istanbul 2005 with a Witch and a dream.","kind":"yn","expr":{"stat":"reverse","side":"A"},"op":">=","value":1},
@@ -965,6 +965,8 @@ function invPhi(p) {
 // What each card is, for the deck markets (spells drafted, average elixir, legendaries...).
 // Rarity comes from the battle log when it has it; the table covers hand-logged decks too.
 const cardInfo = (name) => CARDS[name] || null;
+const CARD_KEYS = new Map(Object.keys(CARDS).map((n) => [n.toLowerCase().replace(/[^a-z0-9]/g, ''), n]));
+const canonCard = (n) => (typeof n === 'string' ? CARD_KEYS.get(n.toLowerCase().replace(/[^a-z0-9]/g, '')) || null : null);
 const CATS = ['spell', 'building', 'troop', 'wincon', 'air', 'legendary', 'epic', 'rare', 'common', 'champion', 'cheap', 'heavy'];
 function inCat(name, cat) {
   const c = cardInfo(name); if (!c) return false;
@@ -998,7 +1000,6 @@ function gameStat(g, x) {
     case 'three': { const tA = +(g.winner === 'A' && g.a === 3), tB = +(g.winner === 'B' && g.b === 3); return S === 'A' ? tA : S === 'B' ? tB : Math.max(tA, tB); }
     case 'win': return S === 'tot' ? null : +(g.winner === S);
     case 'ot': return S === 'tot' ? b01(g.overtime) : null;
-    case 'tb': return S === 'tot' ? +(g.winner !== 'D' && g.a === g.b) : null;
     case 'first': return S === 'tot' || g.firstCrown == null ? null : +(g.firstCrown === S);
     case 'clean': return S === 'A' ? +(g.b === 0) : S === 'B' ? +(g.a === 0) : null;
     case 'dmg1k': return two(b01(g.dmgA), b01(g.dmgB));
@@ -1013,11 +1014,11 @@ function gameStat(g, x) {
     default: return null;
   }
 }
-const GAME_STATS = ['crowns', 'kings', 'three', 'win', 'ot', 'tb', 'first', 'clean', 'dmg1k', 'dealt', 'leak', 'card', 'cat', 'elixir'];
+const GAME_STATS = ['crowns', 'kings', 'three', 'win', 'ot', 'first', 'clean', 'dmg1k', 'dealt', 'leak', 'card', 'cat', 'elixir'];
 const SERIES_STATS = ['seriesWins', 'games', 'sweep', 'distance', 'reverse', 'g1win'];
 const sideOk = (stat, side) => {
   if (['win', 'first', 'clean', 'seriesWins', 'reverse', 'g1win'].includes(stat)) return side === 'A' || side === 'B';
-  if (['ot', 'tb', 'games', 'distance'].includes(stat)) return side === 'tot';
+  if (['ot', 'games', 'distance'].includes(stat)) return side === 'tot';
   return ['A', 'B', 'tot'].includes(side);
 };
 
@@ -1083,11 +1084,13 @@ function specSels(m, format) {
 }
 // Does selection `sel` of market `m` win? Builds the test once; it then takes a game (or, for a
 // series market, a series) and answers true / false / null (couldn't be settled: void).
+// Over a .5 line means more than it; over a whole-number line means that many or more
+const overLine = (v, L) => (Number.isInteger(L) ? v >= L : v > L);
 function specTest(m, sel, format) {
   if (!specSels(m, format).some((x) => x.key === sel)) return () => null;
   const ex = (side) => ({ ...m.expr, ...(side ? { side } : {}) }), xs = m.expr ? ex() : null, xa = m.expr ? ex('A') : null, xb = m.expr ? ex('B') : null;
   const val = (it, x) => (format ? seriesStat(it, x) : gameStat(it, x));
-  if (m.kind === 'ou') { const [dir, l] = sel.split(':'), L = +l; return (it) => { const v = val(it, xs); return v == null ? null : dir === 'over' ? v > L : v <= L; }; }
+  if (m.kind === 'ou') { const [dir, l] = sel.split(':'), L = +l; return (it) => { const v = val(it, xs); return v == null ? null : dir === 'over' ? overLine(v, L) : !overLine(v, L); }; }
   if (m.kind === 'yn') {
     return (it) => { const v = val(it, xs); if (v == null) return null; const hit = m.op === '>=' ? v >= m.value : m.op === '<=' ? v <= m.value : v === m.value; return sel === 'yes' ? hit : !hit; };
   }
@@ -1109,7 +1112,7 @@ function deckModel(a, b, res) {
     const ca = cardsOf(r.cardsA), cb = cardsOf(r.cardsB);
     if (ca.length !== 8 || cb.length !== 8) continue;
     G++;
-    for (const [cards, pid] of [[ca, r.playerA], [cb, r.playerB]]) for (const c of cards) {
+    for (const [cards, pid] of [[ca, r.playerA], [cb, r.playerB]]) for (const c of cards.map(canonCard).filter(Boolean)) {
       const e = seen.get(c) || { g: 0, A: 0, B: 0 }; e.g++; if (pid === a) e.A++; if (pid === b) e.B++; seen.set(c, e);
     }
   }
@@ -1147,39 +1150,50 @@ function drawDealt(J, side, o, rand) {
   if (hi - lo < 1e-9) return mu < floor ? floor : cap;
   return Math.round(clamp(mu + d.sd * invPhi(lo + rand() * (hi - lo)), floor, cap));
 }
-const SIM_GAMES = 8000, SIM_SERIES = 4000, SIM_DECKS = 1500;
+const SIM_GAMES = 8000, SIM_SERIES = 4000, SIM_DECKS = 4000;
 let SIM_CACHE = new Map();
 function versionsAt(cutoff) { return resultData().versions.filter((r) => r.finalAt <= cutoff && !(r.until && r.until <= cutoff)); }
 function bookIndex(cutoff) { const M = resultData().marks; let lo = 0, hi = M.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (M[mid] <= cutoff) lo = mid + 1; else hi = mid; } return lo; }
-// Simulated games (or series) for a pair, as things stood at `cutoff`
+// A game or series seen from the other player's side
+const flipGame = (g) => ({ ...g, a: g.b, b: g.a, winner: g.winner === 'A' ? 'B' : g.winner === 'B' ? 'A' : g.winner,
+  firstCrown: g.firstCrown === 'A' ? 'B' : g.firstCrown === 'B' ? 'A' : g.firstCrown, dmgA: g.dmgB, dmgB: g.dmgA, kingA: g.kingB, kingB: g.kingA,
+  dealtA: g.dealtB, dealtB: g.dealtA, leakA: g.leakB, leakB: g.leakA, deckA: g.deckB, deckB: g.deckA });
+const cachePut = (k, v) => { if (SIM_CACHE.size >= 16) SIM_CACHE.delete(SIM_CACHE.keys().next().value); SIM_CACHE.set(k, v); return v; };
+// Simulated games (or series) for a pair, as things stood at `cutoff`. The pair is always played
+// out in the same order, with dice that depend only on who's playing and the format, so the
+// price is the same whichever way round you look at it and no unrelated result can re-roll it.
 function simBook(a, b, cutoff, s, format) {
-  const key = [a, b, bookIndex(cutoff), format || 'game', s.princessHp, s.kingHp].join('|');
-  if (SIM_CACHE.has(key)) { const v = SIM_CACHE.get(key); SIM_CACHE.delete(key); SIM_CACHE.set(key, v); return v; }
-  const { J } = bookAt(a, b, cutoff, s), res = versionsAt(cutoff);
-  const dm = deckModel(a, b, res), lA = leakModel(a, res), lB = leakModel(b, res);
-  const rand = seeded(hash32(key));
-  const cum = []; let total = 0; for (const st of J.states) { total += st.p; cum.push(total); }
-  const decks = Array.from({ length: SIM_DECKS }, () => drawDecks(dm, rand));
-  const game = () => {
-    const u = rand() * total; let lo = 0, hi = cum.length - 1;
-    while (lo < hi) { const mid = (lo + hi) >> 1; if (cum[mid] < u) lo = mid + 1; else hi = mid; }
-    const o = J.states[lo].o, dk = decks[Math.floor(rand() * decks.length)];
-    return { ...o, dealtA: drawDealt(J, 'A', o, rand), dealtB: drawDealt(J, 'B', o, rand), leakA: drawLeak(lA, rand), leakB: drawLeak(lB, rand), deckA: dk[0], deckB: dk[1] };
-  };
-  let out;
-  if (!format) out = { games: Array.from({ length: SIM_GAMES }, game) };
-  else {
-    const N = format === 'bo3' ? 2 : 3, series = [];
-    for (let i = 0; i < SIM_SERIES; i++) {
-      const gs = []; let wa = 0, wb = 0;
-      while (wa < N && wb < N && gs.length < 4 * N) { const g = game(); gs.push(g); if (g.winner === 'A') wa++; else if (g.winner === 'B') wb++; }
-      series.push(seriesOf(gs, N));
+  syncCaches();
+  const [x, y] = a < b ? [a, b] : [b, a];
+  const key = [x, y, bookIndex(cutoff), format || 'game', s.princessHp, s.kingHp].join('|');
+  let base = SIM_CACHE.get(key);
+  if (!base) {
+    const { J } = bookAt(x, y, cutoff, s), res = versionsAt(cutoff);
+    const dm = deckModel(x, y, res), lA = leakModel(x, res), lB = leakModel(y, res);
+    const rand = seeded(hash32([x, y, format || 'game'].join('|')));
+    const cum = []; let total = 0; for (const st of J.states) { total += st.p; cum.push(total); }
+    const decks = Array.from({ length: SIM_DECKS }, () => drawDecks(dm, rand));
+    const game = () => {
+      const u = rand() * total; let lo = 0, hi = cum.length - 1;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (cum[mid] < u) lo = mid + 1; else hi = mid; }
+      const o = J.states[lo].o, dk = decks[Math.floor(rand() * decks.length)];
+      return { ...o, dealtA: drawDealt(J, 'A', o, rand), dealtB: drawDealt(J, 'B', o, rand), leakA: drawLeak(lA, rand), leakB: drawLeak(lB, rand), deckA: dk[0], deckB: dk[1] };
+    };
+    if (!format) base = { games: Array.from({ length: SIM_GAMES }, game) };
+    else {
+      const N = format === 'bo3' ? 2 : 3, series = [];
+      for (let i = 0; i < SIM_SERIES; i++) {
+        const gs = []; let wa = 0, wb = 0;
+        while (wa < N && wb < N && gs.length < 4 * N) { const g = game(); gs.push(g); if (g.winner === 'A') wa++; else if (g.winner === 'B') wb++; }
+        series.push(seriesOf(gs, N));
+      }
+      base = { series, format };
     }
-    out = { series, format };
+    cachePut(key, base);
   }
-  if (SIM_CACHE.size >= 10) SIM_CACHE.delete(SIM_CACHE.keys().next().value);
-  SIM_CACHE.set(key, out);
-  return out;
+  if (x === a) return base;
+  return SIM_CACHE.get(key + '|flip') || cachePut(key + '|flip', format
+    ? { series: base.series.map((S) => seriesOf(S.games.map(flipGame), S.N)), format } : { games: base.games.map(flipGame) });
 }
 // One leg as a test on a simulated (or real) game or series
 function legTest(l, format, at) {
@@ -1190,9 +1204,15 @@ function legTest(l, format, at) {
 }
 function simProb(book, legs, format, at) {
   const tests = legs.map((l) => legTest(l, format, at)), items = format ? book.series : book.games;
-  let hit = 0;
-  for (const it of items) { let ok = true; for (const t of tests) if (t(it) !== true) { ok = false; break; } if (ok) hit++; }
-  return hit / items.length;
+  let hit = 0, voided = 0;
+  for (const it of items) {
+    let lost = false, unknown = false;
+    for (const t of tests) { const r = t(it); if (r === false) { lost = true; break; } if (r !== true) unknown = true; }
+    if (lost) continue;
+    if (unknown) voided++; else hit++;
+  }
+  // a refunded bet is neither won nor lost, so the price is for the games that settle
+  return hit / Math.max(1, items.length - voided);
 }
 
 // ======================================================================
@@ -1258,13 +1278,14 @@ async function put(coll, id, data) {
     const doc = { ...data, id, ...(uid ? { uid } : {}) }, i = list.findIndex((x) => x.id === id);
     if (i >= 0) list[i] = doc; else list.push(doc);
   }
-  resetBooks(); changed(); saveLocal(); renderAll();
+  if (coll === 'config' && id === 'specials') PRICE_MEMO = new Map();
+  changed(); saveLocal(); renderAll();
 }
 async function remove(coll, id) {
   if (db) { await db.collection(coll).doc(id).delete(); return; }
   const list = localList(coll), i = list.findIndex((x) => x.id === id);
   if (i >= 0) list.splice(i, 1);
-  resetBooks(); changed(); saveLocal(); renderAll();
+  changed(); saveLocal(); renderAll();
 }
 
 async function connect() {
@@ -1290,7 +1311,7 @@ async function connect() {
   try { me.skippedJoin = me.admin && sessionStorage.getItem('clashbets-skip') === '1'; } catch { /* ignore */ }
   const pending = new Set(['players', 'matches', 'claims', 'links', 'bets', 'settings', 'house', 'specials', 'importState']);
   // the odds only depend on results, links, players and settings, so bets and claims don't reset them
-  const done = (k) => { pending.delete(k); store.ready = pending.size === 0; if (k !== 'bets' && k !== 'claims') resetBooks(); changed(); if (store.ready) { watchActs(); adminChores(); } renderAll(); };
+  const done = (k) => { pending.delete(k); store.ready = pending.size === 0; if (k === 'specials') PRICE_MEMO = new Map(); changed(); if (store.ready) { watchActs(); adminChores(); } renderAll(); };
   const onErr = () => { $('#syncState').textContent = 'Lost connection. Reload to retry.'; };
   const watch = (name, key) => db.collection(name).onSnapshot((snap) => {
     store[key] = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
@@ -1315,7 +1336,7 @@ function watchActs() {
     actsWatched.add(uid);
     db.collection(`acts/${uid}/items`).onSnapshot((snap) => {
       store.acts[uid] = snap.docs.map((d) => ({ ...d.data(), id: d.id, uid }));
-      resetBooks(); changed(); renderAll();
+      changed(); renderAll();
     }, () => {});
   }
 }
@@ -1391,26 +1412,43 @@ function settingsAt(t) {
 // The first lock made inside the betting window is the record of what was bet;
 // a lock dated outside the window doesn't count, so a late lock can't pull in late bets.
 const LOCK_GRACE = 60000;
+const fmtOf = (x) => (x === 'bo3' || x === 'bo5' ? x : null);
 const fixtureData = memo(() => {
   const list = [], byKey = {};
+  // who may open a fixture: one of its players, or the admin
+  const valid = (owner, d) => !!d && canon(d.at) && !!playerById(d.a) && !!playerById(d.b) && d.a !== d.b
+    && (isAdminUid(owner) || speaksFor(owner, d.a, d.at) || speaksFor(owner, d.b, d.at));
+  const docs = {};
   for (const [uid, items] of Object.entries(store.acts)) for (const x of items) {
-    if (x.type !== 'fixture' || !canon(x.at) || !playerById(x.a) || !playerById(x.b) || x.a === x.b) continue;
-    if (!(isAdminUid(uid) || speaksFor(uid, x.a, x.at) || speaksFor(uid, x.b, x.at))) continue;
-    const f = { key: `${uid}~${x.id}`, docId: x.id, owner: uid, a: x.a, b: x.b, at: x.at, format: ['bo3', 'bo5'].includes(x.format) ? x.format : null };
-    list.push(f); byKey[f.key] = f;
+    if (x.type === 'fixture' && valid(uid, x)) docs[`${uid}~${x.id}`] = { owner: uid, docId: x.id, a: x.a, b: x.b, at: x.at, format: fmtOf(x.format) };
   }
-  for (const f of list) {
-    const s = settingsAt(f.at), opened = ms(f.at);
-    f.windowEnds = opened + num(s.betWindowMin) * 60000;
-    f.expiresAt = opened + num(s.fixtureHours) * 3600000;
-    f.lockers = [...new Set([...uidsFor(f.a, f.at), ...uidsFor(f.b, f.at), adminUid()].filter(Boolean))];
-    f.locks = [];
-    for (const uid of f.lockers) for (const x of store.acts[uid] || []) if (x.type === 'lock' && x.fx === f.key && canon(x.at) && Array.isArray(x.bets)) f.locks.push(x);
-    const inWindow = (l) => { const t = ms(l.at); return t >= opened - LOCK_GRACE && t <= f.windowEnds + LOCK_GRACE; };
-    f.primary = f.locks.filter(inWindow).sort((p, q) => p.at.localeCompare(q.at) || String(p.uid).localeCompare(String(q.uid)))[0] || null;
-    f.closesAt = Math.min(f.windowEnds, f.primary ? ms(f.primary.at) : Infinity);
+  // Every lock carries a copy of the fixture it locked. Once a lock counts, that copy is the
+  // fixture: editing or deleting the fixture afterwards changes nothing.
+  const locks = [];
+  for (const [uid, items] of Object.entries(store.acts)) for (const x of items) {
+    if (x.type !== 'lock' || typeof x.fx !== 'string' || !canon(x.at) || !Array.isArray(x.bets)) continue;
+    const owner = x.fx.split('~')[0], doc = docs[x.fx];
+    const pin = x.pin && typeof x.pin === 'object' ? { a: x.pin.a, b: x.pin.b, at: x.pin.at, format: fmtOf(x.pin.format) } : doc ? { a: doc.a, b: doc.b, at: doc.at, format: doc.format } : null;
+    if (valid(owner, pin)) locks.push({ ...x, uid, pin });
   }
-  list.sort((p, q) => q.at.localeCompare(p.at));
+  const timing = (d) => { const st = settingsAt(d.at), opened = ms(d.at), windowEnds = opened + num(st.betWindowMin) * 60000; return { opened, windowEnds, expiresAt: opened + num(st.fixtureHours) * 3600000 }; };
+  const lockersOf = (d) => [...new Set([...uidsFor(d.a, d.at), ...uidsFor(d.b, d.at), adminUid()].filter(Boolean))];
+  const samePin = (p, d) => p.a === d.a && p.b === d.b && p.at === d.at && p.format === d.format;
+  for (const key of new Set([...Object.keys(docs), ...locks.map((l) => l.fx)])) {
+    const counts = (l) => { const t = timing(l.pin), at = ms(l.at); return lockersOf(l.pin).includes(l.uid) && at >= t.opened - LOCK_GRACE && at <= t.windowEnds + LOCK_GRACE; };
+    const mine = locks.filter((l) => l.fx === key);
+    const primary = mine.filter(counts).sort((p, q) => p.at.localeCompare(q.at) || String(p.uid).localeCompare(String(q.uid)))[0] || null;
+    const def = primary ? primary.pin : docs[key];
+    if (!def) continue;
+    const t = timing(def), owner = key.split('~')[0];
+    const f = { key, docId: key.slice(owner.length + 1), owner, a: def.a, b: def.b, at: def.at, format: def.format, windowEnds: t.windowEnds, expiresAt: t.expiresAt };
+    f.lockers = lockersOf(def);
+    f.locks = mine.filter((l) => f.lockers.includes(l.uid) && samePin(l.pin, def));
+    f.primary = primary;
+    f.closesAt = Math.min(f.windowEnds, primary ? ms(primary.at) : Infinity);
+    list.push(f); byKey[key] = f;
+  }
+  list.sort((p, q) => q.at.localeCompare(p.at) || p.key.localeCompare(q.key));
   return { list, byKey };
 });
 const canLock = (f) => !!me.uid && f.lockers.includes(me.uid) && !readOnly;
@@ -1435,8 +1473,12 @@ const bool = (v) => (typeof v === 'boolean' ? v : null);
 const numOr = (v) => (Number.isFinite(v) ? v : null);
 const towersOf = (t) => (t && typeof t === 'object' && ['left', 'king', 'right'].every((k) => Number.isFinite(t[k])) ? { left: t.left, king: t.king, right: t.right } : null);
 const cardsOf = (c) => (Array.isArray(c) ? c.filter((x) => typeof x === 'string').map((x) => x.slice(0, 40)).slice(0, 8) : []);
+// The battle log shows a tiebreaker as a one-crown win (the game knocks over the weakest tower);
+// when the import has spotted one, the crowns go back to level, as they were when time ran out.
+const levelled = (m) => (m.tiebreaker === true && (m.winner === 'A' || m.winner === 'B') && Math.abs(m.crownsA - m.crownsB) === 1
+  ? { crownsA: Math.min(m.crownsA, m.crownsB), crownsB: Math.min(m.crownsA, m.crownsB), overtime: true } : {});
 const clean = (m) => ({
-  ...m, overtime: bool(m.overtime), dmgA: bool(m.dmgA), dmgB: bool(m.dmgB), kingA: bool(m.kingA), kingB: bool(m.kingB),
+  ...m, ...levelled(m), overtime: levelled(m).overtime || bool(m.overtime), dmgA: bool(m.dmgA), dmgB: bool(m.dmgB), kingA: bool(m.kingA), kingB: bool(m.kingB),
   firstCrown: ['A', 'B', 'none'].includes(m.firstCrown) ? m.firstCrown : null, towersA: towersOf(m.towersA), towersB: towersOf(m.towersB),
   dealtA: numOr(m.dealtA), dealtB: numOr(m.dealtB), cardsA: cardsOf(m.cardsA), cardsB: cardsOf(m.cardsB),
   elixirLeakedA: numOr(m.elixirLeakedA), elixirLeakedB: numOr(m.elixirLeakedB),
@@ -1523,24 +1565,41 @@ const resultData = memo(() => {
   const dupe = (r) => claims(r) && settles[r.fx] !== r;
   const duplicates = [...current, ...pending].filter(dupe);
   const dupeKeys = new Set(duplicates.map((r) => r.key));
-  const versions = all.filter((r) => !dupeKeys.has(r.key));
+  // The odds history: every result version in force over time. A confirmer's lone copy is one
+  // person's word, so it never enters the odds (nobody could pad them with made-up results).
+  const versions = all.filter((r) => !dupeKeys.has(r.key) && !r.bookOnly);
   // the moments the set of results in force changes, so the odds at any time can be cached
   const marks = [...new Set(versions.flatMap((r) => [r.finalAt, r.until]).filter(Boolean))].sort();
-  return { final: current.filter((r) => !dupe(r)), pending: pending.filter((r) => !dupe(r)).sort(byDate), duplicates, versions, settles, marks };
+  // a fingerprint of the odds history, so cached prices survive anything that doesn't change it
+  const sig = hash32(JSON.stringify([versions.map((r) => [r.key, r.finalAt, r.until, hashOf(r), r.elixirLeakedA, r.elixirLeakedB, r.cardsA, r.cardsB]), store.settings.history || []])).toString(36);
+  // the official battle-log records, fixture tags ignored (a series counts every official game)
+  const official = current.filter((r) => r.source === 'api');
+  return { final: current.filter((r) => !dupe(r)), pending: pending.filter((r) => !dupe(r)).sort(byDate), duplicates, versions, settles, marks, sig, official };
 });
 const finalResults = () => resultData().final;
 const resultForFixture = (f) => { const r = resultData().settles[f.key]; return r && r.final ? r : null; };
 const pendingForFixture = (f) => { const r = resultData().settles[f.key]; return r && !r.final ? r : null; };
 
 // The odds as they stood when a bet was placed: the result versions in force then, settings in force then
-let BOOK_CACHE = new Map(), PRICE_MEMO = new Map();
-const resetBooks = () => { BOOK_CACHE = new Map(); SIM_CACHE = new Map(); PRICE_MEMO = new Map(); };
+// Cached odds and price checks stay valid until the odds history itself changes
+// Price verdicts outlive that: a bet only depends on the history before it was placed (and the
+// specials in force then), so a new result never makes the page re-price every old bet.
+let BOOK_CACHE = new Map(), PRICE_MEMO = new Map(), HIST_KEYS = new Map(), CACHE_SIG = null;
+function syncCaches() { const sg = resultData().sig; if (sg !== CACHE_SIG) { BOOK_CACHE = new Map(); SIM_CACHE = new Map(); HIST_KEYS = new Map(); CACHE_SIG = sg; } }
+function histKey(cut, s) {
+  const k0 = bookIndex(cut) + '|' + JSON.stringify(s);
+  let k = HIST_KEYS.get(k0);
+  if (!k) { k = hash32(JSON.stringify([versionsAt(cut).map((r) => [r.key, r.finalAt, r.until, hashOf(r), r.elixirLeakedA, r.elixirLeakedB, r.cardsA, r.cardsB]), s])).toString(36); HIST_KEYS.set(k0, k); }
+  return k;
+}
+const resetBooks = () => { CACHE_SIG = null; };
 function bookAt(a, b, cutoff, s) {
+  syncCaches();
   const R = resultData();
   let lo = 0, hi = R.marks.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (R.marks[mid] <= cutoff) lo = mid + 1; else hi = mid; }
   const k = [a, b, lo, s.margin, s.builderMargin, s.princessHp, s.kingHp].join('|');
   if (!BOOK_CACHE.has(k)) {
-    if (BOOK_CACHE.size > 600) resetBooks();
+    if (BOOK_CACHE.size > 600) BOOK_CACHE.delete(BOOK_CACHE.keys().next().value);
     const m = model(a, b, R.versions.filter((r) => r.finalAt <= cutoff && !(r.until && r.until <= cutoff)));
     BOOK_CACHE.set(k, { m, J: jointModel(m, { princess: s.princessHp, king: s.kingHp }) });
   }
@@ -1559,9 +1618,10 @@ function priceOk(b, s) {
   // every pick has to be a market the board offered at the time
   if (!legs.every((l) => (format ? !!marketById(l.market, format, b.placedAt) : CLASSIC.has(l.market) || !!marketById(l.market, null, b.placedAt)))) return false;
   const sim = !!format || legs.some((l) => !CLASSIC.has(l.market));
-  const memoKey = betKey(b.uid, b.fx, b.id) + JSON.stringify(CORE.map((k) => b[k] ?? null));
-  if (PRICE_MEMO.has(memoKey)) return PRICE_MEMO.get(memoKey);
+  syncCaches();
   const earlier = new Date(ms(b.placedAt) - 3 * 60000).toISOString();
+  const memoKey = betKey(b.uid, b.fx, b.id) + JSON.stringify([CORE.map((k) => b[k] ?? null), f ? [f.a, f.b, f.at, f.format] : null, histKey(b.placedAt, s), histKey(earlier, s)]);
+  if (PRICE_MEMO.has(memoKey)) return PRICE_MEMO.get(memoKey);
   const ok = [b.placedAt, earlier].some((cut) => {
     const { m, J } = bookAt(b.a, b.b, cut, s);
     if (legs.some((l) => l.market.startsWith('dealt') && CLASSIC.has(l.market) && !['over:', 'under:'].map((d) => d + dealtLine(m, l.market.slice(5))).includes(l.selection))) return false;
@@ -1571,24 +1631,24 @@ function priceOk(b, s) {
       const fair = b.legs ? price(q, s.builderMargin, 1).decimal : price(q, s.margin).decimal;
       return b.odds - 1 <= (fair - 1) * 1.05 + 1e-9;
     }
-    // simulated markets: same board limits, and one rung of leeway for the simulation's own wobble
+    // simulated markets: the board's own limits (no near-certainties, no wild long shots)
     const q = simProb(simBook(b.a, b.b, cut, s, format), legs, format, b.placedAt);
-    if (b.legs ? q < 0.002 : q < 0.004 || q > 0.985) return false;
+    if (q > 0.985 || q < (b.legs ? 0.002 : 0.004)) return false;
     const fair = b.legs ? price(q, s.builderMargin, 1).decimal : price(q, s.margin).decimal;
-    return b.odds <= rungAbove(fair) + 1e-9;
+    return b.odds - 1 <= (fair - 1) * 1.05 + 1e-9;
   });
+  if (PRICE_MEMO.size > 5000) PRICE_MEMO = new Map();
   PRICE_MEMO.set(memoKey, ok);
   return ok;
 }
-const rungAbove = (dec) => { const r = LADDER.find((x) => x.x > dec - 1 + 1e-9); return r ? Math.round((1 + r.x) * 100) / 100 : dec; };
 function ownBetProblem(b, s) {
   if (b.bettor !== b.a && b.bettor !== b.b) return '';
   if (!s.ownMatchBets) return 'Bet on their own match';
-  if (b.legs || !['result', 's.winner'].includes(b.market) || b.selection !== (b.bettor === b.a ? 'A' : 'B')) return 'On your own match you can only back yourself to win';
+  if (b.legs || b.market !== 'result' || b.selection !== (b.bettor === b.a ? 'A' : 'B')) return 'On your own match you can only back yourself to win';
   return '';
 }
 
-const CORE = ['id', 'uid', 'bettor', 'fx', 'a', 'b', 'market', 'selection', 'legs', 'odds', 'stake', 'placedAt'];
+const CORE = ['id', 'uid', 'bettor', 'fx', 'format', 'a', 'b', 'market', 'selection', 'legs', 'odds', 'stake', 'placedAt'];
 const coreEq = (x, y) => JSON.stringify(CORE.map((k) => x[k] ?? null)) === JSON.stringify(CORE.map((k) => y[k] ?? null));
 const betKey = (uid, fx, id) => `${uid}|${fx}|${id}`;
 const voidOf = (b) => { const v = store.house.voids; return v && typeof v === 'object' ? v[betKey(b.uid, b.fx, b.id)] || null : null; };
@@ -1639,6 +1699,7 @@ function judge(b) {
   if (hv) return voidIt(`Voided by the admin${hv.reason ? `: ${hv.reason}` : ''}`);
   const f = fixtureData().byKey[b.fx];
   if (!f || !((f.a === b.a && f.b === b.b) || (f.a === b.b && f.b === b.a))) return voidIt('No matching fixture');
+  if ((b.format || null) !== (f.format || null)) return voidIt('The fixture changed after this bet was placed');
   if (b.late) return voidIt('Didn\'t make it into the lock before the draft');
   const placed = ms(b.placedAt);
   if (!(placed >= ms(f.at) - LOCK_GRACE && placed <= f.windowEnds)) return voidIt('Placed outside the betting window');
@@ -1696,25 +1757,32 @@ const catalogueFor = memo(() => {
 // The admin's specials: kept forever once published (hidden ones stay valid for bets already placed)
 const specialsList = memo(() => (Array.isArray(store.specials.list) ? store.specials.list : [])
   .filter((x) => x && specOk(x) && /^x\./.test(x.id) && canon(x.createdAt)));
+// Hiding a special takes it off the board from that moment; bets placed before still stand
+function specialHidden(m, at) {
+  let hidden = false;
+  for (const t of Array.isArray(m.toggles) ? m.toggles : []) if (t && canon(t.at) && t.at <= at) hidden = !!t.hidden;
+  return hidden;
+}
 function marketById(id, format, at) {
   const fromCat = catalogueFor().find((m) => m.id === id && forFormat(m, format));
   if (fromCat) return fromCat;
   const sp = specialsList().find((m) => m.id === id && forFormat(m, format));
-  return sp && (!at || sp.createdAt <= at) ? sp : null;
+  return sp && (!at || (sp.createdAt <= at && !specialHidden(sp, at))) ? sp : null;
 }
 const CLASSIC = new Set(marketDefs('A', 'B').map((d) => d.key));
 const GROUPS = [['Series', ['seriesWins', 'games', 'sweep', 'distance', 'reverse', 'g1win']], ['Crowns & towers', ['crowns', 'three', 'clean', 'first', 'win']],
-  ['King Towers', ['kings']], ['Damage', ['dealt', 'dmg1k']], ['Overtime & tiebreakers', ['ot', 'tb']], ['Elixir', ['leak']], ['The draft', ['card', 'cat', 'elixir']]];
+  ['King Towers', ['kings']], ['Damage', ['dealt', 'dmg1k']], ['Overtime', ['ot']], ['Elixir', ['leak']], ['The draft', ['card', 'cat', 'elixir']]];
 const groupOf = (m) => (/^x\./.test(m.id) ? 'Bookie\'s specials' : !m.expr ? 'Series' : (GROUPS.find(([, stats]) => stats.includes(m.expr.stat)) || ['Specials'])[0]);
 const lineLabel = (m, l) => (['dealt'].includes(m.expr.stat) ? fmtN(l) : ['leak', 'elixir'].includes(m.expr.stat) ? String(l) : String(l));
 
 // Price every selection of the simulation markets for one board (game or series)
 function simMarkets(a, b, format) {
+  syncCaches();
   const now = nowIso(), s = settingsAt(now), nA = nameOf(a), nB = nameOf(b);
-  const key = ['board', a, b, format || 'game', bookIndex(now), s.margin, s.princessHp, s.kingHp, specialsList().length].join('|');
+  const key = ['board', a, b, format || 'game', bookIndex(now), s.margin, s.princessHp, s.kingHp, JSON.stringify(specialsList().map((m) => [m.id, specialHidden(m, now)]))].join('|');
   if (SIM_CACHE.has(key)) return SIM_CACHE.get(key);
   const book = simBook(a, b, now, s, format), items = format ? book.series : book.games;
-  const list = [...catalogueFor(), ...specialsList().filter((x) => !x.hidden)].filter((m) => forFormat(m, format));
+  const list = [...catalogueFor(), ...specialsList().filter((x) => !specialHidden(x, now))].filter((m) => forFormat(m, format));
   const out = [];
   for (const m of list) {
     const ok = (p) => p >= 0.004 && p <= 0.985;
@@ -1723,8 +1791,8 @@ function simMarkets(a, b, format) {
     if (m.kind === 'ou') {
       const vals = items.map((it) => (format ? seriesStat(it, m.expr) : gameStat(it, m.expr))).filter((v) => v != null);
       for (const l of m.lines) {
-        const pOver = vals.filter((v) => v > l).length / Math.max(1, vals.length);
-        if (ok(pOver)) sels.push({ ...sel('over:' + l, `Over ${lineLabel(m, l)}`, pOver), line: l, dir: 'over' });
+        const pOver = vals.filter((v) => overLine(v, l)).length / Math.max(1, vals.length);
+        if (ok(pOver)) sels.push({ ...sel('over:' + l, Number.isInteger(l) ? `${lineLabel(m, l)} or more` : `Over ${lineLabel(m, l)}`, pOver), line: l, dir: 'over' });
         if (ok(1 - pOver)) sels.push({ ...sel('under:' + l, `Under ${lineLabel(m, l)}`, 1 - pOver), line: l, dir: 'under' });
       }
     } else {
@@ -1741,45 +1809,45 @@ function simMarkets(a, b, format) {
   }
   const order = [...GROUPS.map(([g]) => g), 'Specials', 'Bookie\'s specials'];
   out.sort((x, y) => order.indexOf(x.group) - order.indexOf(y.group)); // stable: catalogue order within a group
-  if (SIM_CACHE.size >= 10) SIM_CACHE.delete(SIM_CACHE.keys().next().value);
-  SIM_CACHE.set(key, out);
-  return out;
+  return cachePut(key, out);
 }
 
 // ---------- Series results ----------
-// A series is settled from the results of its two players after it opened, in order, until one
-// side has the wins it needs. It settles only on official (or admin) results, once the official
-// battle log is known to cover the deciding game, so a game nobody logged can't be skipped.
-// The admin can seal a series to settle it on what's there.
+// A series is played out on the official battle log: its two players' official games after it
+// opened, in order, until one side has the wins it needs. It settles once the log is known to be
+// complete up to the deciding game, so a game nobody logged can't be skipped and no game is counted
+// twice. Hand-logged results only show it's under way. The admin can seal a series to settle it on
+// the official games logged up to that moment.
 const coverage = (a, b) => {
   const th = store.importState && store.importState.through;
   if (!th || typeof th !== 'object' || !canon(th[a]) || !canon(th[b])) return null;
   return th[a] < th[b] ? th[a] : th[b];
 };
-const sealFor = (f) => (store.acts[adminUid()] || []).find((x) => x.type === 'seal' && x.fx === f.key && canon(x.at)) || null;
+const hasFeed = (pid) => { const th = store.importState && store.importState.through; return !th || typeof th !== 'object' || !Object.keys(th).length || canon(th[pid]); };
+const sealFor = (f) => (store.acts[adminUid()] || []).filter((x) => x.type === 'seal' && x.fx === f.key && canon(x.at)).sort((p, q) => p.at.localeCompare(q.at))[0] || null;
+const SERIES_GIVE_UP = 2 * 86400000; // no official log two days after expiry (say a player has no tag): refund
 const seriesState = memo(() => {
-  const out = {}, byDate = (p, q) => p.date.localeCompare(q.date) || p.key.localeCompare(q.key);
+  const out = {}, byDate = (p, q) => p.date.localeCompare(q.date) || p.key.localeCompare(q.key), R = resultData();
   for (const f of fixtureData().list) {
     if (!f.format) continue;
-    const N = f.format === 'bo3' ? 2 : 3, from = ms(f.at) - LOCK_GRACE;
-    const inWin = (r) => samePair(r, f.a, f.b) && ms(r.date) >= from && ms(r.date) <= f.expiresAt;
-    const games = finalResults().filter(inWin).sort(byDate);
+    const N = f.format === 'bo3' ? 2 : 3, from = ms(f.at) - LOCK_GRACE, sealed = sealFor(f);
+    const inWin = (r) => samePair(r, f.a, f.b) && ms(r.date) >= from && ms(r.date) <= f.expiresAt && (!sealed || (r.date <= sealed.at && r.finalAt <= sealed.at));
+    const games = R.official.filter(inWin).sort(byDate);
     const S = seriesOf(games.map((r) => gameFrom(r, f.a)), N), used = games.slice(0, S.games.length);
-    const waiting = resultData().pending.filter(inWin).length;
-    const sealed = sealFor(f), cov = coverage(f.a, f.b);
-    const official = used.every((r) => r.byAdmin);
-    const last = used.length ? used[used.length - 1].date : null;
+    const handLogged = [...R.final, ...R.pending].filter((r) => r.source !== 'api' && inWin(r)).length;
+    const cov = coverage(f.a, f.b), last = used.length ? used[used.length - 1].date : null;
     let status = used.length ? 'live' : 'waiting';
-    if (S.winner) status = sealed || (official && cov && cov >= last) ? 'final' : 'provisional';
-    else if (sealed || (cov && ms(cov) >= f.expiresAt)) status = 'void';
-    out[f.key] = { status, games: used, S, N, waiting, sealed: !!sealed };
+    if (S.winner) status = sealed || (cov && cov >= last) ? 'final' : 'provisional';
+    else if (sealed || (cov && ms(cov) >= f.expiresAt) || Date.now() > f.expiresAt + SERIES_GIVE_UP) status = 'void';
+    out[f.key] = { status, games: used, S, N, waiting: handLogged > used.length ? handLogged - used.length : 0, sealed: !!sealed };
   }
   return out;
 });
 // A result as a game seen from player `a`
 function gameFrom(r, a) {
   const o = orientPair(r, a), mine = r.playerA === a ? 'A' : 'B', opp = mine === 'A' ? 'B' : 'A';
-  const deck = (cs) => (Array.isArray(cs) && cs.length === 8 ? cs : null);
+  if (!o) return null;
+  const deck = (cs) => { const d = Array.isArray(cs) && cs.length === 8 ? cs.map(canonCard) : null; return d && d.every(Boolean) && new Set(d).size === 8 ? d : null; };
   return { ...o, leakA: numOr(r['elixirLeaked' + mine]), leakB: numOr(r['elixirLeaked' + opp]), deckA: deck(r['cards' + mine]), deckB: deck(r['cards' + opp]) };
 }
 const seriesStarted = (f) => { const st = seriesState()[f.key]; return !!st && (st.games.length > 0 || st.waiting > 0); };
@@ -1969,7 +2037,7 @@ async function lockFixture(f) {
   const bets = [];
   for (const d of store.betDocs) for (const b of Array.isArray(d.list) ? d.list : []) if (b && b.fx === f.key) bets.push({ ...b, uid: d.id });
   locking.add(f.key);
-  try { await put(`acts/${me.uid}/items`, 'l_' + safeSeg(f.key), { type: 'lock', fx: f.key, a: f.a, b: f.b, at: nowIso(), bets }); }
+  try { await put(`acts/${me.uid}/items`, 'l_' + safeSeg(f.key), { type: 'lock', fx: f.key, a: f.a, b: f.b, pin: { a: f.a, b: f.b, at: f.at, format: f.format }, at: nowIso(), bets }); }
   finally { locking.delete(f.key); }
 }
 // If a player (or the admin) has the page open when the betting window runs out, it locks by itself
@@ -2083,6 +2151,7 @@ function builderQuote() {
   if (p < 1e-6) return { impossible: true, why: 'These picks can\'t all happen in the same match. Swap one out.' };
   // below 1 in 500 the model is mostly guessing, so the book won't take it
   if (p < 0.002) return { impossible: true, why: 'That combo is too much of a long shot for the book to price. Swap a pick out.' };
+  if (p > 0.985) return { impossible: true, why: 'That combo is close to a sure thing, so the book won\'t price it. Add a braver pick.' };
   const single = (l) => {
     const mk = currentBook.markets.find((x) => x.key === l.market), sel = mk && mk.sels.find((x) => x.key === l.selection);
     return sel ? sel.decimal : price(jointProb(currentBook.J, [l]), store.settings.margin).decimal;
@@ -2200,7 +2269,7 @@ function ladderHtml(mk, isOn) {
   return `<div class="ladder">${lines.map((l) => {
     const o = mk.sels.find((x) => x.line === l && x.dir === 'over'), u = mk.sels.find((x) => x.line === l && x.dir === 'under');
     const cell = (x) => (x ? priceBtn(mk, x, isOn(mk.key, x.key), true) : '<span class="ph"></span>');
-    return `<div class="rung"><b>${esc((o || u).label.replace(/^(Over|Under) /, ''))}</b>${cell(o)}${cell(u)}</div>`;
+    return `<div class="rung"><b>${esc((o || u).label.replace(/^(Over|Under) /, '').replace(/ or more$/, ''))}</b>${cell(o)}${cell(u)}</div>`;
   }).join('')}</div>`;
 }
 function boardHtml(markets, isOn) {
@@ -2254,6 +2323,7 @@ function seriesStatus(f, st) {
   if (st.status === 'live') return `<span class="pill open">In play · ${st.S.winsA}–${st.S.winsB}</span>`;
   return f.primary ? '<span class="pill">Locked · waiting for game 1</span>' : '<span class="pill">Betting closed</span>';
 }
+const S_WINNER = (st) => !!(st.S && st.S.winner);
 function renderSeriesList() {
   const now = Date.now(), all = fixtureData().list.filter((f) => f.format && now < f.expiresAt + 2 * 86400000);
   $('#seriesList').innerHTML = all.length ? all.map((f) => {
@@ -2261,11 +2331,11 @@ function renderSeriesList() {
     const games = st.games.map((r, i) => { const g = gameFrom(r, f.a); return `<span class="chip">G${i + 1} ${g.winner === 'D' ? 'draw' : esc(nameOf(g.winner === 'A' ? f.a : f.b))} ${g.a}–${g.b}</span>`; }).join('');
     const canSeal = me.admin && !readOnly && !['final', 'void'].includes(st.status) && (st.status === 'provisional' || now > f.windowEnds);
     return `<div class="series-row"><div><b>${esc(nameOf(f.a))}</b> v <b>${esc(nameOf(f.b))}</b> · ${fmtName(f.format)} ${seriesStatus(f, st)}
-      <div class="small muted">Opened ${ago(now - Date.parse(f.at))} · ${nBets} bet${nBets === 1 ? '' : 's'}${st.waiting ? ` · ${st.waiting} game${st.waiting === 1 ? '' : 's'} waiting for confirmation` : ''}</div></div>
+      <div class="small muted">Opened ${ago(now - Date.parse(f.at))} · ${nBets} bet${nBets === 1 ? '' : 's'}${st.waiting ? ` · ${st.waiting} more game${st.waiting === 1 ? '' : 's'} logged by hand, waiting for the official log` : ''}</div></div>
       ${games ? `<div class="games">${games}</div>` : ''}
       <div class="row">${open ? `<button class="btn tiny" type="button" data-srbet="${esc(f.key)}">Bet on this</button>` : ''}
         ${open && canLock(f) && !f.primary ? `<button class="btn tiny warn" type="button" data-fxlock="${esc(f.key)}">Lock: series starting</button>` : ''}
-        ${canSeal ? `<button class="btn tiny" type="button" data-seal="${esc(f.key)}">${T.sealing === f.key ? `Settle on these ${st.games.length} games?` : 'Settle now'}</button>` : ''}</div>
+        ${canSeal ? `<button class="btn tiny" type="button" data-seal="${esc(f.key)}">${T.sealing === f.key ? (S_WINNER(st) ? `Settle on these ${st.games.length} games?` : 'No winner yet: refund every bet?') : 'Settle now'}</button>` : ''}</div>
       ${open && canLock(f) && !f.primary ? '<div class="small">Tap Lock as game 1 starts. If nobody in the series locks it before betting closes, every bet on it is refunded.</div>' : ''}</div>`;
   }).join('') : '<p class="note">No series on. Open one below when you\'re about to play.</p>';
 }
@@ -2289,6 +2359,8 @@ $('#seriesForm').addEventListener('submit', async (e) => {
   if (!a || !b || a === b) return toast('Pick two different players.', true);
   if (fixtureData().list.some((f) => f.format && ((f.a === a && f.b === b) || (f.a === b && f.b === a)) && Date.now() < f.expiresAt && !['final', 'void'].includes(seriesState()[f.key].status)))
     return toast('Those two already have a series on.', true);
+  const noFeed = [a, b].find((x) => !hasFeed(x));
+  if (noFeed) return toast(`A series settles from the official battle log, and ${nameOf(noFeed)} isn't on it yet (no player tag). Ask the admin to add it.`, true);
   try {
     await put(`acts/${me.uid}/items`, 'f_' + newId(), { type: 'fixture', a, b, at: nowIso(), format: T.newFormat });
     $('#trA').value = a; $('#trB').value = b; T.format = T.newFormat;
@@ -2314,10 +2386,7 @@ function tBlock(a, b, single) {
   if (readOnly) return 'You\'re view-only. Ask the admin to invite your email as an Editor to bet.';
   if (!pid) return me.admin ? 'Link yourself to a player (reload and pick one) to bet.' : 'Your player link is waiting for the admin\'s approval.';
   if (!openSeriesFor(a, b, T.format)) return `No ${fmtName(T.format)} open for these two. One of them opens it on this tab just before they start.`;
-  if (pid === a || pid === b) {
-    if (!s.ownMatchBets) return 'You\'re playing in this one, so no betting on it.';
-    if (!single || single.market !== 's.winner' || single.selection !== (pid === a ? 'A' : 'B')) return 'In your own series you can only back yourself to win it.';
-  }
+  if (pid === a || pid === b) return 'You\'re playing in this one, so no betting on it.';
   return '';
 }
 function tQuote() {
@@ -2325,6 +2394,7 @@ function tQuote() {
   if (T.legs.length < 2) return null;
   const p = legsProb(a, b, T.legs, T.format);
   if (p < 0.002) return { impossible: true, why: p < 1e-6 ? 'These picks can\'t all happen in the same series. Swap one out.' : 'That combo is too much of a long shot for the book to price. Swap a pick out.' };
+  if (p > 0.985) return { impossible: true, why: 'That combo is close to a sure thing, so the book won\'t price it. Add a braver pick.' };
   const single = (l) => { const mk = T.markets.find((x) => x.key === l.market), x = mk && mk.sels.find((y) => y.key === l.selection); return x ? x.decimal : 1; };
   return { p, acca: T.legs.reduce((t, l) => t * single(l), 1), ...price(p, store.settings.builderMargin, 1) };
 }
@@ -2388,7 +2458,7 @@ async function placeTBet() {
   if (stake * odds > s.maxReturn) return toast(`Max return is ${fmtN(s.maxReturn)} coins, so the most you can stake at ${fractional} is ${fmtN(Math.floor(s.maxReturn / odds))}.`, true);
   if (stake > coinsOf(pid)) return toast(`You only have ${fmtN(coinsOf(pid))} coins.`, true);
   const head = `${nameOf(a)} v ${nameOf(b)} (${fmtName(T.format)})`;
-  const bet = { id: newId(), bettor: pid, fx: f.key, a, b, odds, fractional, stake, placedAt: nowIso(),
+  const bet = { id: newId(), bettor: pid, fx: f.key, format: f.format, a, b, odds, fractional, stake, placedAt: nowIso(),
     ...(isB ? { market: 'builder', selection: 'builder', legs: T.legs.map(({ market, selection, label, marketName }) => ({ market, selection, label, marketName })), label: `${head}: Bet Builder, ${T.legs.length} picks` }
       : { market: T.slip.market, selection: T.slip.selection, label: `${head}: ${T.slip.marketName}, ${T.slip.label}` }) };
   const mine = store.betDocs.find((d) => d.id === me.uid);
@@ -2416,10 +2486,10 @@ function bookieBrief(format) {
   const existing = [...catalogueFor(), ...specialsList()].filter((m) => forFormat(m, format)).map((m) => m.name).join('; ');
   return `You are a Clash Royale expert and a cheeky British bookmaker. Invent 6 NEW betting specials for ${format ? `a ${fmtName(format)} series (first to ${format === 'bo3' ? 2 : 3} wins) of` : 'a single game of'} Clash Royale Triple Draft between two mates, {A} and {B}. Coins only, just for fun.
 Every special MUST be written in this JSON market language, because a computer prices and settles it from the official battle log:
-- per-game stats (with "side": "A", "B" or "tot"): crowns (towers taken; A/B 0-3, tot 0-5), kings (that side's own King Tower woke; tot 0-2), three (won with 3 crowns), win (A/B only), ot (tot only: overtime), tb (tot only: crowns level, won on tiebreaker), first (A/B: took the first tower), clean (A/B: lost no towers), dmg1k (1,000+ damage before overtime), dealt (tower damage dealt, 0-10928 per player), leak (elixir leaked, decimal), card (needs "card": exact card name; 1 if drafted by that side, tot = either deck; the two decks never share a card), cat (needs "cat": one of ${CATS.join(', ')}; how many deck cards are in it), elixir (average elixir cost of the deck).
+- per-game stats (with "side": "A", "B" or "tot"): crowns (towers taken; A/B 0-3, tot 0-5), kings (that side's own King Tower woke; tot 0-2), three (won with 3 crowns), win (A/B only), ot (tot only: overtime), first (A/B: took the first tower), clean (A/B: lost no towers), dmg1k (1,000+ damage before overtime), dealt (tower damage dealt, 0-10928 per player), leak (elixir leaked, decimal), card (needs "card": exact card name; 1 if drafted by that side, tot = either deck; the two decks never share a card), cat (needs "cat": one of ${CATS.join(', ')}; how many deck cards are in it), elixir (average elixir cost of the deck).
 ${format ? `- series stats: seriesWins (A/B), games (tot), sweep (A/B/tot), distance (tot: reached the last possible game), reverse (A/B: lost the first ${format === 'bo3' ? 'game' : 'two games'} and won), g1win (A/B). Per-game stats in a series need "agg": "sum" (total over the series), "games" (number of games where the value is at least "min", default 1) or "max" (best single game).` : ''}
 - kinds: "ou" with "lines" (over/under ladder, over wins when value > line; use .5 lines for whole-number stats), "yn" with "op" (">=", "<=", "==") and "value" (yes/no), "hl" with optional "tie": true (who has more, {A} or {B}).
-NOT recorded, so never use: cards actually played or how often, troop counts, emotes, game length, elixir spent.
+${format ? 'The official log often leaves ot, first and dmg1k blank, so avoid them in series (those bets get refunded). ' : ''}NOT recorded, so never use: cards actually played or how often, troop counts, emotes, game length, elixir spent.
 Real data from ${n} games: ${Math.round((one / n) * 100)}% ended with exactly 1 crown in total, ${Math.round((three / n) * 100)}% had a 3-crown. Damage dealt per player has a median of about 3,400. Elixir leaked per player has a median of about 2.3 and the top 10% leak over 10. Most drafted cards: ${top}.
 Don't repeat these existing markets: ${existing}.
 Make them funny, Clash-flavoured and fair: lines where both sides get action. Names under 50 characters and may use {A}/{B}. Each blurb is one sentence of banter.
@@ -2468,8 +2538,8 @@ function renderBookie() {
       <span class="small muted">${esc(i.spec.blurb)}</span>${i.ok ? previewSpecial(i.spec, format) : '<span class="small down">Can\'t be priced or settled, so it can\'t go on the board.</span>'}</label>`).join('')}
     <div class="row"><button class="btn gold" type="button" id="bkPublish">Put the ticked ones on the board</button></div>` : '';
   const live = specialsList();
-  $('#bkLive').innerHTML = live.length ? `<h3>On the board</h3>${live.map((m) => `<div class="confirm-row"><span><b>${esc(m.name)}</b> <span class="small muted">${m.scope === 'game' ? 'Single game' : fmtName(m.formats ? m.formats[0] : 'bo3')}</span>${m.hidden ? ' <span class="pill">hidden</span>' : ''}</span>
-      <button class="btn tiny" type="button" data-bkhide="${esc(m.id)}">${m.hidden ? 'Show' : 'Hide'}</button></div>`).join('')}` : '';
+  $('#bkLive').innerHTML = live.length ? `<h3>On the board</h3>${live.map((m) => `<div class="confirm-row"><span><b>${esc(m.name)}</b> <span class="small muted">${m.scope === 'game' ? 'Single game' : fmtName(m.formats ? m.formats[0] : 'bo3')}</span>${specialHidden(m, nowIso()) ? ' <span class="pill">hidden</span>' : ''}</span>
+      <button class="btn tiny" type="button" data-bkhide="${esc(m.id)}">${specialHidden(m, nowIso()) ? 'Show' : 'Hide'}</button></div>`).join('')}` : '';
 }
 $('#bkAsk').addEventListener('click', askBookie);
 $('#bkOut').addEventListener('change', (e) => { const k = e.target.dataset.bkpick; if (k != null) BK.ideas[+k].pick = e.target.checked; });
@@ -2483,7 +2553,9 @@ $('#bkOut').addEventListener('click', async (e) => {
 });
 $('#bkLive').addEventListener('click', async (e) => {
   const id = e.target.dataset.bkhide; if (!id || !me.admin) return;
-  const list = (Array.isArray(store.specials.list) ? store.specials.list : []).map((m) => (m && m.id === id ? { ...m, hidden: !m.hidden } : m));
+  const now = nowIso();
+  const list = (Array.isArray(store.specials.list) ? store.specials.list : []).map((m) => (m && m.id === id
+    ? { ...m, toggles: [...(Array.isArray(m.toggles) ? m.toggles : []), { at: now, hidden: !specialHidden(m, now) }].slice(-50) } : m));
   try { await put('config', 'specials', { list }); } catch { /* toast shown */ }
 });
 
@@ -2639,6 +2711,13 @@ function neededFields(f, m) {
       if ((k === 'kingA' || k === 'kingB') && (m.kingA == null || m.kingB == null)) need.add(NEEDS[k]);
       if ((k === 'first' || k === 'comeback') && m.firstCrown == null) need.add(NEEDS.first);
       if ((k === 'dealtA' || k === 'dealtB') && m.dealtA == null) need.add(NEEDS[k]);
+      const sp = CLASSIC.has(k) ? null : marketById(k, null, b.placedAt), stat = sp && sp.expr && sp.expr.stat;
+      if (stat === 'dealt' && (m.dealtA == null || m.dealtB == null)) need.add(NEEDS.dealtA);
+      if (stat === 'kings' && (m.kingA == null || m.kingB == null)) need.add(NEEDS.kingA);
+      if (stat === 'dmg1k' && (m.dmgA == null || m.dmgB == null)) need.add(NEEDS.dmgA);
+      if (stat === 'ot' && m.overtime == null) need.add(NEEDS.overtime);
+      if (stat === 'first' && m.firstCrown == null) need.add(NEEDS.first);
+      if (['card', 'cat', 'elixir'].includes(stat) && !(cardsOf(m.cardsA).length === 8 && cardsOf(m.cardsB).length === 8)) need.add('Both 8-card decks');
     }
   }
   return [...need];
@@ -2790,7 +2869,7 @@ async function deleteResult(r) {
 function legList(bet) {
   const f = fixtureData().byKey[bet.fx];
   let it = null, format = null;
-  if (f && f.format) { const st = seriesState()[f.key]; if (st.status === 'final') { it = seriesOf(st.games.map((r) => gameFrom(r, bet.a)), st.N); format = f.format; } }
+  if (f && f.format) { const st = seriesState()[f.key]; if (bet.matchKey === 'series:' + f.key && st.status === 'final') { it = seriesOf(st.games.map((r) => gameFrom(r, bet.a)), st.N); format = f.format; } }
   else { const fin = bet.matchKey && finalResults().find((x) => x.key === bet.matchKey); if (fin) it = gameFrom(fin, bet.a); }
   return `<ul class="leg-list">${(Array.isArray(bet.legs) ? bet.legs : []).map((l) => {
     const r = it && l && typeof l.market === 'string' ? legTest(l, format, bet.placedAt)(it) : undefined;

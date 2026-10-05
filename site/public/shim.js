@@ -52,7 +52,8 @@
   async function request(method, url, body, opts) {
     const o = opts || {};
     const init = { method, credentials: 'same-origin', cache: 'no-store', headers: { 'X-CB': '1' }, signal: o.signal };
-    if (body !== undefined) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(body); }
+    // the server wants JSON on every change request, even a DELETE with nothing to say
+    if (method !== 'GET') { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(body === undefined ? {} : body); }
     let res;
     try { res = await fetch(url, init); } catch (e) { throw fail('unavailable', 'Couldn\'t reach the server. Check your connection.', 0); }
     let data = null;
@@ -117,8 +118,8 @@
     const cur = kids.get(id);
     if (!exists) { if (!cur) return; kids.delete(id); }
     else {
-      // our own write coming back from the change feed: nothing new
-      if (cur && cur.own && cur.version === version) { cur.own = false; return; }
+      // our own write coming back from the change feed: nothing new, unless the server kept something different
+      if (cur && cur.own && cur.version === version) { cur.own = false; if (JSON.stringify(cur.data) === JSON.stringify(data)) return; }
       kids.set(id, { data, version, own: !!own });
     }
     dirtyColls.add(coll); dirtyDocs.add(path); snapCache.delete(coll);
@@ -447,10 +448,21 @@
 #siteAdmin { display: grid; gap: 14px; min-width: 0; }
 .cbx-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; word-break: break-all; }
 .cbx-link { flex: 1 1 220px; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
-.cbx-msg { min-height: 1.2em; margin: 0; font-size: 13px; color: var(--muted, #95a2cb); }
+.cbx-msg { margin: 0; font-size: 13px; color: var(--muted, #95a2cb); }
+.cbx-msg:empty { display: none; }
 .cbx-msg.bad { color: var(--red, #ff5d6c); }
 .cbx-msg.good { color: var(--green, #43d17a); }
 .cbx-new { border-color: var(--gold, #f6c544) !important; }
+.cbx-acts { white-space: nowrap; }
+@media (max-width: 640px) {
+  .cbx-accts, .cbx-accts tbody, .cbx-accts tr, .cbx-accts td { display: block; width: 100%; }
+  .cbx-accts thead { display: none; }
+  .cbx-accts tr { padding: 8px 0; border-bottom: 1px solid var(--line, #2a3c75); }
+  .cbx-accts td { border: 0; padding: 2px 8px; }
+  .cbx-accts td[data-label]::before { content: attr(data-label) ': '; color: var(--muted, #95a2cb); font-size: 12px; }
+  .cbx-accts td.cbx-acts { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; white-space: normal; }
+  .cbx-accts td.cbx-acts:empty { display: none; }
+}
 .cbx-user small { display: block; color: var(--muted, #95a2cb); font-size: 12px; }
 .cbx-pill, .cbx-pill * { box-sizing: border-box; }
 .cbx-pill { position: fixed; left: 12px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 7; display: inline-flex; align-items: center; gap: 8px;
@@ -467,7 +479,7 @@ body { padding-bottom: 72px; }
 @media (max-width: 820px) { .cbx-pill { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); } body { padding-bottom: 130px; } }
 .cbx-dialog { border: 0; padding: 0; background: transparent; color: var(--fg, #eef1fb); width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: visible; }
 .cbx-dialog::backdrop { background: rgb(5 10 30 / .74); }
-.cbx-card { background: var(--panel, #152149); border: 1px solid var(--line, #2a3c75); border-top: 3px solid var(--gold, #f6c544); border-radius: 14px; padding: 16px; display: grid; gap: 14px;
+.cbx-card { background: var(--panel, #152149); border: 1px solid var(--line, #2a3c75); box-shadow: inset 0 3px 0 var(--gold, #f6c544); border-radius: 14px; padding: 19px 16px 16px; display: grid; gap: 14px;
   max-height: calc(100dvh - 24px); overflow-y: auto; font: 15px/1.45 var(--body, system-ui, sans-serif); }
 .cbx-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .cbx-head h2 { margin: 0; font: 400 22px/1.2 var(--display, "Lilita One", sans-serif); letter-spacing: .3px; }
@@ -484,6 +496,7 @@ body { padding-bottom: 72px; }
 .cbx-field { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted, #95a2cb); }
 .cbx-field input { background: var(--bg, #0d1530); color: var(--fg, #eef1fb); border: 1px solid var(--line, #2a3c75); border-radius: 10px; padding: 10px 12px; font: 16px var(--body, system-ui, sans-serif); min-width: 0; width: 100%; }
 .cbx-vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.cbx-foot { border-top: 1px solid var(--line, #2a3c75); padding-top: 12px; }
 .cbx-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
 .cbx-btn { background: var(--panel-2, #1c2b5a); color: var(--fg, #eef1fb); border: 1px solid var(--line, #2a3c75); border-radius: 10px; padding: 10px 16px; font: 700 15px var(--body, system-ui, sans-serif); cursor: pointer; }
 .cbx-btn:hover { border-color: var(--gold, #f6c544); }
@@ -532,8 +545,10 @@ body { padding-bottom: 72px; }
   function renderCard() {
     const hasPw = !!me.hasPassword;
     const msg = h('p', { class: 'cbx-msg' + (flash ? ' ' + flash.kind : ''), role: 'status' }, flash ? flash.text : '');
-    const save = h('button', { type: 'submit', class: 'cbx-btn gold' }, hasPw ? 'Change password' : 'Set password');
-    const form = h('form', { class: 'cbx-form', autocomplete: 'on' },
+    const say = (kind, text) => { flash = { kind, text }; msg.className = 'cbx-msg ' + kind; msg.textContent = text; };
+    const label = hasPw ? 'Change password' : 'Set password';
+    const save = h('button', { type: 'submit', class: 'cbx-btn gold' }, label);
+    const form = h('form', { class: 'cbx-form', autocomplete: 'on', novalidate: true },
       h('h3', {}, hasPw ? 'Change your password' : 'Set a password'),
       hasPw ? h('input', { class: 'cbx-vh', type: 'text', name: 'username', autocomplete: 'username', value: me.username, readonly: true, tabindex: '-1', 'aria-hidden': 'true' })
         : field('cbx-un', 'Username (you sign in with this)', { name: 'username', type: 'text', autocomplete: 'username', value: me.username, minlength: 3, maxlength: 24, autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false' }),
@@ -546,7 +561,7 @@ body { padding-bottom: 72px; }
       e.preventDefault();
       const val = (id) => form.querySelector('#' + id).value;
       const next = val('cbx-new');
-      const say = (kind, text) => { flash = { kind, text }; msg.className = 'cbx-msg ' + kind; msg.textContent = text; };
+      if (hasPw && !val('cbx-cur')) return say('bad', 'Enter your current password.');
       if (next.length < 8) return say('bad', 'Pick a password with at least 8 characters.');
       if (next !== val('cbx-new2')) return say('bad', 'The two new passwords don\'t match.');
       const body = { next };
@@ -559,25 +574,25 @@ body { padding-bottom: 72px; }
       save.disabled = true; save.textContent = 'Saving…';
       try {
         await request('POST', '/api/auth/password', body, { keep401: true });
-        await refreshMe();
         flash = { kind: 'good', text: hasPw ? 'Password changed. Your other devices have been signed out.' : 'Password saved. You can now sign in on any device.' };
+        await refreshMe(); // draws the window again, with the message
       } catch (err) {
         if (err.status === 401) { try { await request('GET', '/api/auth/me'); } catch (x) { return; } }
-        flash = { kind: 'bad', text: err.message };
+        // keep what they typed, so only the wrong box needs fixing
+        say('bad', err.message); save.disabled = false; save.textContent = label;
       }
-      renderCard();
     });
     const signOut = h('button', { type: 'button', class: 'cbx-btn', onclick: async (e) => {
       e.target.disabled = true;
-      try { await request('POST', '/api/auth/logout', {}); leaving = true; location.replace('/login'); } catch (err) { e.target.disabled = false; flash = { kind: 'bad', text: err.message }; renderCard(); }
+      try { await request('POST', '/api/auth/logout', {}); leaving = true; location.replace('/login'); } catch (err) { e.target.disabled = false; say('bad', err.message); }
     } }, 'Sign out');
     clear(card).append(
       h('div', { class: 'cbx-head' }, h('h2', { id: 'cbx-title' }, 'Your account'), h('button', { type: 'button', class: 'cbx-x', 'aria-label': 'Close', onclick: closeAccount }, '×')),
       h('div', { class: 'cbx-who' }, h('img', { src: look(me.uid, me.display).avatarUrl, alt: '' }),
         h('div', {}, h('b', {}, me.display), h('span', {}, '@' + me.username), me.admin ? h('span', { class: 'cbx-tag' }, 'Admin') : null)),
-      hasPw ? null : h('p', { class: 'cbx-note' }, 'You got in with a personal link. Set a password so you can sign in again on another phone or if you clear your browser.'),
+      ...(hasPw ? [] : [h('p', { class: 'cbx-note' }, 'You got in with a personal link. Set a password so you can sign in again on another phone or if you clear your browser.')]),
       form,
-      h('div', { class: 'cbx-row' }, signOut));
+      h('div', { class: 'cbx-row cbx-foot' }, signOut));
   }
 
   // ---------- admin panel ----------
@@ -616,17 +631,17 @@ body { padding-bottom: 72px; }
       const rows = S.accounts.map((a) => {
         const self = a.uid === me.uid;
         const ask = S.ask === 'reset:' + a.uid;
-        const acts = h('td', { style: 'white-space:nowrap' },
+        const acts = h('td', { class: 'cbx-acts' },
           self ? null : h('button', { type: 'button', class: 'btn tiny' + (ask ? ' warn' : ''), onclick: () => (ask ? resetPassword(a) : ((S.ask = 'reset:' + a.uid), renderAccounts())) }, ask ? 'Sure? Reset' : 'Reset password'), ' ',
           self ? null : h('button', { type: 'button', class: 'btn tiny' + (a.disabled ? '' : ' warn'), onclick: () => switchAccount(a) }, a.disabled ? 'Switch on' : 'Switch off'));
         return h('tr', { class: self ? 'mine' : '' },
           h('td', { class: 'cbx-user' }, h('b', {}, a.display), a.admin ? [' ', h('span', { class: 'pill admin' }, 'Admin')] : null, a.disabled ? [' ', h('span', { class: 'pill lost' }, 'Off')] : null,
             h('small', {}, '@' + a.username + (a.hasPassword ? '' : ' · no password yet'))),
-          h('td', {}, a.playerId ? nameOfPlayer(a.playerId) : h('span', { class: 'na' }, 'None')),
-          h('td', { class: 'small' }, ago(a.lastSeenAt)),
+          h('td', { 'data-label': 'Player' }, a.playerId ? nameOfPlayer(a.playerId) : h('span', { class: 'na' }, 'None')),
+          h('td', { class: 'small', 'data-label': 'Last seen' }, ago(a.lastSeenAt)),
           acts);
       });
-      accWrap.append(h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Account'), h('th', {}, 'Player'), h('th', {}, 'Last seen'), h('th', {}))), h('tbody', {}, rows)));
+      accWrap.append(h('table', { class: 'cbx-accts' }, h('thead', {}, h('tr', {}, h('th', {}, 'Account'), h('th', {}, 'Player'), h('th', {}, 'Last seen'), h('th', {}))), h('tbody', {}, rows)));
     }
     async function resetPassword(a) {
       S.ask = null;

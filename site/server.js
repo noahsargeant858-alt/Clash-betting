@@ -275,7 +275,7 @@ async function startServer(opts = {}) {
     let user = me;
     if (!me) {
       const username = auth.freeUsername(slugOf(pname));
-      user = auth.createUser({ uid, username, display: auth.cleanDisplay(pname) || username, pass: null, via: 'invite' });
+      user = auth.createUser({ uid, username, display: auth.cleanDisplay([...pname.trim()].slice(0, 30).join('')) || username, pass: null, via: 'invite' });
       startSession(ctx, uid);
     }
     auth.markUsed(inv, uid);
@@ -376,8 +376,9 @@ async function startServer(opts = {}) {
 
   function changes(ctx) {
     const user = needUser(ctx);
-    const since = Number(ctx.query.get('since'));
-    if (!Number.isInteger(since) || since < 0) throw new HttpError(400, 'since must be a whole number.');
+    const sinceRaw = ctx.query.get('since');
+    if (typeof sinceRaw !== 'string' || !/^\d{1,15}$/.test(sinceRaw)) throw new HttpError(400, 'since must be a whole number.');
+    const since = Number(sinceRaw);
     const wait = Math.min(25, Math.max(0, Math.floor(Number(ctx.query.get('wait'))) || 0));
     const now = changesFor(user, since);
     if (wait === 0 || now.reset || since < store.seq) return json(ctx, now);

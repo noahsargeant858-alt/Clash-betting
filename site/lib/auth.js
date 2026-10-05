@@ -13,7 +13,7 @@ const DAY = 86400e3;
 // no 0 O 1 l I: temporary passwords get read out and typed on phones
 const TEMP_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
 // control characters, line separators and the bidi overrides that can make a name read backwards
-const BAD_DISPLAY = /[\u0000-\u001f\u007f-\u009f  ‪-‮⁦-⁩]/;
+const BAD_DISPLAY = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029\\u202a-\\u202e\\u2066-\\u2069]');
 
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const iso = (ms) => new Date(ms === undefined ? Date.now() : ms).toISOString();

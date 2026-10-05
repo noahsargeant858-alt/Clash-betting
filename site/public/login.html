@@ -186,8 +186,9 @@ function fail(which, text, field) {
   const box = $('#' + which + '-err');
   box.textContent = text;
   for (const el of document.querySelectorAll('#panel-' + which + ' input')) el.removeAttribute('aria-invalid');
-  const el = field && $(field);
-  if (el) { el.setAttribute('aria-invalid', 'true'); el.focus(); }
+  const els = [].concat(field || []).map($).filter(Boolean);
+  els.forEach((el) => el.setAttribute('aria-invalid', 'true'));
+  if (els.length) els[els.length - 1].focus();
 }
 // Which box a server message is about, so that one gets the red outline
 function fieldFor(which, msg) {
@@ -202,7 +203,8 @@ function problem(which, e) {
   if (e.network) return fail(which, 'Couldn\'t reach ClashBets. Check your connection and try again.');
   const msg = e.message || (e.status === 429 ? 'Too many tries. Wait a few minutes and try again.' : e.status >= 500 ? 'Something went wrong on our side. Try again in a moment.' : 'That didn\'t work. Check the details and try again.');
   if (which === 'up' && e.status === 403 && /code/i.test(msg)) wantCode();
-  fail(which, msg, fieldFor(which, msg));
+  // wrong sign-in details could be either box, so both get the red outline
+  fail(which, msg, which === 'in' && e.status === 401 ? ['#in-user', '#in-pass'] : fieldFor(which, msg));
 }
 
 async function submit(which, url, body, busy) {

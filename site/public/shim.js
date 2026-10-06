@@ -601,6 +601,7 @@ body { padding-bottom: 72px; }
     const accMsg = h('p', { class: 'cbx-msg', role: 'status' }), invMsg = h('p', { class: 'cbx-msg', role: 'status' });
     const tempBox = h('div'), accWrap = h('div', { class: 'scroll' });
     const freshBox = h('div'), invList = h('div', { class: 'stack' });
+    const groupBox = h('div'), groupMsg = h('p', { class: 'cbx-msg', role: 'status' });
     const pickSel = h('select', { 'aria-label': 'Player to invite' });
     const makeBtn = h('button', { type: 'button', class: 'btn gold', onclick: createInvite }, 'Create invite link');
     const say = (el, kind, text) => { el.className = 'cbx-msg' + (kind ? ' ' + kind : ''); el.textContent = text || ''; };
@@ -611,6 +612,9 @@ body { padding-bottom: 72px; }
       h('section', { class: 'panel stack' }, h('h2', {}, 'Website accounts'),
         h('p', { class: 'note' }, 'Everyone who can sign in to this site. Reset a password if someone is locked out; the new one is shown once. Switching an account off signs it out and stops it signing in, and you can switch it back on.'),
         accMsg, tempBox, accWrap),
+      h('section', { class: 'panel stack' }, h('h2', {}, 'Group link'),
+        h('p', { class: 'note' }, 'One link for the group chat. It opens Create account with the group code already filled in, so your mates only pick a username and password, then tap their name and you approve them under Player link requests. Anyone who gets hold of it can make an account, so keep it in the chat. Changing SIGNUP_CODE on Render makes old group links stop working.'),
+        groupMsg, groupBox),
       h('section', { class: 'panel stack' }, h('h2', {}, 'Invite links'),
         h('p', { class: 'note' }, 'Make a personal link for a player. Whoever opens it is signed in as that player straight away, with no sign-up. Each link works once. Send it to them privately: a link only shows here when you make it, so copy it then. Players who already have an account are greyed out.'),
         h('div', { class: 'row' }, pickSel, makeBtn), invMsg, freshBox, invList));
@@ -630,6 +634,7 @@ body { padding-bottom: 72px; }
       if (!S.accounts.length) { accWrap.append(h('div', { class: 'empty' }, 'No accounts yet.')); return; }
       const rows = S.accounts.map((a) => {
         const self = a.uid === me.uid;
+        const live = [...S.links].find(([, uid]) => uid === a.uid), pid = live ? live[0] : a.playerId; // the live links beat the last fetch
         const ask = S.ask === 'reset:' + a.uid;
         const acts = h('td', { class: 'cbx-acts' },
           self ? null : h('button', { type: 'button', class: 'btn tiny' + (ask ? ' warn' : ''), onclick: () => (ask ? resetPassword(a) : ((S.ask = 'reset:' + a.uid), renderAccounts())) }, ask ? 'Sure? Reset' : 'Reset password'), ' ',
@@ -637,7 +642,7 @@ body { padding-bottom: 72px; }
         return h('tr', { class: self ? 'mine' : '' },
           h('td', { class: 'cbx-user' }, h('b', {}, a.display), a.admin ? [' ', h('span', { class: 'pill admin' }, 'Admin')] : null, a.disabled ? [' ', h('span', { class: 'pill lost' }, 'Off')] : null,
             h('small', {}, '@' + a.username + (a.hasPassword ? '' : ' · no password yet'))),
-          h('td', { 'data-label': 'Player' }, a.playerId ? nameOfPlayer(a.playerId) : h('span', { class: 'na' }, 'None')),
+          h('td', { 'data-label': 'Player' }, pid ? nameOfPlayer(pid) : h('span', { class: 'na' }, 'None')),
           h('td', { class: 'small', 'data-label': 'Last seen' }, ago(a.lastSeenAt)),
           acts);
       });
@@ -722,24 +727,40 @@ body { padding-bottom: 72px; }
             h('button', { type: 'button', class: 'btn tiny' + (st === 'open' ? ' warn' : ''), onclick: () => revoke(i) }, st === 'open' ? 'Revoke' : 'Remove'))));
       }
     }
+    // -- group link
+    async function loadGroupLink() {
+      try {
+        const r = await request('GET', '/api/admin/group-link');
+        if (!r.hasCode) say(groupMsg, '', 'There is no group code (SIGNUP_CODE is empty on Render), so this is just the sign-up page and anyone with the address can make an account.');
+        else say(groupMsg, '', '');
+        const btns = [h('button', { type: 'button', class: 'btn tiny', onclick: async (e) => { e.target.textContent = (await copyText(r.url)) ? 'Copied' : 'Press Ctrl+C'; } }, 'Copy link')];
+        if (typeof navigator.share === 'function') btns.push(h('button', { type: 'button', class: 'btn tiny', onclick: async () => { try { await navigator.share({ title: 'ClashBets', text: 'Join ClashBets: tap the link, pick a username and password, then tap your name.', url: r.url }); } catch (e) { /* closed without sharing */ } } }, 'Share'));
+        clear(groupBox).append(h('div', { class: 'confirm-row' },
+          h('input', { class: 'cbx-link', type: 'text', readonly: true, value: r.url, 'aria-label': 'Group link', onfocus: (e) => e.target.select() }),
+          h('span', { class: 'row' }, btns)));
+      } catch (e) { say(groupMsg, 'bad', e.message); }
+    }
+
     async function loadInvites() {
       try { S.invites = (await request('GET', '/api/admin/invites')).invites || []; } catch (e) { say(invMsg, 'bad', e.message); }
       renderInvites();
     }
 
+    const refresh = () => { S.last = Date.now(); loadAccounts(); loadInvites(); };
     // The players and links come from the same live copy the page uses
     const watch = (name, fn) => subscribe(name, collSubs, ensureColl, (snap) => { fn(snap.docs.map((d) => ({ ...d.data(), id: d.id }))); fillPlayers(); renderAccounts(); renderInvites(); }, () => {});
     watch('players', (docs) => { S.players = docs.filter((d) => typeof d.name === 'string'); });
-    watch('links', (docs) => { S.links = new Map(docs.map((d) => [d.id, d.uid])); });
+    watch('links', (docs) => { S.links = new Map(docs.map((d) => [d.id, d.uid])); if (S.last && Date.now() - S.last > 2000) refresh(); }); // someone just joined: fetch the account list again
 
-    const refresh = () => { S.last = Date.now(); loadAccounts(); loadInvites(); };
+    loadGroupLink();
     const visible = () => root.offsetParent !== null || root.getClientRects().length > 0;
     if (typeof IntersectionObserver === 'function') new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting) && Date.now() - S.last > 2000) refresh(); }).observe(root);
-    setInterval(() => { if (!document.hidden && visible() && Date.now() - S.last > 30000) refresh(); }, 10000);
+    setInterval(() => { if (!document.hidden && visible() && Date.now() - S.last > 15000) refresh(); }, 5000);
     refresh();
   }
 
   function boot() {
+    if (/^#(code=|create$)/.test(location.hash)) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* harmless */ } }
     renderOnline();
     loadMe().then(() => {
       buildAccount();

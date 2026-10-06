@@ -317,6 +317,14 @@ async function startServer(opts = {}) {
     json(ctx, { accounts: list });
   }
 
+  // One link for the group chat: the sign-up page with the group code already filled in. The code rides in the
+  // #fragment, which browsers never send to a server, so it stays out of logs, link previews and Referer headers.
+  function groupLink(ctx) {
+    needAdmin(ctx);
+    const base = `${baseUrl(ctx)}/login`;
+    json(ctx, { url: cfg.signupCode ? `${base}#code=${encodeURIComponent(cfg.signupCode)}` : `${base}#create`, hasCode: !!cfg.signupCode });
+  }
+
   async function resetPassword(ctx, uid) {
     const me = needAdmin(ctx);
     if (uid === me.uid) throw new HttpError(400, 'Use Change password for your own account.');
@@ -449,6 +457,7 @@ async function startServer(opts = {}) {
     'GET /api/admin/accounts': accounts,
     'POST /api/admin/invites': createInvite,
     'GET /api/admin/invites': listInvites,
+    'GET /api/admin/group-link': groupLink,
     'POST /api/admin/import-now': importNow,
     'GET /api/db/list': dbList,
     'GET /api/db/doc': dbDoc,

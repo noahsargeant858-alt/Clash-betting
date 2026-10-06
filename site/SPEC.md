@@ -130,6 +130,7 @@ cross-site requests. Request bodies are capped at 300 KB (413). Errors: `{ "erro
 * `POST   /api/admin/invites` `{playerId}` → `{id, token, url, expiresAt}` where `url` = `<PUBLIC_URL or Host-derived>/join/<token>`. 404 if the player doesn't exist. The token is only ever returned here.
 * `GET    /api/admin/invites` → `{invites:[{id, playerId, createdAt, expiresAt, usedAt, usedBy}]}` (never tokens)
 * `DELETE /api/admin/invites/<id>` → `{ok:true}`
+* `GET    /api/admin/group-link` → `{url, hasCode}`: `url` = `<base>/login#code=<encodeURIComponent(SIGNUP_CODE)>` (or `<base>/login#create` with no code). Admin only. The login page reads the fragment, opens Create account with the code filled in, and removes it with `history.replaceState`; the app's shim does the same if a signed-in person is redirected to `/` with it.
 
 ### Database (signed in)
 * `GET  /api/db/list?collection=<collection path>` → `{ docs:[{id, data, version}], seq }` — direct children of that collection that the caller may read, ordered by id.

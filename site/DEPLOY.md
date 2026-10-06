@@ -20,11 +20,15 @@ accounts and bets. You pay Render directly. Cancel any time by deleting the serv
 
 ## Getting your friends in
 
-Two ways, and you can mix them:
+Three ways, and you can mix them:
 
 * **Personal link (easiest for them):** Admin tab → **Invite links** → pick the player → **Create invite link**. Send that link to that friend, privately.
   They tap it, tap **Join as …**, and they are in as that player with their coins. No sign-up, no password. A link works once.
   They can set a username and password later from the **Account** button, so they can sign in on another phone.
+* **One group link (easiest for you):** Admin tab → **Group link** → **Copy link**, and post it in the group chat. It opens
+  **Create account** with the group code already filled in, so they only pick a username and password, then tap their name. You approve them
+  under **Admin → Player link requests**. The code sits after the `#` in the link, which browsers never send to a server, and the page
+  wipes it from the address bar once it has read it. Changing `SIGNUP_CODE` on Render makes old group links stop working.
 * **They make their own account:** send them the site address and the group code. They create an account, then tap their name
   ("Ask to be jamie") or type their name if they are not on the list. You approve them under **Admin → Player link requests**.
 

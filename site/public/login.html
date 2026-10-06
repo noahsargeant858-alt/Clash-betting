@@ -116,7 +116,7 @@ noscript p { text-align: center; color: var(--amber); }
       <div class="field" id="code-field" hidden>
         <label for="up-code">Group code</label>
         <input id="up-code" name="code" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="100" aria-describedby="up-code-hint up-err">
-        <p class="hint" id="up-code-hint">Ask the admin for it.</p>
+        <p class="hint" id="up-code-hint">Ask the admin for it, or open the group link they sent.</p>
       </div>
       <p class="err" id="up-err" role="alert"></p>
       <button type="submit" class="go">Create account</button>
@@ -175,6 +175,27 @@ for (const b of document.querySelectorAll('.eye')) b.addEventListener('click', (
 function wantCode() { $('#code-field').hidden = false; }
 fetch('/api/auth/config', { credentials: 'same-origin' }).then((r) => r.json()).then((c) => { if (c && c.signupCode) wantCode(); }).catch(() => { /* the form still works without it */ });
 
+// The admin's group link is /login#code=<the code>: open "Create account" with the code already in,
+// then take it out of the address bar so it isn't left on screen or in the history.
+function codeFromLink(hash) {
+  if (!/^#code=/.test(hash)) return null;
+  let code;
+  try { code = decodeURIComponent(hash.slice(6)); } catch { return null; }
+  code = code.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 100);
+  return code || null;
+}
+const linkCode = codeFromLink(location.hash);
+if (linkCode !== null || /^#code=/.test(location.hash)) {
+  try { history.replaceState(null, '', location.pathname + location.search); } catch { /* old browser: harmless */ }
+}
+if (linkCode) {
+  pick(1, false);
+  wantCode();
+  $('#up-code').value = linkCode;
+  $('#up-code-hint').textContent = 'Filled in from your group link.';
+  $('.sub').textContent = 'You\'ve been invited. Pick a username and password to join.';
+}
+
 // ---------- forms ----------
 const WORDS = { 'in': { user: '#in-user', pass: '#in-pass' }, up: { user: '#up-user', display: '#up-name', pass: '#up-pass', code: '#up-code' } };
 function fail(which, text, field) {
@@ -197,7 +218,7 @@ function fieldFor(which, msg) {
 function problem(which, e) {
   if (e.network) return fail(which, 'Couldn\'t reach ClashBets. Check your connection and try again.');
   const msg = e.message || (e.status === 429 ? 'Too many tries. Wait a few minutes and try again.' : e.status >= 500 ? 'Something went wrong on our side. Try again in a moment.' : 'That didn\'t work. Check the details and try again.');
-  if (which === 'up' && e.status === 403 && /code/i.test(msg)) wantCode();
+  if (which === 'up' && e.status === 403 && /code/i.test(msg)) { wantCode(); if (linkCode) $('#up-code-hint').textContent = 'The code in your link is out of date. Ask the admin for the new one.'; }
   // wrong sign-in details could be either box, so both get the red outline
   fail(which, msg, which === 'in' && e.status === 401 ? ['#in-user', '#in-pass'] : fieldFor(which, msg));
 }
@@ -244,7 +265,7 @@ $('#panel-up').addEventListener('submit', (e) => {
 });
 
 // a keyboard on a phone is in the way of the heading, so only grab focus where there's a real keyboard
-if (window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches) $('#in-user').focus();
+if (window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches) $(linkCode ? '#up-user' : '#in-user').focus();
 </script>
 </body>
 </html>

@@ -50,7 +50,7 @@ function resolveConfig(opts) {
     dataDir: path.resolve(String(pick('dataDir', 'DATA_DIR', 'site-data'))),
     adminUsername: String(pick('adminUsername', 'ADMIN_USERNAME', 'admin')).trim().toLowerCase(),
     adminPassword: pick('adminPassword', 'ADMIN_PASSWORD', ''),
-    signupCode: String(pick('signupCode', 'SIGNUP_CODE', '')),
+    signupCode: String(pick('signupCode', 'SIGNUP_CODE', '')).trim(),
     publicUrl: String(pick('publicUrl', 'PUBLIC_URL', '')).replace(/\/+$/, ''),
     trustProxy: trust,
     cookieSecure,
@@ -105,6 +105,7 @@ async function startServer(opts = {}) {
   const trust = cfg.trustProxy;
   if (cfg.production && !cfg.dataDirGiven) throw new Error('Set DATA_DIR to the folder on your persistent disk (on Render: /var/data). Without it every deploy would wipe the accounts and bets.');
   if (cfg.production && !cfg.signupCode) log('[security] SIGNUP_CODE is not set, so anyone who finds the address can make an account. Set a group code.');
+  if (cfg.signupCode.length > 200) log('[config] SIGNUP_CODE is longer than 200 characters, which is more than the sign-up box takes. Pick a shorter one.');
 
   // --- data: restore a backup into an empty folder, then load both files
   const snapshot = GithubSnapshot.create({ ...cfg.snapshot, dir: cfg.dataDir, scryptN: cfg.snapshot.scryptN, log });
@@ -322,7 +323,9 @@ async function startServer(opts = {}) {
   function groupLink(ctx) {
     needAdmin(ctx);
     const base = `${baseUrl(ctx)}/login`;
-    json(ctx, { url: cfg.signupCode ? `${base}#code=${encodeURIComponent(cfg.signupCode)}` : `${base}#create`, hasCode: !!cfg.signupCode });
+    // encodeURIComponent leaves ! ' ( ) * . ~ - alone, and chat apps drop those from the end of a link they detect
+    const code = encodeURIComponent(cfg.signupCode).replace(/[!'()*.~-]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+    json(ctx, { url: cfg.signupCode ? `${base}#code=${code}` : `${base}#create`, hasCode: !!cfg.signupCode, tooLong: cfg.signupCode.length > 200 });
   }
 
   async function resetPassword(ctx, uid) {

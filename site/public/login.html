@@ -115,7 +115,7 @@ noscript p { text-align: center; color: var(--amber); }
       </div>
       <div class="field" id="code-field" hidden>
         <label for="up-code">Group code</label>
-        <input id="up-code" name="code" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="100" aria-describedby="up-code-hint up-err">
+        <input id="up-code" name="code" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="200" aria-describedby="up-code-hint up-err">
         <p class="hint" id="up-code-hint">Ask the admin for it, or open the group link they sent.</p>
       </div>
       <p class="err" id="up-err" role="alert"></p>
@@ -175,26 +175,29 @@ for (const b of document.querySelectorAll('.eye')) b.addEventListener('click', (
 function wantCode() { $('#code-field').hidden = false; }
 fetch('/api/auth/config', { credentials: 'same-origin' }).then((r) => r.json()).then((c) => { if (c && c.signupCode) wantCode(); }).catch(() => { /* the form still works without it */ });
 
-// The admin's group link is /login#code=<the code>: open "Create account" with the code already in,
-// then take it out of the address bar so it isn't left on screen or in the history.
+// The admin's group link is /login#code=<the code>: open "Create account" with the code already in.
+// The code stays in the address bar until the account is made, so a reload, a restored tab or "Open in Safari/Chrome"
+// from a chat app's own browser still has it; signing up then moves on to the app, which drops it.
 function codeFromLink(hash) {
   if (!/^#code=/.test(hash)) return null;
   let code;
   try { code = decodeURIComponent(hash.slice(6)); } catch { return null; }
-  code = code.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 100);
+  code = code.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 200);
   return code || null;
 }
-const linkCode = codeFromLink(location.hash);
-if (linkCode !== null || /^#code=/.test(location.hash)) {
-  try { history.replaceState(null, '', location.pathname + location.search); } catch { /* old browser: harmless */ }
-}
-if (linkCode) {
+let linkCode = null;
+function applyLinkCode() {
+  const code = codeFromLink(location.hash);
+  if (!code) return;
+  linkCode = code;
   pick(1, false);
   wantCode();
-  $('#up-code').value = linkCode;
+  $('#up-code').value = code;
   $('#up-code-hint').textContent = 'Filled in from your group link.';
   $('.sub').textContent = 'You\'ve been invited. Pick a username and password to join.';
 }
+applyLinkCode();
+window.addEventListener('hashchange', applyLinkCode); // the link opened in a tab that was already on this page
 
 // ---------- forms ----------
 const WORDS = { 'in': { user: '#in-user', pass: '#in-pass' }, up: { user: '#up-user', display: '#up-name', pass: '#up-pass', code: '#up-code' } };

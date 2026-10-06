@@ -597,7 +597,7 @@ body { padding-bottom: 72px; }
 
   // ---------- admin panel ----------
   function mountAdmin(root) {
-    const S = { accounts: [], invites: [], players: [], links: new Map(), fresh: new Map(), temp: null, ask: null, last: 0 };
+    const S = { accounts: [], invites: [], players: [], links: new Map(), linksLoaded: false, trail: 0, fresh: new Map(), temp: null, ask: null, last: 0 };
     const accMsg = h('p', { class: 'cbx-msg', role: 'status' }), invMsg = h('p', { class: 'cbx-msg', role: 'status' });
     const tempBox = h('div'), accWrap = h('div', { class: 'scroll' });
     const freshBox = h('div'), invList = h('div', { class: 'stack' });
@@ -634,7 +634,7 @@ body { padding-bottom: 72px; }
       if (!S.accounts.length) { accWrap.append(h('div', { class: 'empty' }, 'No accounts yet.')); return; }
       const rows = S.accounts.map((a) => {
         const self = a.uid === me.uid;
-        const live = [...S.links].find(([, uid]) => uid === a.uid), pid = live ? live[0] : a.playerId; // the live links beat the last fetch
+        const live = [...S.links].find(([, uid]) => uid === a.uid), pid = S.linksLoaded ? (live ? live[0] : null) : a.playerId; // the live links beat the last fetch
         const ask = S.ask === 'reset:' + a.uid;
         const acts = h('td', { class: 'cbx-acts' },
           self ? null : h('button', { type: 'button', class: 'btn tiny' + (ask ? ' warn' : ''), onclick: () => (ask ? resetPassword(a) : ((S.ask = 'reset:' + a.uid), renderAccounts())) }, ask ? 'Sure? Reset' : 'Reset password'), ' ',
@@ -732,7 +732,10 @@ body { padding-bottom: 72px; }
       try {
         const r = await request('GET', '/api/admin/group-link');
         if (!r.hasCode) say(groupMsg, '', 'There is no group code (SIGNUP_CODE is empty on Render), so this is just the sign-up page and anyone with the address can make an account.');
+        else if (r.tooLong) say(groupMsg, 'bad', 'Your SIGNUP_CODE is longer than 200 characters, which is more than the sign-up box takes, so this link can\'t work. Pick a shorter one on Render.');
         else say(groupMsg, '', '');
+        const shown = groupBox.querySelector('input');
+        if (shown && shown.value === r.url) return; // unchanged: leave the box alone (it may be selected for copying)
         const btns = [h('button', { type: 'button', class: 'btn tiny', onclick: async (e) => { e.target.textContent = (await copyText(r.url)) ? 'Copied' : 'Press Ctrl+C'; } }, 'Copy link')];
         if (typeof navigator.share === 'function') btns.push(h('button', { type: 'button', class: 'btn tiny', onclick: async () => { try { await navigator.share({ title: 'ClashBets', text: 'Join ClashBets: tap the link, pick a username and password, then tap your name.', url: r.url }); } catch (e) { /* closed without sharing */ } } }, 'Share'));
         clear(groupBox).append(h('div', { class: 'confirm-row' },
@@ -746,13 +749,18 @@ body { padding-bottom: 72px; }
       renderInvites();
     }
 
-    const refresh = () => { S.last = Date.now(); loadAccounts(); loadInvites(); };
+    const refresh = () => { S.last = Date.now(); clearTimeout(S.trail); loadAccounts(); loadInvites(); loadGroupLink(); };
     // The players and links come from the same live copy the page uses
     const watch = (name, fn) => subscribe(name, collSubs, ensureColl, (snap) => { fn(snap.docs.map((d) => ({ ...d.data(), id: d.id }))); fillPlayers(); renderAccounts(); renderInvites(); }, () => {});
     watch('players', (docs) => { S.players = docs.filter((d) => typeof d.name === 'string'); });
-    watch('links', (docs) => { S.links = new Map(docs.map((d) => [d.id, d.uid])); if (S.last && Date.now() - S.last > 2000) refresh(); }); // someone just joined: fetch the account list again
+    watch('links', (docs) => {
+      S.links = new Map(docs.map((d) => [d.id, d.uid])); S.linksLoaded = true;
+      if (!S.last) return; // the first refresh is still to come
+      const wait = 2000 - (Date.now() - S.last); // someone just joined: fetch the account list again, at most every 2s
+      clearTimeout(S.trail);
+      if (wait <= 0) refresh(); else S.trail = setTimeout(refresh, wait);
+    });
 
-    loadGroupLink();
     const visible = () => root.offsetParent !== null || root.getClientRects().length > 0;
     if (typeof IntersectionObserver === 'function') new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting) && Date.now() - S.last > 2000) refresh(); }).observe(root);
     setInterval(() => { if (!document.hidden && visible() && Date.now() - S.last > 15000) refresh(); }, 5000);

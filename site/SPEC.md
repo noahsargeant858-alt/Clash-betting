@@ -193,7 +193,7 @@ inside seed doc data is replaced by the admin's uid, so `links/triqqi.uid` and `
 * Never log passwords, tokens or cookies. Never return password hashes, session hashes or invite hashes from any endpoint.
 * Constant-time comparisons for secrets; generic login errors; rate limits on login/signup/invite redeem (20/15 min/IP).
 * A user can never read another user's `data/users/...`, write another user's `claims|bets|acts` doc, or write `players|links|matches|config` unless admin.
-* Request timeouts: headers 15 s, body 15 s; long-poll max 25 s; a global cap of 200 concurrent connections.
+* Request timeouts: body 15 s; sockets that send nothing are dropped quickly (header timeout is 70 s so a proxy never reuses a socket we are closing); long-poll max 25 s; a global cap of 200 concurrent connections.
 
 ## Server-side integrity rules (`site/lib/integrity.js`)
 

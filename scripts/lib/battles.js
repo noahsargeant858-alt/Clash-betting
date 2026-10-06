@@ -7,7 +7,7 @@ const P_HP = 3052, K_HP = 4824;
 
 const normTag = (t) => '#' + String(t).trim().toUpperCase().replace(/^#/, '').replace(/O/g, '0');
 const iso = (t) => t.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(\.\d+)?Z$/, '$1-$2-$3T$4:$5:$6$7Z');
-const docId = (battleKey) => 'cr_' + battleKey.replace(/[^A-Za-z0-9_.~:@+-]/g, '');
+const docId = (battleKey) => 'cr_' + String(battleKey).replace(/[^A-Za-z0-9_.~:@+-]/g, '').slice(0, 120);
 
 // squad tag -> site player id, matching squad.json names to the site's players
 function playerMap(squad, players) {

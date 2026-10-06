@@ -267,11 +267,13 @@ fs.writeFileSync(path.join(__dirname, '..', 'seen.json'), JSON.stringify({
   store.write('set', 'matches/recent', { date: recent, playerA: 'pp', again: true });
   store.write('set', 'matches/old', { date: old });
   store.write('set', 'matches/nodate', { x: 1 });
-  store.write('set', 'acts/u_a/items/m1', { type: 'match', date: recent });
-  store.write('set', 'acts/u_a/items/m-old', { type: 'match', date: old });
+  const hand = (date) => ({ type: 'match', playerA: 'pp', playerB: 'pp2', crownsA: 2, crownsB: 1, winner: 'A', date, loggedAt: date });
+  store.write('set', 'acts/u_a/items/m1', hand(recent));
+  store.write('set', 'acts/u_a/items/m-old', hand(old));
+  store.write('set', 'acts/u_a/items/m-junk', { type: 'match', date: recent });
   store.write('set', 'acts/u_a/items/fixture', { type: 'fixture', date: recent });
-  store.write('set', 'acts/u_b/items/m2', { type: 'match', date: recent });
-  store.write('set', 'acts/u_b/other/m3', { type: 'match', date: recent });
+  store.write('set', 'acts/u_b/items/m2', hand(recent));
+  store.write('set', 'acts/u_b/other/m3', hand(recent));
   store.write('set', 'config/importState', { ranAt: 'x' });
   const before = Date.now();
   await createImporter({ store, repoRoot: root, battlesUrl: feed.url, intervalMin: 0 }).runImport();
@@ -285,7 +287,7 @@ fs.writeFileSync(path.join(__dirname, '..', 'seen.json'), JSON.stringify({
   assert.deepStrictEqual(seen.matches, ['recent.json'], 'only results inside the window');
   assert.deepStrictEqual(seen.links, ['pp.json']);
   assert.deepStrictEqual(seen.acts.sort(), ['u_a', 'u_b']);
-  assert.deepStrictEqual(seen.actsItems, ['m1.json'], 'only logged results inside the window');
+  assert.deepStrictEqual(seen.actsItems, ['m1.json'], 'only well-formed logged results inside the window');
   assert.deepStrictEqual(seen.actsB, ['m2.json']);
   assert.deepStrictEqual(seen.link, { uid: 'u_a', at: 'a', former: [] });
 });
@@ -301,7 +303,7 @@ test('failures are reported, change nothing, and are retried', async (t) => {
   assert.match(r.json.error, /The import failed: The battles feed answered HTTP 503/);
   // not JSON, not an object
   w.feed.st.status = 200;
-  for (const [bad, pattern] of [['not json', /not valid JSON/], ['[1,2]', /expected shape/], ['null', /expected shape/]]) {
+  for (const [bad, pattern] of [['not json', /expected shape/], ['[1,2]', /expected shape/], ['null', /expected shape/]]) {
     w.feed.set(bad);
     r = await w.admin.post('/api/admin/import-now');
     assert.strictEqual(r.status, 500, bad);

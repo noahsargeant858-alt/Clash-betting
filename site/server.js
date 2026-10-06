@@ -17,6 +17,7 @@ const { createImporter } = require('./lib/importer');
 
 const { HttpError } = H;
 const COOKIE = 'cb_session';
+const integrity = require('./lib/integrity');
 const BODY_LIMIT = 300 * 1024;
 const MAX_CHANGES = 1000;               // more than this and the client is told to re-list instead
 const MAX_CHANGE_BYTES = 4 * 1024 * 1024;
@@ -33,8 +34,8 @@ function resolveConfig(opts) {
   const env = opts.env || process.env;
   const pick = (key, name, d) => (opts[key] !== undefined ? opts[key] : env[name] !== undefined && env[name] !== '' ? env[name] : d);
   const production = env.NODE_ENV === 'production';
-  let trust = pick('trustProxy', 'TRUST_PROXY', production ? 1 : 0);
-  trust = /^(true|yes|on)$/i.test(String(trust)) ? 1 : /^(false|no|off)$/i.test(String(trust)) ? 0 : Math.max(0, Math.floor(num(trust, 0)));
+  let trust = pick('trustProxy', 'TRUST_PROXY', production ? 'auto' : 0);
+  trust = /^auto$/i.test(String(trust)) ? 'auto' : /^(true|yes|on)$/i.test(String(trust)) ? 1 : /^(false|no|off)$/i.test(String(trust)) ? 0 : Math.max(0, Math.floor(num(trust, 0)));
   const secureRaw = pick('cookieSecure', 'COOKIE_SECURE', undefined);
   const cookieSecure = secureRaw === undefined ? undefined : /^(1|true|yes|on)$/i.test(String(secureRaw)) ? true : /^(0|false|no|off)$/i.test(String(secureRaw)) ? false : undefined;
   const snap = opts.snapshot || {
@@ -44,6 +45,8 @@ function resolveConfig(opts) {
   return {
     port: num(pick('port', 'PORT', 3000), 3000),
     host: pick('host', 'HOST', undefined),
+    production,
+    dataDirGiven: pick('dataDir', 'DATA_DIR', undefined) !== undefined,
     dataDir: path.resolve(String(pick('dataDir', 'DATA_DIR', 'site-data'))),
     adminUsername: String(pick('adminUsername', 'ADMIN_USERNAME', 'admin')).trim().toLowerCase(),
     adminPassword: pick('adminPassword', 'ADMIN_PASSWORD', ''),
@@ -53,7 +56,8 @@ function resolveConfig(opts) {
     cookieSecure,
     sessionDays: num(pick('sessionDays', 'SESSION_DAYS', 90), 90),
     inviteDays: num(pick('inviteDays', 'INVITE_DAYS', 14), 14),
-    maxAccounts: num(pick('maxAccounts', 'MAX_ACCOUNTS', 1000), 1000),
+    maxAccounts: num(pick('maxAccounts', 'MAX_ACCOUNTS', 200), 200),
+    skewSeconds: num(pick('skewSeconds', 'TIME_SKEW_SECONDS', 120), 120),
     battlesUrl: pick('battlesUrl', 'BATTLES_URL', BATTLES_URL),
     importIntervalMin: num(pick('importIntervalMin', 'IMPORT_INTERVAL_MIN', 20), 20),
     publicDir: opts.publicDir || path.join(__dirname, 'public'),
@@ -99,6 +103,8 @@ async function startServer(opts = {}) {
   const cfg = resolveConfig(opts);
   const log = cfg.log;
   const trust = cfg.trustProxy;
+  if (cfg.production && !cfg.dataDirGiven) throw new Error('Set DATA_DIR to the folder on your persistent disk (on Render: /var/data). Without it every deploy would wipe the accounts and bets.');
+  if (cfg.production && !cfg.signupCode) log('[security] SIGNUP_CODE is not set, so anyone who finds the address can make an account. Set a group code.');
 
   // --- data: restore a backup into an empty folder, then load both files
   const snapshot = GithubSnapshot.create({ ...cfg.snapshot, dir: cfg.dataDir, scryptN: cfg.snapshot.scryptN, log });
@@ -116,6 +122,7 @@ async function startServer(opts = {}) {
   persist.provide('auth', () => auth.serialize());
 
   // --- the owner's account, then seed data (which points at the owner)
+  if (cfg.production && !cfg.adminPassword && ![...auth.users.values()].some((u) => u.admin)) throw new Error('Set ADMIN_PASSWORD (in Render: Environment) before the first start, so the admin account gets a password you chose.');
   const boot = await auth.ensureAdmin({ username: cfg.adminUsername, password: cfg.adminPassword });
   if (boot.created) {
     if (boot.generated) {
@@ -184,6 +191,7 @@ async function startServer(opts = {}) {
 
   async function signup(ctx) {
     if (!auth.limits.signupIp.take(ctx.ipk)) throw tooMany(auth.limits.signupIp, ctx.ipk, 'Too many accounts made from this connection. Try again later.');
+    if (!auth.limits.signupAll.take('all')) throw tooMany(auth.limits.signupAll, 'all', 'A lot of accounts were made in the last hour. Ask the admin for a personal link, or try again later.');
     const b = await body(ctx);
     if (cfg.signupCode && !(typeof b.code === 'string' && H.safeEqual(b.code.trim(), cfg.signupCode))) throw new HttpError(403, 'That group code is not right.');
     const username = auth.normUsername(b.username);
@@ -194,26 +202,36 @@ async function startServer(opts = {}) {
     if (problem) throw new HttpError(400, problem);
     if (auth.byName.has(username)) throw new HttpError(409, 'That username is taken.');
     if (auth.users.size >= cfg.maxAccounts) throw new HttpError(507, 'This site has reached its limit on accounts. Ask the admin.');
-    const pass = await auth.hasher.hash(b.password);
+    const pass = await oneOfFew(ctx, () => auth.hasher.hash(b.password));
     const user = auth.createUser({ username, display, pass, via: 'signup' }); // checks the name again: someone may have taken it while we hashed
     startSession(ctx, user.uid);
     json(ctx, { ok: true, me: meOf(user) });
   }
 
+  // At most three password hashes in flight per connection, so one machine can't fill the shared queue
+  const hashing = new Map();
+  async function oneOfFew(ctx, fn) {
+    const n = hashing.get(ctx.ipk) || 0;
+    if (n >= 3) throw new HttpError(429, 'Slow down: let one sign-in finish before starting another.', { 'Retry-After': '5' });
+    hashing.set(ctx.ipk, n + 1);
+    try { return await fn(); } finally { const m = (hashing.get(ctx.ipk) || 1) - 1; if (m) hashing.set(ctx.ipk, m); else hashing.delete(ctx.ipk); }
+  }
+
   async function login(ctx) {
     const b = await body(ctx);
     const name = typeof b.username === 'string' ? b.username.trim().toLowerCase().slice(0, 64) : '';
-    const L = auth.limits;
-    if (L.loginIp.blocked(ctx.ipk) || L.loginUser.blocked(name)) {
-      throw tooMany(L.loginIp.blocked(ctx.ipk) ? L.loginIp : L.loginUser, L.loginIp.blocked(ctx.ipk) ? ctx.ipk : name);
-    }
-    const r = await auth.authenticate(name, b.password);
+    const L = auth.limits, pair = `${name}|${ctx.ipk}`;
+    if (L.loginIp.blocked(ctx.ipk)) throw tooMany(L.loginIp, ctx.ipk);
+    if (L.loginUser.blocked(pair)) throw tooMany(L.loginUser, pair);
+    if (L.loginUserAll.blocked(name)) throw tooMany(L.loginUserAll, name);
+    if (!L.loginAttempt.take(ctx.ipk)) throw tooMany(L.loginAttempt, ctx.ipk, 'Too many sign-in attempts from this connection. Wait a few minutes and try again.');
+    const r = await oneOfFew(ctx, () => auth.authenticate(name, b.password));
     if (r.status === 'bad') {
-      L.loginIp.add(ctx.ipk); L.loginUser.add(name);
+      L.loginIp.add(ctx.ipk); L.loginUser.add(pair); L.loginUserAll.add(name);
       throw new HttpError(401, 'Wrong username or password');
     }
     if (r.status === 'disabled') throw new HttpError(403, 'This account is switched off. Ask the admin.');
-    L.loginUser.reset(name);
+    L.loginUser.reset(pair);
     r.user.lastSeenAt = new Date().toISOString();
     startSession(ctx, r.user.uid);
     json(ctx, { ok: true, me: meOf(r.user) });
@@ -240,11 +258,11 @@ async function startServer(opts = {}) {
     }
     if (user.pass) {
       if (typeof b.current !== 'string' || !b.current) throw new HttpError(400, 'Enter your current password.');
-      if (!(await auth.hasher.verify(b.current.slice(0, 1000), user.pass))) { lim.add(user.uid); throw new HttpError(403, 'Your current password is wrong.'); }
+      if (!(await oneOfFew(ctx, () => auth.hasher.verify(b.current.slice(0, 1000), user.pass)))) { lim.add(user.uid); throw new HttpError(403, 'Your current password is wrong.'); }
     }
     const problem = auth.passwordProblem(b.next, newName || user.username);
     if (problem) throw new HttpError(400, problem);
-    const pass = await auth.hasher.hash(b.next);
+    const pass = await oneOfFew(ctx, () => auth.hasher.hash(b.next));
     if (newName && newName !== user.username) auth.setUsername(user, newName); // 409 here if it was taken meanwhile, before anything changed
     user.pass = pass;
     auth.revokeUser(user.uid, ctx.key); // everywhere else is signed out; this browser stays in
@@ -300,7 +318,8 @@ async function startServer(opts = {}) {
   }
 
   async function resetPassword(ctx, uid) {
-    needAdmin(ctx);
+    const me = needAdmin(ctx);
+    if (uid === me.uid) throw new HttpError(400, 'Use Change password for your own account.');
     const target = auth.users.get(uid);
     if (!target) throw new HttpError(404, 'No such account.');
     const temp = auth.tempPassword();
@@ -375,7 +394,8 @@ async function startServer(opts = {}) {
     if (!segs || !rules.isDoc(segs)) throw new HttpError(400, 'That is not a valid document path.');
     if (b.op !== 'set' && b.op !== 'update' && b.op !== 'delete') throw new HttpError(400, 'Unknown operation.');
     if (!rules.canWrite(user, segs)) throw new HttpError(403, 'You can\'t change that.');
-    json(ctx, store.write(b.op, segs.join('/'), b.data, { ifVersion: b.ifVersion, quota: !user.admin }));
+    const guard = (op, gsegs, cur, next) => integrity.check({ op, segs: gsegs, cur, next, now: Date.now(), skewMs: cfg.skewSeconds * 1000, getDoc: (p) => store.get(p), isAdmin: user.admin });
+    json(ctx, store.write(b.op, segs.join('/'), b.data, { ifVersion: b.ifVersion, quota: !user.admin, guard }));
   }
 
   function changes(ctx) {
@@ -480,7 +500,7 @@ async function startServer(opts = {}) {
   function site(ctx) {
     const { pathname } = ctx;
     if (ctx.m !== 'GET') throw new HttpError(404, 'Not found.');
-    if (pathname === '/healthz') return H.sendText(ctx.res, 200, 'ok');
+    if (pathname === '/healthz') return persist.failing() ? H.sendText(ctx.res, 503, 'saving to disk is failing') : H.sendText(ctx.res, 200, 'ok');
     if (pathname === '/') return ctx.user ? page(ctx, 'app.html', 'no-store') : H.redirect(ctx.res, '/login');
     if (pathname === '/login') return ctx.user ? H.redirect(ctx.res, '/') : page(ctx, 'login.html', 'no-cache');
     if (pathname.startsWith('/join/')) return joinLanding(ctx);
@@ -528,10 +548,22 @@ async function startServer(opts = {}) {
     H.securityHeaders(res, H.isHttps(req, trust));
     handle(req, res, H.isHttps(req, trust)).catch((e) => fail(res, e));
   });
-  server.headersTimeout = 15000;
+  server.headersTimeout = 70000;
   server.requestTimeout = 30000;
-  server.keepAliveTimeout = 5000;
+  server.keepAliveTimeout = 65000; // longer than a proxy's idle timeout, or it sometimes sends on a socket we just closed
   server.maxConnections = 200;
+  // A connection that hasn't sent a whole request within 10 seconds is dropped, and when people connect to us
+  // directly one address can't hold more than 40 of them open (behind a proxy every connection is the proxy's).
+  const open = new Map();
+  server.on('connection', (socket) => {
+    const addr = socket.remoteAddress || '?';
+    const n = (open.get(addr) || 0) + 1;
+    if (!trust && n > 40) { socket.destroy(); return; }
+    open.set(addr, n);
+    socket.once('close', () => { const m = (open.get(addr) || 1) - 1; if (m) open.set(addr, m); else open.delete(addr); });
+    socket.setTimeout(10000, () => socket.destroy());
+  });
+  server.on('request', (req) => req.socket.setTimeout(0));
   // protocol-level failures (junk, oversized headers) still get the security headers
   server.on('clientError', (err, socket) => {
     if (!socket.writable) { socket.destroy(); return; }
@@ -580,7 +612,7 @@ if (require.main === module) {
       console.log(`[server] ${why}: saving and shutting down.`);
       const force = setTimeout(() => process.exit(1), 15000);
       force.unref();
-      app.close().then(() => process.exit(0), (e) => { console.error(`[server] shutdown problem: ${e.message}`); process.exit(1); });
+      app.close().then((saved) => process.exit(saved === false ? 1 : 0), (e) => { console.error(`[server] shutdown problem: ${e.message}`); process.exit(1); });
     };
     process.on('SIGTERM', () => stop('SIGTERM'));
     process.on('SIGINT', () => stop('SIGINT'));

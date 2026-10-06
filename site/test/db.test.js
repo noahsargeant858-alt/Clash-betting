@@ -42,7 +42,7 @@ test('every row of the access table, for the owner, other users, and the admin',
     // the first writer in the list creates it, so that reads have something to find
     let created = false;
     for (const [who, c] of Object.entries(people)) {
-      const r = await c.set(path, { by: who, secret: 'hello' });
+      const r = await c.set(path, { by: who, secret: 'hello', list: [] });
       if (canWrite.includes(who)) {
         assert.strictEqual(r.status, 200, `${who} should be able to write ${path}: ${r.text}`);
         created = true;
@@ -65,7 +65,9 @@ test('every row of the access table, for the owner, other users, and the admin',
     // deleting follows the write rule
     for (const [who, c] of Object.entries(people)) {
       const r = await c.write('delete', path);
-      assert.strictEqual(r.status, canWrite.includes(who) ? 200 : 403, `${who} deleting ${path}`);
+      // a bet list can't be torn up by its owner (that would be a way to dodge a loss); only the admin may
+      const expected = !canWrite.includes(who) ? 403 : path.startsWith('bets/') && who !== 'd' ? 409 : 200;
+      assert.strictEqual(r.status, expected, `${who} deleting ${path}`);
     }
   }
 });
@@ -369,10 +371,12 @@ test('a user cannot write by pretending to be someone else in the body', async (
 test('a signed-up friend can place bets and log things in their own folders end to end', async (t) => {
   const w = await world(t);
   const friend = await signup(w.app, 'friend');
-  assert.strictEqual((await friend.client.set(`bets/${friend.uid}`, { list: [{ id: 'b1', stake: 10 }] })).status, 200);
+  const bet = { id: 'b1', fx: 'f1', stake: 10, placedAt: new Date().toISOString() };
+  assert.strictEqual((await friend.client.set(`bets/${friend.uid}`, { list: [bet] })).status, 200);
   assert.strictEqual((await friend.client.set(`claims/${friend.uid}`, { playerId: 'p1', at: 'now' })).status, 200);
   assert.strictEqual((await friend.client.set('players/p9', { name: 'Hacker' })).status, 403);
   assert.strictEqual((await w.alice.client.doc(`bets/${friend.uid}`)).json.data.list[0].stake, 10, 'others can read it');
   assert.strictEqual((await w.alice.client.set(`bets/${friend.uid}`, { list: [] })).status, 403, 'but not change it');
+  assert.strictEqual((await friend.client.set(`bets/${friend.uid}`, { list: [] })).status, 409, 'and even they cannot take a placed bet back');
   assert.strictEqual((await w.admin.set(`bets/${friend.uid}`, { list: [], voided: true })).status, 200, 'the admin can');
 });

@@ -24,7 +24,8 @@ test('everything survives a restart: accounts, sessions, documents, versions, se
   await admin.set('players/p1', { name: 'Ann' });
   await admin.set('players/p1', { name: 'Anne' });
   await admin.write('update', 'players/p1', { coins: 7 });
-  await friend.client.set(`bets/${friend.uid}`, { list: [1, 2, 3] });
+  const betDoc = { list: [{ id: 'b1', fx: 'f1', stake: 5, placedAt: new Date().toISOString() }] };
+  await friend.client.set(`bets/${friend.uid}`, betDoc);
   await admin.set('matches/gone', { x: 1 });
   await admin.write('delete', 'matches/gone');
   const inv = (await admin.post('/api/admin/invites', { playerId: 'p1' })).json;
@@ -52,7 +53,7 @@ test('everything survives a restart: accounts, sessions, documents, versions, se
   // documents, versions and seq
   const doc = (await again.doc('players/p1')).json;
   assert.deepStrictEqual([doc.data, doc.version, doc.seq], [{ name: 'Anne', coins: 7 }, 3, seq]);
-  assert.deepStrictEqual((await again.doc(`bets/${friend.uid}`)).json.data, { list: [1, 2, 3] });
+  assert.deepStrictEqual((await again.doc(`bets/${friend.uid}`)).json.data, betDoc);
   assert.strictEqual((await again.doc('matches/gone')).json.exists, false);
   // new writes carry on from where it left off
   const w = await client(b, admin.cookie).set('players/p1', { name: 'Again' });
@@ -269,7 +270,7 @@ function mockGithub({ token = 'ghp_secrettoken' } = {}) {
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ st, url: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((r) => { server.close(r); server.closeAllConnections(); }) })));
 }
 
-const snapOpts = (gh, extra = {}) => ({ repo: 'o/r', branch: 'site-backup', token: gh.st.token, key: 'a-long-backup-key-123', apiBase: gh.url, intervalMs: 0, scryptN: 1024, ...extra });
+const snapOpts = (gh, extra = {}) => ({ repo: 'o/r', branch: 'site-backup', token: gh.st.token, key: 'a-long-backup-key-1234567890', apiBase: gh.url, intervalMs: 0, scryptN: 1024, ...extra });
 
 test('GitHub snapshot: pushed encrypted on shutdown, restored into an empty folder', async (t) => {
   const gh = await mockGithub();
@@ -294,7 +295,7 @@ test('GitHub snapshot: pushed encrypted on shutdown, restored into an empty fold
   }
   assert.ok(gh.st.requests.every((r) => r.authorization === `Bearer ${gh.st.token}`));
   const logs = a.logs.join('\n');
-  assert.ok(!logs.includes(gh.st.token) && !logs.includes('a-long-backup-key-123'), 'neither the token nor the key is ever logged');
+  assert.ok(!logs.includes(gh.st.token) && !logs.includes('a-long-backup-key-1234567890'), 'neither the token nor the key is ever logged');
 
   // a brand new host with an empty disk
   const b = await boot({ snapshot: snapOpts(gh) });
@@ -426,11 +427,12 @@ test('GitHub snapshot: needs all three settings, a sane repo name and a long key
   assert.strictEqual(logs.length, 0, 'not configured at all: silent');
   assert.strictEqual(GithubSnapshot.create({ repo: 'o/r', log }), null);
   assert.strictEqual(GithubSnapshot.create({ repo: 'o/r', token: 't', key: 'short', log }), null);
-  assert.strictEqual(GithubSnapshot.create({ repo: 'not a repo', token: 't', key: 'a'.repeat(20), log }), null);
-  assert.strictEqual(GithubSnapshot.create({ repo: '../x/y', token: 't', key: 'a'.repeat(20), log }), null);
-  assert.strictEqual(GithubSnapshot.create({ repo: 'o/r', branch: 'bad branch;', token: 't', key: 'a'.repeat(20), log }), null);
-  assert.strictEqual(logs.length, 5);
-  assert.ok(GithubSnapshot.create({ repo: 'o/r', token: 't', key: 'a'.repeat(20), log }));
+  assert.strictEqual(GithubSnapshot.create({ repo: 'o/r', token: 't', key: 'a'.repeat(23), log }), null, 'a 23-character key is still too short');
+  assert.strictEqual(GithubSnapshot.create({ repo: 'not a repo', token: 't', key: 'a'.repeat(24), log }), null);
+  assert.strictEqual(GithubSnapshot.create({ repo: '../x/y', token: 't', key: 'a'.repeat(24), log }), null);
+  assert.strictEqual(GithubSnapshot.create({ repo: 'o/r', branch: 'bad branch;', token: 't', key: 'a'.repeat(24), log }), null);
+  assert.strictEqual(logs.length, 6);
+  assert.ok(GithubSnapshot.create({ repo: 'o/r', token: 't', key: 'a'.repeat(24), log }));
   assert.ok(logs.every((l) => !l.includes('aaaaaaaa')), 'the key is never echoed');
   // through the real server too: a half-configured backup is reported and ignored
   const app = await boot({ snapshot: { repo: 'o/r', token: 'x' } });

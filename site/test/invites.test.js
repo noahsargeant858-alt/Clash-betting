@@ -374,7 +374,7 @@ test('end to end: admin makes a link, a friend taps it, lands in the app signed 
   const friend = client(w.app, cookie);
   const me = (await friend.get('/api/auth/me')).json;
   assert.strictEqual(me.playerId, 'p2');
-  assert.strictEqual((await friend.set(`bets/${me.uid}`, { list: [{ stake: 25 }] })).status, 200);
+  assert.strictEqual((await friend.set(`bets/${me.uid}`, { list: [{ id: 'b1', fx: 'f1', stake: 25, placedAt: new Date().toISOString() }] })).status, 200);
   // the same link, opened again in the same browser, goes straight to the app
   const again = await request(w.app.port, { path: url.pathname, headers: { Cookie: cookie } });
   assert.strictEqual(again.status, 302);

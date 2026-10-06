@@ -27,7 +27,10 @@ class Persist {
     this.providers = {};
     this.dirty = new Set();
     this.timer = null;
+    this.failedSince = 0;
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    // half-written copies left by a crash
+    for (const f of fs.readdirSync(dir)) if (/\.json\.\d+\.tmp$/.test(f)) { try { fs.unlinkSync(path.join(dir, f)); } catch { /* leave it */ } }
   }
 
   file(name) { return path.join(this.dir, FILES[name]); }
@@ -59,7 +62,9 @@ class Persist {
         writeAtomic(this.file(name), this.providers[name]());
         this.dirty.delete(name);
         wrote = true;
+        this.failedSince = 0;
       } catch (e) {
+        if (!this.failedSince) this.failedSince = Date.now();
         this.log(`[persist] could not write ${FILES[name]}: ${e.message}`);
         if (!this.closed && !this.timer) { this.timer = setTimeout(() => { this.timer = null; this.flush(); }, 5000); this.timer.unref(); }
       }
@@ -67,6 +72,9 @@ class Persist {
     if (wrote && this.snapshot) this.snapshot.notify();
     return !this.dirty.size;
   }
+
+  // true when saving has been failing for a while, so the host's health check can say so
+  failing() { return this.failedSince > 0 && Date.now() - this.failedSince > 10000; }
 
   async close() {
     this.closed = true;
@@ -116,7 +124,7 @@ class GithubSnapshot {
     if (given < 3) { log('[snapshot] backup is off: it needs SNAPSHOT_REPO, SNAPSHOT_TOKEN and SNAPSHOT_KEY together.'); return null; }
     if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(o.repo)) { log('[snapshot] backup is off: SNAPSHOT_REPO must look like owner/name.'); return null; }
     if (o.branch && !/^[A-Za-z0-9._/-]{1,100}$/.test(o.branch)) { log('[snapshot] backup is off: SNAPSHOT_BRANCH has odd characters.'); return null; }
-    if (String(o.key).length < 16) { log('[snapshot] backup is off: SNAPSHOT_KEY must be at least 16 characters.'); return null; }
+    if (String(o.key).length < 24) { log('[snapshot] backup is off: SNAPSHOT_KEY must be at least 24 characters.'); return null; }
     return new GithubSnapshot(o);
   }
 
@@ -157,9 +165,11 @@ class GithubSnapshot {
     if (!env || env.v !== 1 || env.alg !== 'aes-256-gcm') throw new Error('unknown snapshot format');
     const n = Number(env.n);
     if (!Number.isInteger(n) || n < 1024 || n > 131072 || (n & (n - 1)) !== 0) throw new Error('bad snapshot parameters');
-    const decipher = crypto.createDecipheriv('aes-256-gcm', await scryptAsync(this.key, Buffer.from(env.salt, 'base64'), n), Buffer.from(env.iv, 'base64'));
+    const tag = Buffer.from(String(env.tag), 'base64');
+    if (tag.length !== 16) throw new Error('bad snapshot tag');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', await scryptAsync(this.key, Buffer.from(env.salt, 'base64'), n), Buffer.from(env.iv, 'base64'), { authTagLength: 16 });
     decipher.setAAD(AAD);
-    decipher.setAuthTag(Buffer.from(env.tag, 'base64'));
+    decipher.setAuthTag(tag);
     const plain = Buffer.concat([decipher.update(Buffer.from(env.data, 'base64')), decipher.final()]).toString('utf8');
     const out = JSON.parse(plain);
     if (!out || out.v !== 1 || !out.files || typeof out.files !== 'object') throw new Error('bad snapshot contents');

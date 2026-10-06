@@ -130,9 +130,15 @@ class Auth {
     this.onChange = null;
     const L = opts.limits || {};
     this.limits = {
+      // wrong passwords: 10 per person-and-connection pair, 30 per connection, 300 per username overall (so one
+      // stranger can't lock a friend out from everywhere); and every attempt, right or wrong, counts toward
+      // loginAttempt, so a flood of correct logins can't hog the password hasher either
       loginUser: new RateLimiter(L.loginPerUser || 10, 15 * 60e3),
       loginIp: new RateLimiter(L.loginPerIp || 30, 15 * 60e3),
-      signupIp: new RateLimiter(L.signupPerHour || 10, 60 * 60e3),
+      loginUserAll: new RateLimiter(L.loginPerUserAll || 300, 15 * 60e3),
+      loginAttempt: new RateLimiter(L.loginAttemptsPerIp || 60, 5 * 60e3),
+      signupIp: new RateLimiter(L.signupPerHour || 30, 60 * 60e3),
+      signupAll: new RateLimiter(L.signupAllPerHour || 60, 60 * 60e3),
       redeemIp: new RateLimiter(L.redeemPer15Min || 20, 15 * 60e3),
       password: new RateLimiter(L.passwordPerUser || 10, 15 * 60e3),
       write: new RateLimiter(L.writesPerMin || 120, 60e3),

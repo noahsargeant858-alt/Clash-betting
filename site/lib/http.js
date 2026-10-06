@@ -123,16 +123,35 @@ function cookieString(name, value, { maxAge, secure }) {
 
 const stripV4 = (ip) => ip.replace(/^::ffff:/i, '');
 
-// trust = how many proxies sit in front of us (0 = none). Then the client is the Nth address from the right.
+// Addresses that belong to proxies we can trust to tell the truth about who connected to them: this machine and
+// private networks (the host's own load balancer) and Cloudflare, which many hosts put in front of their customers.
+const PROXIES = new net.BlockList();
+for (const [a, bits] of [['127.0.0.0', 8], ['10.0.0.0', 8], ['172.16.0.0', 12], ['192.168.0.0', 16], ['169.254.0.0', 16], ['100.64.0.0', 10],
+  ['173.245.48.0', 20], ['103.21.244.0', 22], ['103.22.200.0', 22], ['103.31.4.0', 22], ['141.101.64.0', 18], ['108.162.192.0', 18], ['190.93.240.0', 20],
+  ['188.114.96.0', 20], ['197.234.240.0', 22], ['198.41.128.0', 17], ['162.158.0.0', 15], ['104.16.0.0', 13], ['104.24.0.0', 14], ['172.64.0.0', 13], ['131.0.72.0', 22]]) PROXIES.addSubnet(a, bits, 'ipv4');
+for (const [a, bits] of [['::1', 128], ['fc00::', 7], ['fe80::', 10], ['2400:cb00::', 32], ['2606:4700::', 32], ['2803:f800::', 32], ['2405:b500::', 32], ['2405:8100::', 32], ['2a06:98c0::', 29], ['2c0f:f248::', 32]]) PROXIES.addSubnet(a, bits, 'ipv6');
+const isProxy = (ip) => net.isIP(ip) !== 0 && PROXIES.check(ip, net.isIPv6(ip) ? 'ipv6' : 'ipv4');
+
+// trust = 'auto': believe X-Forwarded-For only when the connection comes from one of those proxies, then take the
+// rightmost address that is not itself a proxy (what the first outside proxy saw), so extra addresses a client
+// adds to the header never count. trust = a number: the Nth address from the right. 0: the connecting address.
 function clientIp(req, trust) {
-  let ip = stripV4(req.socket.remoteAddress || '0.0.0.0');
+  const peer = stripV4(req.socket.remoteAddress || '0.0.0.0');
+  const xff = String(req.headers['x-forwarded-for'] || '').split(',').map((s) => stripV4(s.trim())).filter(Boolean);
+  if (trust === 'auto') {
+    if (!isProxy(peer)) return peer;
+    for (let i = xff.length - 1; i >= 0; i--) {
+      if (!net.isIP(xff[i])) return peer;
+      if (!isProxy(xff[i])) return xff[i];
+    }
+    return peer;
+  }
   const hops = Math.floor(Number(trust));
   if (hops > 0) {
-    const xff = String(req.headers['x-forwarded-for'] || '').split(',').map((s) => s.trim()).filter(Boolean);
-    const pick = xff.length >= hops ? stripV4(xff[xff.length - hops]) : null;
-    if (pick && net.isIP(pick)) ip = pick;
+    const pick = xff.length >= hops ? xff[xff.length - hops] : null;
+    if (pick && net.isIP(pick)) return pick;
   }
-  return ip;
+  return peer;
 }
 
 // Rate limits count an IPv6 /64 as one client (a home connection has billions of addresses)
@@ -149,7 +168,7 @@ function ipKey(ip) {
 
 function isHttps(req, trust) {
   if (req.socket.encrypted) return true;
-  return Math.floor(Number(trust)) > 0 && String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase() === 'https';
+  return (trust === 'auto' || Math.floor(Number(trust)) > 0) && String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase() === 'https';
 }
 
 // Safe to put into a URL we hand out: a plain host[:port], else a placeholder

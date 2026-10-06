@@ -254,15 +254,15 @@ test('without a trusted proxy, X-Forwarded-For cannot dodge the limit', withApp(
   assert.strictEqual((await from('10.0.0.99')).status, 429);
 }));
 
-test('signup rate limit: 10 per hour per address by default', async (t) => {
+test('signup rate limit: 30 per hour per address by default (a whole friend group can share one wifi address)', async (t) => {
   const app = await boot({ limits: {} });
   t.after(() => app.close());
   const anon = client(app);
-  for (let i = 0; i < 10; i++) assert.strictEqual((await anon.post('/api/auth/signup', { username: `user${i}`, password: 'correct horse 1' })).status, 200, `signup ${i}`);
-  const r = await anon.post('/api/auth/signup', { username: 'user10', password: 'correct horse 1' });
+  for (let i = 0; i < 30; i++) assert.strictEqual((await anon.post('/api/auth/signup', { username: `user${i}`, password: 'correct horse 1' })).status, 200, `signup ${i}`);
+  const r = await anon.post('/api/auth/signup', { username: 'user30', password: 'correct horse 1' });
   assert.strictEqual(r.status, 429);
   assert.ok(Number(r.headers['retry-after']) > 0);
-  assert.strictEqual(app.auth.byName.has('user10'), false);
+  assert.strictEqual(app.auth.byName.has('user30'), false);
 });
 
 test('signup rate limit also stops group-code guessing', withApp({ signupCode: 'right-code', limits: { signupPerHour: 4 } }, async (app) => {

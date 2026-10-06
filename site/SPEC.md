@@ -35,7 +35,7 @@ site/
 | `ADMIN_PASSWORD` | none | if set, the admin account always has this password (change the variable to reset it). If unset and no admin exists yet, a random one is generated and printed once to stdout |
 | `SIGNUP_CODE` | none | if set, creating an account needs this group code |
 | `PUBLIC_URL` | derived from request Host | used to build invite links |
-| `TRUST_PROXY` | `1` when `NODE_ENV=production` | read `X-Forwarded-For` / `X-Forwarded-Proto` |
+| `TRUST_PROXY` | `auto` when `NODE_ENV=production`, else `0` | `auto`: believe `X-Forwarded-For` / `-Proto` only when the connection comes from a private or Cloudflare address, taking the rightmost non-proxy entry. A number N: the Nth address from the right. `0`: ignore the headers |
 | `COOKIE_SECURE` | auto (https) | force the Secure flag |
 | `SESSION_DAYS` | 90 | session lifetime |
 | `BATTLES_URL` | `https://raw.githubusercontent.com/noahsargeant858-alt/Clash-betting/battle-data/battles.json` | official battles feed |
@@ -194,3 +194,14 @@ inside seed doc data is replaced by the admin's uid, so `links/triqqi.uid` and `
 * Constant-time comparisons for secrets; generic login errors; rate limits on login/signup/invite redeem (20/15 min/IP).
 * A user can never read another user's `data/users/...`, write another user's `claims|bets|acts` doc, or write `players|links|matches|config` unless admin.
 * Request timeouts: headers 15 s, body 15 s; long-poll max 25 s; a global cap of 200 concurrent connections.
+
+## Server-side integrity rules (`site/lib/integrity.js`)
+
+The platform rules only say who may write a document. The page computes everyone's coins from fixtures, locks, confirmations and
+bet lists that browsers write, so the server also checks that what is written is genuine. A refused write is HTTP 409 (the shim maps
+it to `aborted`, which the page shows as a toast; `invalid_argument` is avoided because the page treats it as "view only").
+
+- Times in fixtures, locks, seals, confirmations and newly logged results must be within `SKEW_SECONDS` (default 120) of the server's clock, as canonical ISO strings.
+- Fixtures, locks and seals are immutable once written; fixtures, locks, seals and confirmations can't be deleted (except by the admin).
+- A lock can only freeze bets that exist, identically, in their owners' bet lists, all on the lock's own fixture (at most 400).
+- A bet list is append-only: no editing, removing or duplicating ids, each new bet dated now, no deleting the list. The admin may void or fix a list.

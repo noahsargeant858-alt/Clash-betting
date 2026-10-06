@@ -5,7 +5,8 @@
   "description": "A sportsbook for Clash Royale triple draft friendlies between mates. Play money only.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node site/server.js",
+    "legacy": "node server.js",
     "dev": "node --watch server.js",
     "seed": "node scripts/seed-demo.js",
     "site": "node site/server.js",

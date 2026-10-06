@@ -10,9 +10,30 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { SEGMENT } = require('./rules');
 
-const MAX_FEED = 25 * 1024 * 1024;
+const MAX_FEED = 5 * 1024 * 1024;
 const DAY = 86400e3;
 const safeId = (id) => SEGMENT.test(id) && id !== '.' && id !== '..';
+
+// Players' own hand logs can end up merged into official results, so only well-formed fields are passed on
+const canon = (t) => typeof t === 'string' && t.length === 24 && Number.isFinite(Date.parse(t)) && new Date(Date.parse(t)).toISOString() === t;
+const txt = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ').slice(0, max) : null);
+const tri = (v) => (typeof v === 'boolean' ? v : null);
+const int03 = (v) => (Number.isInteger(v) && v >= 0 && v <= 3 ? v : null);
+const num = (v) => (Number.isFinite(v) && v >= 0 && v <= 100000 ? v : null);
+const towers = (t) => (t && typeof t === 'object' && ['left', 'king', 'right'].every((k) => Number.isFinite(t[k]) && t[k] >= 0 && t[k] <= 100000) ? { left: t.left, king: t.king, right: t.right } : null);
+const cards = (c) => (Array.isArray(c) ? c.filter((x) => typeof x === 'string').slice(0, 8).map((x) => txt(x, 40)) : []);
+function cleanHandLog(x) {
+  if (!x || typeof x !== 'object' || x.type !== 'match') return null;
+  const pa = txt(x.playerA, 64), pb = txt(x.playerB, 64);
+  if (!pa || !pb || !safeId(pa) || !safeId(pb) || !canon(x.date) || !canon(x.loggedAt) || int03(x.crownsA) === null || int03(x.crownsB) === null || !['A', 'B', 'draw'].includes(x.winner)) return null;
+  const fx = typeof x.fx === 'string' && x.fx.length <= 200 && /^[A-Za-z0-9_.~:@+-]+$/.test(x.fx) ? x.fx : null;
+  return {
+    type: 'match', playerA: pa, playerB: pb, crownsA: x.crownsA, crownsB: x.crownsB, winner: x.winner, date: x.date, loggedAt: x.loggedAt,
+    overtime: tri(x.overtime), dmgA: tri(x.dmgA), dmgB: tri(x.dmgB), kingA: tri(x.kingA), kingB: tri(x.kingB),
+    firstCrown: ['A', 'B', 'none'].includes(x.firstCrown) ? x.firstCrown : null, towersA: towers(x.towersA), towersB: towers(x.towersB),
+    dealtA: num(x.dealtA), dealtB: num(x.dealtB), cardsA: cards(x.cardsA), cardsB: cards(x.cardsB), notes: txt(x.notes, 400) || '', fx,
+  };
+}
 
 function createImporter({ store, repoRoot, battlesUrl, intervalMin, log = () => {}, fetchImpl }) {
   let etag = null, running = null, timer = null, bootTimer = null;
@@ -51,7 +72,8 @@ function createImporter({ store, repoRoot, battlesUrl, intervalMin, log = () => 
       const m = /^acts\/([^/]+)\/items$/.exec(coll);
       if (!m || !safeId(m[1])) continue;
       for (const d of store.list(coll)) {
-        if (safeId(d.id) && d.data.type === 'match' && typeof d.data.date === 'string' && d.data.date >= since) put(dir, `db/acts/${m[1]}/items/${d.id}.json`, d.data);
+        const clean = safeId(d.id) && d.data.type === 'match' && typeof d.data.date === 'string' && d.data.date >= since ? cleanHandLog(d.data) : null;
+        if (clean) put(dir, `db/acts/${m[1]}/items/${d.id}.json`, clean);
       }
     }
     const state = store.get('config/importState');
@@ -62,7 +84,7 @@ function createImporter({ store, repoRoot, battlesUrl, intervalMin, log = () => 
   function runScript(dir) {
     return new Promise((resolve, reject) => {
       // a bare environment: the script needs nothing, and must never see the site's secrets
-      execFile(process.execPath, [path.join(repoRoot, 'scripts', 'daily-import.js'), dir],
+      execFile(process.execPath, ['--max-old-space-size=256', path.join(repoRoot, 'scripts', 'daily-import.js'), dir],
         { timeout: 60000, maxBuffer: 4 * 1024 * 1024, cwd: dir, env: { NODE_ENV: 'production' } }, (err, stdout, stderr) => {
           if (err) return reject(new Error(`daily-import.js failed: ${String(stderr || err.message).trim().split('\n')[0].slice(0, 300)}`));
           resolve(String(stdout));
@@ -104,9 +126,7 @@ function createImporter({ store, repoRoot, battlesUrl, intervalMin, log = () => 
     if (res.status === 304) return { summary: 'The battles feed has not changed; nothing to do.', newResults: 0, checks: 0, skipped: 0, applied: 0, unchanged: true };
     if (!res.ok) throw new Error(`The battles feed answered HTTP ${res.status}.`);
     const text = await readLimited(res);
-    let feed;
-    try { feed = JSON.parse(text); } catch { throw new Error('The battles feed was not valid JSON.'); }
-    if (!feed || typeof feed !== 'object' || Array.isArray(feed)) throw new Error('The battles feed was not in the expected shape.');
+    if (text.trimStart()[0] !== '{') throw new Error('The battles feed was not in the expected shape.'); // the script below does the real parsing, in its own process
     const newTag = res.headers.get('etag');
 
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clashbets-import-'));
@@ -116,7 +136,7 @@ function createImporter({ store, repoRoot, battlesUrl, intervalMin, log = () => 
       put(dir, 'window.json', { since, now: nowIso });
       stageDocs(dir, since);
       const out = await runScript(dir);
-      const lines = out.split('\n').map((l) => l.trim()).filter(Boolean);
+      const lines = out.split('\n').map((l) => l.replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ').trim().slice(0, 300)).filter(Boolean);
       const { applied, skipped } = applyBatches(dir, lines);
       if (!skipped && newTag) etag = newTag; // a skipped write is retried next time rather than waved through as "unchanged"
       const newResults = lines.filter((l) => l.startsWith('New:')).length;
@@ -154,4 +174,4 @@ function createImporter({ store, repoRoot, battlesUrl, intervalMin, log = () => 
   return { runImport, start, stop };
 }
 
-module.exports = { createImporter };
+module.exports = { createImporter, cleanHandLog };

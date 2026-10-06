@@ -12,9 +12,10 @@ const MAX_DOC_BYTES = 256 * 1024;
 const MAX_DEPTH = 32;
 const MAX_DOCS = 25000;
 const MAX_LOG = 5000;
-const MAX_TOTAL_BYTES = 128 * 1024 * 1024;
-const OWNER_DOCS = 1000;            // what one ordinary account may keep in its own folders
-const OWNER_BYTES = 2 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 32 * 1024 * 1024;
+const OWNER_DOCS = 400;             // what one ordinary account may keep in its own folders
+const OWNER_BYTES = 512 * 1024;
+const PUBLIC_SHARE = 0.75;          // ordinary accounts stop at this share of the whole store, so the admin can always write
 
 class StoreError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -166,6 +167,7 @@ class Store {
 
     if (op === 'delete') {
       if (!cur) return { version: 0, seq: this.seq }; // idempotent, and not a change
+      if (opts.guard) { const why = opts.guard('delete', segs, cur.data, null); if (why) throw new StoreError(409, why); }
       this._unindex(path, segs);
       this._commit(path);
       return { version: 0, seq: this.seq };
@@ -175,11 +177,13 @@ class Store {
     if (problem === 'key') throw new StoreError(400, 'That document contains a forbidden field name.');
     if (problem === 'deep') throw new StoreError(507, 'That document is nested too deeply.');
     const next = op === 'set' ? data : merge(cur.data, data);
+    if (opts.guard) { const why = opts.guard(op, segs, cur ? cur.data : null, next); if (why) throw new StoreError(409, why); }
     const size = bytesOf(next);
     if (size > this.maxDocBytes) throw new StoreError(507, 'That document is too big.');
     if (!cur && this.docs.size >= this.maxDocs) throw new StoreError(507, 'The site is full. Ask the admin.');
     if (this.totalBytes + size - (cur ? cur.size : 0) > this.maxTotalBytes) throw new StoreError(507, 'The site is out of space. Ask the admin.');
     if (opts.quota) {
+      if (this.totalBytes + size - (cur ? cur.size : 0) > this.maxTotalBytes * PUBLIC_SHARE) throw new StoreError(507, 'The site is nearly out of space. Ask the admin.');
       const owner = ownerOf(segs);
       const o = (owner && this.owners.get(owner)) || { docs: 0, bytes: 0 };
       if (owner && (o.docs + (cur ? 0 : 1) > this.ownerDocs || o.bytes + size - (cur ? cur.size : 0) > this.ownerBytes)) {

@@ -166,7 +166,7 @@ test('CSRF: state-changing requests need JSON, the X-CB header, and (if present)
     // [who, method, path, body]
     [alice, 'POST', '/api/auth/logout', {}],
     [alice, 'POST', '/api/auth/password', { current: 'correct horse 1', next: 'hijacked password' }],
-    [alice, 'POST', '/api/db/write', { op: 'set', path: `bets/${alice.uid}`, data: { csrf: true } }],
+    [alice, 'POST', '/api/db/write', { op: 'set', path: `bets/${alice.uid}`, data: { csrf: true, list: [] } }],
     [alice, 'POST', '/api/profiles', { ids: [] }],
     [alice, 'POST', '/api/auth/redeem', { token: inv.token }],
     [null, 'POST', '/api/auth/signup', { username: 'csrfuser', password: 'correct horse 1' }],
@@ -213,7 +213,7 @@ test('CSRF: state-changing requests need JSON, the X-CB header, and (if present)
   assert.strictEqual((await client(app, alice.cookie).get('/api/auth/me')).status, 200, 'alice is still signed in: the forged logout did nothing');
   assert.strictEqual((await client(app).post('/api/auth/login', { username: 'alice', password: 'correct horse 1' })).status, 200, 'and her password was not changed');
   // the same requests with the right headers and our own Origin work
-  const ok = await sent(alice, 'POST', '/api/db/write', { op: 'set', path: `bets/${alice.uid}`, data: { fine: true } }, { ...good, Origin: origin });
+  const ok = await sent(alice, 'POST', '/api/db/write', { op: 'set', path: `bets/${alice.uid}`, data: { fine: true, list: [] } }, { ...good, Origin: origin });
   assert.strictEqual(ok.status, 200);
   assert.strictEqual((await sent(alice, 'POST', '/api/profiles', { ids: [] }, { 'Content-Type': 'application/json; charset=UTF-8', 'X-CB': '1', Origin: origin.toUpperCase().replace('HTTP', 'http'), 'Sec-Fetch-Site': 'same-origin' })).status, 200, 'charset, upper-case host and same-origin are fine');
   assert.strictEqual((await sent(alice, 'POST', '/api/profiles', { ids: [] }, { ...good, 'Sec-Fetch-Site': 'same-site' })).status, 200, 'without an Origin header the cookie rules (SameSite=Lax) are what protect us');
@@ -326,9 +326,9 @@ test('limits: 200 connections, header and body timeouts', async (t) => {
   const app = await boot({ bodyTimeoutMs: 300 });
   t.after(() => app.close());
   assert.strictEqual(app.server.maxConnections, 200);
-  assert.strictEqual(app.server.headersTimeout, 15000);
+  assert.strictEqual(app.server.headersTimeout, 70000, 'longer than keep-alive, so a proxy never reuses a socket we are closing');
   assert.ok(app.server.requestTimeout >= 15000 && app.server.requestTimeout <= 30000);
-  assert.ok(app.server.keepAliveTimeout <= 10000);
+  assert.ok(app.server.keepAliveTimeout > 60000 && app.server.keepAliveTimeout < app.server.headersTimeout);
   assert.strictEqual(resolveConfig({ env: {} }).bodyTimeoutMs, 15000);
   // a slow body is cut off
   const t0 = Date.now();
@@ -408,7 +408,8 @@ test('configuration defaults and environment parsing', () => {
   assert.strictEqual(d.cookieSecure, undefined);
   assert.strictEqual(d.dataDir, path.resolve('site-data'));
   assert.strictEqual(d.publicUrl, '');
-  assert.strictEqual(resolveConfig({ env: { NODE_ENV: 'production' } }).trustProxy, 1, 'on by default in production');
+  assert.strictEqual(resolveConfig({ env: { NODE_ENV: 'production' } }).trustProxy, 'auto', 'sorted out by itself in production');
+  assert.strictEqual(resolveConfig({ env: { TRUST_PROXY: 'AUTO' } }).trustProxy, 'auto');
   assert.strictEqual(resolveConfig({ env: { NODE_ENV: 'production', TRUST_PROXY: '0' } }).trustProxy, 0);
   assert.strictEqual(resolveConfig({ env: { TRUST_PROXY: 'true' } }).trustProxy, 1);
   assert.strictEqual(resolveConfig({ env: { TRUST_PROXY: '2' } }).trustProxy, 2);

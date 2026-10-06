@@ -1276,6 +1276,7 @@ async function put(coll, id, data) {
         readOnly = true; $('#readonlyBanner').hidden = false; toast('You\'re view-only, so this can\'t be saved. Ask the admin to give you access.', true);
       } else if (e && e.code === 'invalid_argument') toast('Only the admin can change that.', true);
       else if (e && e.code === 'quota_exceeded') toast('Storage is full. The admin needs to delete some old records.', true);
+      else if (e && e.code === 'aborted' && e.message) toast(e.message, true); // the site refused it and said why
       else toast('Couldn\'t save. Check your connection and try again.', true);
       throw e;
     }

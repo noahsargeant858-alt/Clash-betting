@@ -117,7 +117,7 @@ for (const x of pairs.unmatched) log.push(`Kept hand log ${x.key} "${x.label}": 
 // How far the official log is known to be complete for each player, so a series can settle
 // once its deciding game is covered (a game nobody logged by hand can't be skipped)
 const checked = read('battles.json').checked || {}, through = {};
-for (const [tag, at] of Object.entries(checked)) { const pid = playerOf[lib.normTag(tag)]; if (pid && canon(at)) through[pid] = at; }
+for (const [tag, at] of Object.entries(checked)) { const pid = playerOf[lib.normTag(tag)]; if (pid && canon(at) && at <= now) through[pid] = at; }
 let coverageWrite = null; // goes in its own last batch, so it can never hold up the results
 if (Object.keys(through).length) {
   const v = versions['config/importState'];

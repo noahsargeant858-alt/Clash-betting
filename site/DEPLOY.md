@@ -41,7 +41,10 @@ Everyone starts with the starting coins in Settings (1,000).
 * **Official Clash results** arrive on their own: the server looks at the battle feed (refreshed hourly by the GitHub Action) every 20 minutes and adds new games.
   The old claude.ai routine that did this is no longer needed.
 * **Backups:** Render keeps daily snapshots of the disk on paid plans. For an extra copy off Render, see the optional encrypted backup below.
-* **If friends often see "Too many attempts":** the server is counting everyone as one person. In Render → Environment set `TRUST_PROXY` to `2` and redeploy.
+* **If friends often see "Too many attempts":** the server works out each visitor's address from Render's proxy by itself (`TRUST_PROXY` is `auto`), so this should not happen. If it does, tell me what the page said and roughly how many of you were on the same wifi.
+* **Updates:** the blueprint has `autoDeploy: true`, so every push to the branch you picked redeploys the site (accounts and bets live on the disk and are kept). When this branch is merged, point the service at `main` under Settings → Build & Deploy → Branch.
+* **Betting rules the server enforces:** a placed bet can't be edited or taken back (only you, the admin, can void one), fixtures and locks can't be rewritten after the fact, and times must be within a couple of minutes of the server's clock. A friend whose phone clock is badly out sees "Your phone's clock looks out" and needs to fix their device time.
+* **Privacy:** the Clash tags of the squad are in `squad.json` in this GitHub repository, which is public. Make the repo private if that bothers anyone (Render can still read it through the GitHub connection).
 
 ## Settings (Render → Environment)
 
@@ -53,6 +56,7 @@ Everyone starts with the starting coins in Settings (1,000).
 | `PUBLIC_URL` | optional: the address to put in invite links, e.g. `https://clashbets.onrender.com` (otherwise taken from the request) |
 | `IMPORT_INTERVAL_MIN` | how often to look for new battles (default 20; `0` turns it off) |
 | `INVITE_DAYS` | how long a personal link stays valid (default 14) |
+| `TRUST_PROXY` | `auto` on Render (default in production). Use a number only if you put your own proxy in front |
 
 ## Optional: a free plan with an encrypted backup instead of a disk
 
@@ -60,7 +64,7 @@ Render's free web service has no disk, so its files vanish whenever it restarts.
 on a branch of this GitHub repository and restore it on start. To use that instead of paying for a disk:
 
 1. In `render.yaml` change `plan: starter` to `plan: free`, delete the `disk:` block, and change `DATA_DIR` to `/tmp/clashbets`.
-2. Create a GitHub fine-grained token with **Contents: read and write** on this repository only, and make up a random key of 24+ characters.
+2. Create a GitHub fine-grained token with **Contents: read and write** on this repository only, and make up a random key of at least 24 characters (shorter keys are refused).
 3. In Render → Environment add `SNAPSHOT_REPO` = `noahsargeant858-alt/Clash-betting`, `SNAPSHOT_BRANCH` = `site-data`, `SNAPSHOT_TOKEN` = the token, `SNAPSHOT_KEY` = the key.
    (Keep the key safe: without it the backup cannot be read. The data on the branch is encrypted, so the public repo is fine.)
 
@@ -75,4 +79,4 @@ ADMIN_PASSWORD='something long' SIGNUP_CODE=gold node site/server.js
 ```
 
 After changing `artifact/clashbets.html`, run `node site/build.js` to regenerate `site/public/app.html`, which is what the website serves.
-Tests: `npm test`.
+Tests: `npm test`. The older single-file server (no accounts) is still there as `npm run legacy`.

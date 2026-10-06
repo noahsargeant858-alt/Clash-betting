@@ -131,15 +131,10 @@ noscript p { text-align: center; color: var(--amber); }
 'use strict';
 const $ = (s) => document.querySelector(s);
 
-// Where to go afterwards: only a path on this site, never another address
+// Where to go afterwards: the front page, or the personal link someone was sent here from. Nothing else.
 function nextUrl() {
-  const n = new URLSearchParams(location.search).get('next');
-  if (!n || n[0] !== '/' || n[1] === '/' || n[1] === '\\') return '/';
-  try {
-    const u = new URL(n, location.origin);
-    if (u.origin !== location.origin || /^\/(login|api)(\/|$)/.test(u.pathname)) return '/';
-    return u.pathname + u.search + u.hash;
-  } catch { return '/'; }
+  const n = new URLSearchParams(location.search).get('next') || '';
+  return /^\/join\/[A-Za-z0-9_-]{20,64}$/.test(n) ? n : '/';
 }
 
 async function post(url, body) {

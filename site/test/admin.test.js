@@ -230,16 +230,12 @@ test('someone cannot sign up as the admin, with or without a password set', asyn
   assert.strictEqual(w.app.auth.userByName('sneaky').via, 'signup');
 });
 
-test('the admin can reset themselves and sign in again with the temporary password', async (t) => {
+test('the admin cannot reset their own password through the API (they use Change password instead)', async (t) => {
   const w = await world(t);
   const uid = (await w.admin.get('/api/auth/me')).json.uid;
   const r = await w.admin.post(`/api/admin/accounts/${uid}/reset-password`);
-  assert.strictEqual(r.status, 200);
-  assert.strictEqual((await w.admin.get('/api/auth/me')).status, 401, 'all sessions end, this one included');
-  const back = await client(w.app).post('/api/auth/login', { username: 'admin', password: r.json.tempPassword });
-  assert.strictEqual(back.status, 200);
-  assert.strictEqual(back.json.me.admin, true);
-  assert.ok(cookieOf(back));
+  assert.strictEqual(r.status, 400);
+  assert.strictEqual((await w.admin.get('/api/auth/me')).status, 200, 'and their session carries on');
 });
 
 test('raw requests: admin routes need the CSRF headers too', async (t) => {

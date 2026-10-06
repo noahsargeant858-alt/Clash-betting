@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-10-06T14:51:55.158Z",
+ "updatedAt": "2026-10-06T17:18:19.686Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
@@ -27,7 +27,7 @@
   },
   "#8GQQ9YC2": {
    "name": "EPIC McMoosh",
-   "trophies": 12916,
+   "trophies": 12946,
    "bestTrophies": 12946,
    "expLevel": 59
   },
@@ -39,7 +39,7 @@
   },
   "#UJ20VUYC8": {
    "name": "Calooba",
-   "trophies": 12029,
+   "trophies": 12030,
    "bestTrophies": 12089,
    "expLevel": 54
   },
@@ -63,6 +63,136 @@
   }
  },
  "battles": [
+  {
+   "key": "20261006T170259.000Z|#80JRVYRQC|#9Q0L20PL2",
+   "battleTime": "20261006T170259.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#9Q0L20PL2",
+    "name": "SEK",
+    "crowns": 1,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     2569,
+     241
+    ],
+    "elixirLeaked": 2.35,
+    "cards": [
+     {
+      "name": "Knight",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Cage",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Skeleton Barrel",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Delivery",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Wizard",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Hog Rider",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Musketeer",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#80JRVYRQC",
+    "name": "rishling",
+    "crowns": 0,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     17
+    ],
+    "elixirLeaked": 1.89,
+    "cards": [
+     {
+      "name": "Miner",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Barbarians",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Spirit",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Zap",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Flying Machine",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Hogs",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Earthquake",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Witch",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261006T145115.000Z|#80JRVYRQC|#890UCYCGU",
    "battleTime": "20261006T145115.000Z",
@@ -20264,15 +20394,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-10-06T14:51:52.141Z",
-  "#ULG0PY8UP": "2026-10-06T14:51:52.522Z",
-  "#89R88C82Y": "2026-10-06T14:51:52.839Z",
-  "#9CY0VCVJG": "2026-10-06T14:51:53.177Z",
-  "#9Q0L20PL2": "2026-10-06T14:51:53.495Z",
-  "#UJ20VUYC8": "2026-10-06T14:51:53.812Z",
-  "#80JRVYRQC": "2026-10-06T14:51:54.199Z",
-  "#QL2GJVR02": "2026-10-06T14:51:54.821Z",
-  "#890UCYCGU": "2026-10-06T14:51:55.134Z",
-  "#QQ9CVYG0": "2026-10-06T14:51:54.506Z"
+  "#8GQQ9YC2": "2026-10-06T17:18:16.428Z",
+  "#ULG0PY8UP": "2026-10-06T17:18:16.778Z",
+  "#89R88C82Y": "2026-10-06T17:18:17.124Z",
+  "#9CY0VCVJG": "2026-10-06T17:18:17.466Z",
+  "#9Q0L20PL2": "2026-10-06T17:18:17.824Z",
+  "#UJ20VUYC8": "2026-10-06T17:18:18.239Z",
+  "#80JRVYRQC": "2026-10-06T17:18:18.603Z",
+  "#QL2GJVR02": "2026-10-06T17:18:19.317Z",
+  "#890UCYCGU": "2026-10-06T17:18:19.666Z",
+  "#QQ9CVYG0": "2026-10-06T17:18:18.962Z"
  }
 }

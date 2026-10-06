@@ -602,6 +602,8 @@ body { padding-bottom: 72px; }
     const tempBox = h('div'), accWrap = h('div', { class: 'scroll' });
     const freshBox = h('div'), invList = h('div', { class: 'stack' });
     const groupBox = h('div'), groupMsg = h('p', { class: 'cbx-msg', role: 'status' });
+    const impMsg = h('p', { class: 'cbx-msg', role: 'status' });
+    const impBtn = h('button', { type: 'button', class: 'btn gold', onclick: importNow }, 'Check for new results now');
     const pickSel = h('select', { 'aria-label': 'Player to invite' });
     const makeBtn = h('button', { type: 'button', class: 'btn gold', onclick: createInvite }, 'Create invite link');
     const say = (el, kind, text) => { el.className = 'cbx-msg' + (kind ? ' ' + kind : ''); el.textContent = text || ''; };
@@ -612,6 +614,9 @@ body { padding-bottom: 72px; }
       h('section', { class: 'panel stack' }, h('h2', {}, 'Website accounts'),
         h('p', { class: 'note' }, 'Everyone who can sign in to this site. Reset a password if someone is locked out; the new one is shown once. Switching an account off signs it out and stops it signing in, and you can switch it back on.'),
         accMsg, tempBox, accWrap),
+      h('section', { class: 'panel stack' }, h('h2', {}, 'Official results'),
+        h('p', { class: 'note' }, 'Games played in Clash arrive by themselves: GitHub fetches the battle logs (roughly hourly, sometimes later) and this site checks for them every 20 minutes. If a bet is waiting on a game that has just finished, check now.'),
+        h('div', { class: 'row' }, impBtn), impMsg),
       h('section', { class: 'panel stack' }, h('h2', {}, 'Group link'),
         h('p', { class: 'note' }, 'One link for the group chat. It opens Create account with the group code already filled in, so your mates only pick a username and password, then tap their name and you approve them under Player link requests. Anyone who gets hold of it can make an account, so keep it in the chat. Changing SIGNUP_CODE on Render makes old group links stop working.'),
         groupMsg, groupBox),
@@ -727,6 +732,17 @@ body { padding-bottom: 72px; }
             h('button', { type: 'button', class: 'btn tiny' + (st === 'open' ? ' warn' : ''), onclick: () => revoke(i) }, st === 'open' ? 'Revoke' : 'Remove'))));
       }
     }
+    // -- official results
+    async function importNow() {
+      impBtn.disabled = true; say(impMsg, '', 'Checking…');
+      try {
+        const r = await request('POST', '/api/admin/import-now', {});
+        const lines = String(r.summary || '').split('\n').filter((l) => /official results|^New:|^CHECK|^SKIPPED/.test(l));
+        say(impMsg, 'good', lines.slice(0, 8).join(' · ') || 'Done.');
+      } catch (e) { say(impMsg, 'bad', e.message); }
+      impBtn.disabled = false;
+    }
+
     // -- group link
     async function loadGroupLink() {
       try {

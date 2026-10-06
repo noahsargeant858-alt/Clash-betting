@@ -183,6 +183,20 @@ ul.house-log { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px;
 .join-grid small { font-family: var(--body); font-size: 12px; color: var(--muted); }
 tr.mine td { background: var(--panel-2); }
 .inline-num { width: 90px; padding: 5px 8px; }
+.squad-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+#squad td { vertical-align: middle; }
+#squad .who small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+#squad .acts { white-space: nowrap; text-align: right; }
+#squad .num { text-align: right; }
+#squad .who { overflow-wrap: anywhere; }
+@media (max-width: 480px) { #squad th, #squad td { padding: 7px 5px; } #squad th { letter-spacing: .3px; } }
+.btn.gold-line { border-color: var(--gold); color: var(--gold); }
+#squad tr.more td { background: var(--bg); }
+#coinsDlg { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 16px; padding: 18px; width: min(420px, calc(100% - 32px)); box-shadow: inset 0 3px 0 var(--gold), 0 14px 40px rgb(0 0 0 / .45); }
+#coinsDlg::backdrop { background: rgb(5 9 25 / .65); }
+#coinsDlg .field { display: grid; gap: 5px; font-size: 13px; font-weight: 600; color: var(--muted); }
+#coinsDlg .field input { width: 100%; font-size: 16px; font-weight: 400; color: var(--fg); }
+#coinsDlg .field input::placeholder { color: var(--muted); opacity: .75; font-style: italic; }
 .note { font-size: 13px; color: var(--muted); margin: 0; }
 
 #toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 140%); background: var(--panel-2); border: 1px solid var(--gold); padding: 10px 16px; border-radius: 12px; max-width: calc(100% - 32px); transition: transform .25s; z-index: 10; }
@@ -352,14 +366,29 @@ tr.mine td { background: var(--panel-2); }
     <div id="siteAdmin" class="stack"></div>
     <div class="panel stack"><h2>Results to confirm</h2><p class="note">A player's result counts once their opponent confirms it. You can confirm anything here, for example when the opponent hasn't joined yet.</p><div id="adminResults" class="stack"></div></div>
     <div class="panel stack">
-      <h2>Squad and accounts</h2>
-      <p class="note">Unlink an account if someone got the wrong player. Coin gifts need a reason and show up in the house log.</p>
-      <form id="addPlayer" class="row">
+      <div class="squad-head"><h2>Squad and accounts</h2><button class="btn tiny" type="button" id="squadAll" aria-pressed="false">Show everyone</button></div>
+      <p class="note" id="squadNote"></p>
+      <form id="addPlayer" class="row" hidden>
         <input type="text" id="newName" placeholder="Name" maxlength="30" aria-label="New player name">
         <button class="btn gold" type="submit">Add player</button>
       </form>
       <div class="scroll" id="squad"></div>
     </div>
+    <dialog id="coinsDlg" aria-labelledby="coinsTitle">
+      <form id="coinsForm" class="stack" novalidate>
+        <div class="squad-head"><h2 id="coinsTitle">Coins for <span id="coinsWho"></span></h2><button class="btn tiny" type="button" id="coinsCancel" aria-label="Close">×</button></div>
+        <p class="note">They have <b id="coinsNow"></b> coins. Gifts show up in the house log for everyone to see.</p>
+        <div class="row" id="coinsQuick" role="group" aria-label="Quick amounts">
+          <button class="btn tiny" type="button" data-amt="50">+50</button><button class="btn tiny" type="button" data-amt="100">+100</button>
+          <button class="btn tiny" type="button" data-amt="250">+250</button><button class="btn tiny" type="button" data-amt="500">+500</button>
+          <button class="btn tiny warn" type="button" data-amt="-100">−100</button>
+        </div>
+        <label class="field">Amount (a minus takes coins away)<input type="number" step="10" id="coinsAmt" placeholder="e.g. 100, or -50 to take" inputmode="numeric"></label>
+        <label class="field">Reason<input type="text" id="coinsWhy" maxlength="60" placeholder="e.g. Welcome bonus" list="coinsReasons" autocomplete="off"></label>
+        <datalist id="coinsReasons"></datalist>
+        <div class="row"><button class="btn gold" type="submit">Apply</button></div>
+      </form>
+    </dialog>
     <div class="panel stack" id="bookiePanel">
       <h2>AI bookie</h2>
       <p class="note">Ask Claude, briefed as a Clash Royale expert, to invent new specials. The book prices them from the same simulations as everything else, and only the ones you publish go on the board. Each ask uses a little of your own Claude usage.</p>
@@ -3008,7 +3037,9 @@ $('#muB').addEventListener('change', renderMatchup);
 // ======================================================================
 //  Admin: link requests, results to confirm, squad, coins, settings
 // ======================================================================
-let confirmRemove = null, confirmRelease = null, renaming = null;
+let confirmRemove = null, confirmRelease = null, renaming = null, squadMore = null;
+let squadAll = false;
+try { squadAll = localStorage.getItem('clashbets-squad-all') === '1'; } catch { /* ignore */ }
 async function renderAdmin() {
   const { byPlayer, byUid } = linkMaps();
   const requests = store.claims.filter((c) => !byUid[c.id] && (playerById(c.playerId) || newNameOf(c)));
@@ -3024,16 +3055,30 @@ async function renderAdmin() {
     <span class="row"><button class="btn gold tiny" type="button" data-aconfirm="${esc(r.key)}">Confirm as admin</button><button class="btn tiny warn" type="button" data-areject="${esc(r.key)}">Delete</button></span></div>`).join('')
     : '<p class="note">Nothing waiting.</p>';
   const uids = Object.values(byPlayer).concat(requests.map((c) => c.id));
-  $('#squad').innerHTML = store.players.length ? `<table><thead><tr><th>Player</th><th>Linked account</th><th>Results</th><th>Coins</th><th>Give or take coins</th><th></th></tr></thead><tbody>${store.players.map((p) => {
-    const uid = byPlayer[p.id];
-    return `<tr><td>${renaming === p.id ? `<form class="row" data-rename-form="${esc(p.id)}"><input type="text" id="rename-${esc(p.id)}" value="${esc(p.name)}" maxlength="30" aria-label="New name"><button class="btn tiny" type="submit">Save</button></form>` : `<b>${esc(p.name)}</b>`}</td>
-      <td>${uid ? `<span data-uid-name="${esc(uid)}">Linked</span>${uid === me.uid ? ' (you)' : ''}` : '<span class="na">Nobody yet</span>'}</td>
+  // Only people who have made an account, unless the admin asks to see everyone
+  const linked = store.players.filter((p) => byPlayer[p.id]), hiddenN = store.players.length - linked.length;
+  const shown = (squadAll ? [...store.players] : linked).sort((a, b) => (byPlayer[a.id] ? 0 : 1) - (byPlayer[b.id] ? 0 : 1) || String(a.name).localeCompare(String(b.name)));
+  $('#squadAll').hidden = !hiddenN && !squadAll;
+  $('#squadAll').textContent = squadAll ? 'Only people with accounts' : `Show everyone (${hiddenN} more)`;
+  $('#squadAll').setAttribute('aria-pressed', String(squadAll));
+  $('#addPlayer').hidden = !squadAll && store.players.length > 0;
+  $('#squadNote').textContent = squadAll
+    ? 'Everyone in the squad, including players nobody has signed up as yet. Add a player here if a new mate joins.'
+    : `People who have made an account.${hiddenN ? ` ${hiddenN} player${hiddenN === 1 ? '' : 's'} without one ${hiddenN === 1 ? 'is' : 'are'} hidden.` : ''} Tap Coins to give or take coins; ⋯ has rename and unlink.`;
+  const squadRow = (p) => {
+    const uid = byPlayer[p.id], open = squadMore === p.id;
+    const main = `<tr${uid === me.uid ? ' class="mine"' : ''}><td class="who"><b>${esc(p.name)}</b>${uid ? `<small><span data-uid-name="${esc(uid)}">Linked</span>${uid === me.uid ? ' (you)' : ''}</small>` : '<small>No account yet</small>'}</td>
       <td class="num">${summarise(p.id, finalResults()).games}</td><td class="num">${fmtN(coinsOf(p.id))}</td>
-      <td><form class="row" data-coins-form="${esc(p.id)}"><input class="inline-num" type="number" step="10" id="coins-${esc(p.id)}" placeholder="+100" aria-label="Coins to add or remove"><input class="inline-text" type="text" id="coinsWhy-${esc(p.id)}" placeholder="Reason" maxlength="60" aria-label="Reason"><button class="btn tiny" type="submit">Apply</button></form></td>
-      <td style="white-space:nowrap"><button class="btn tiny" data-rename="${esc(p.id)}">Rename</button>
-        ${uid ? `<button class="btn tiny" data-release="${esc(p.id)}">${confirmRelease === p.id ? 'Confirm unlink' : 'Unlink'}</button>` : ''}
-        <button class="btn tiny warn" data-remove="${esc(p.id)}">${confirmRemove === p.id ? 'Confirm remove' : 'Remove'}</button></td></tr>`;
-  }).join('')}</tbody></table>` : '<div class="empty">No players yet. Add the squad above.</div>';
+      <td class="acts"><button class="btn tiny gold-line" type="button" data-coins="${esc(p.id)}">Coins</button> <button class="btn tiny" type="button" data-more="${esc(p.id)}" aria-expanded="${open}" aria-label="More for ${esc(p.name)}">⋯</button></td></tr>`;
+    if (!open) return main;
+    const tools = renaming === p.id
+      ? `<form class="row" data-rename-form="${esc(p.id)}"><input type="text" id="rename-${esc(p.id)}" value="${esc(p.name)}" maxlength="30" aria-label="New name"><button class="btn tiny" type="submit">Save</button></form>`
+      : `<div class="row"><button class="btn tiny" type="button" data-rename="${esc(p.id)}">Rename</button>${uid ? `<button class="btn tiny" type="button" data-release="${esc(p.id)}">${confirmRelease === p.id ? 'Confirm unlink' : 'Unlink'}</button>` : ''}<button class="btn tiny warn" type="button" data-remove="${esc(p.id)}">${confirmRemove === p.id ? 'Confirm remove' : 'Remove'}</button></div>`;
+    return main + `<tr class="more"><td colspan="4">${tools}</td></tr>`;
+  };
+  $('#squad').innerHTML = !store.players.length ? '<div class="empty">No players yet. Add the squad above.</div>'
+    : !shown.length ? '<div class="empty">Nobody has made an account yet. Once someone signs up and you approve them, they show up here.</div>'
+    : `<table><thead><tr><th>Player</th><th class="num">Results</th><th class="num">Coins</th><th></th></tr></thead><tbody>${shown.map(squadRow).join('')}</tbody></table>`;
   const f = { setMargin: 'margin', setBuilderMargin: 'builderMargin', setCoins: 'startingCoins', setPrincess: 'princessHp', setKing: 'kingHp',
     setMinStake: 'minStake', setMaxStake: 'maxStake', setMaxReturn: 'maxReturn', setWindow: 'betWindowMin', setExpiry: 'fixtureHours' };
   for (const [id, k] of Object.entries(f)) if (document.activeElement !== $('#' + id)) $('#' + id).value = store.settings[k];
@@ -3077,6 +3122,8 @@ $('#p-admin').addEventListener('click', async (e) => {
       const r = resultData().pending.find((x) => x.key === t.areject); if (!r) return;
       await deleteResult(r); toast('Result deleted.');
     }
+    if (t.coins) openCoins(t.coins);
+    if (t.more) { squadMore = squadMore === t.more ? null : t.more; renaming = null; confirmRelease = null; confirmRemove = null; renderAdmin(); }
     if (t.rename) { renaming = t.rename; renderAdmin(); }
     if (t.release) {
       if (confirmRelease !== t.release) { confirmRelease = t.release; renderAdmin(); return; }
@@ -3099,13 +3146,7 @@ $('#p-admin').addEventListener('click', async (e) => {
 });
 $('#squad').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const cf = e.target.dataset.coinsForm, rf = e.target.dataset.renameForm;
-  if (cf) {
-    const p = playerById(cf), amount = Math.round(+$('#coins-' + cf).value || 0), reason = ($('#coinsWhy-' + cf).value || '').trim().slice(0, 60);
-    if (!p || !amount) return toast('Type a number of coins, like 100 or -50.', true);
-    if (!reason) return toast('Give a reason. It goes in the house log for everyone to see.', true);
-    try { await put('config', 'house', { ...store.house, gifts: [...houseGifts(), { pid: p.id, amount, reason, at: nowIso() }] }); toast(`${amount > 0 ? 'Gave' : 'Took'} ${fmtN(Math.abs(amount))} coins ${amount > 0 ? 'to' : 'from'} ${p.name}.`); } catch { /* toast shown */ }
-  }
+  const rf = e.target.dataset.renameForm;
   if (rf) {
     const p = playerById(rf), name = $('#rename-' + rf).value.trim();
     if (!p || !name) return toast('Type a name.', true);
@@ -3113,6 +3154,44 @@ $('#squad').addEventListener('submit', async (e) => {
     try { await put('players', p.id, playerDoc(p, { name })); toast(`Renamed to ${name}.`); } catch { /* toast shown */ }
   }
 });
+$('#squadAll').addEventListener('click', () => {
+  squadAll = !squadAll; squadMore = null;
+  try { localStorage.setItem('clashbets-squad-all', squadAll ? '1' : '0'); } catch { /* ignore */ }
+  renderAdmin();
+});
+
+// The coins pop-up lives outside the table, so live updates redrawing the table never wipe what's being typed
+let coinsPid = null;
+const coinsDlg = $('#coinsDlg');
+function openCoins(pid) {
+  const p = playerById(pid); if (!p) return;
+  coinsPid = pid;
+  $('#coinsWho').textContent = p.name; $('#coinsNow').textContent = fmtN(coinsOf(pid));
+  $('#coinsAmt').value = ''; $('#coinsWhy').value = '';
+  const seen = [...new Set(['Welcome bonus', 'Top-up', 'Prize', 'Correction', ...houseGifts().map((g) => String(g.reason || '').trim()).filter(Boolean).reverse()])].slice(0, 12);
+  $('#coinsReasons').innerHTML = seen.map((r) => `<option value="${esc(r)}">`).join('');
+  if (typeof coinsDlg.showModal === 'function') { if (!coinsDlg.open) coinsDlg.showModal(); } else coinsDlg.setAttribute('open', '');
+  if (window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches) $('#coinsAmt').focus();
+}
+function closeCoins() { coinsPid = null; if (typeof coinsDlg.close === 'function' && coinsDlg.open) coinsDlg.close(); else coinsDlg.removeAttribute('open'); }
+$('#coinsCancel').addEventListener('click', closeCoins);
+coinsDlg.addEventListener('close', () => { coinsPid = null; });
+coinsDlg.addEventListener('click', (e) => { if (e.target === coinsDlg) closeCoins(); }); // a tap on the dimmed backdrop
+$('#coinsQuick').addEventListener('click', (e) => { const a = e.target.dataset.amt; if (a) { $('#coinsAmt').value = a; if (!$('#coinsWhy').value) $('#coinsWhy').focus(); } });
+$('#coinsForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const p = playerById(coinsPid), amount = Math.round(+$('#coinsAmt').value || 0), reason = ($('#coinsWhy').value || '').trim().slice(0, 60);
+  if (!p) { closeCoins(); return toast('That player is gone.', true); }
+  if (!amount) return toast('Type a number of coins, like 100 or -50.', true);
+  if (!reason) return toast('Give a reason. It goes in the house log for everyone to see.', true);
+  const btn = e.target.querySelector('button[type=submit]'); btn.disabled = true;
+  try {
+    await put('config', 'house', { ...store.house, gifts: [...houseGifts(), { pid: p.id, amount, reason, at: nowIso() }] });
+    closeCoins();
+    toast(`${amount > 0 ? 'Gave' : 'Took'} ${fmtN(Math.abs(amount))} coins ${amount > 0 ? 'to' : 'from'} ${p.name}.`);
+  } catch { /* toast shown */ } finally { btn.disabled = false; }
+});
+
 $('#addPlayer').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = $('#newName').value.trim();

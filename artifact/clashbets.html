@@ -451,7 +451,7 @@ const ANSWER_MS = 48 * 3600e3;
 // From here on a single-game fixture nobody logged settles on the official battle log (see resultData);
 // fixtures that had already expired by then keep what they had
 const AUTO_SETTLE_FROM = '2026-10-07T13:45:00.000Z'; // how long after a result bets wait for the players to fill in a missing detail
-const DETAIL_WAIT = 'Waiting for the players to say what the battle log doesn\'t show';
+const DETAIL_WAIT = 'Waiting for the admin to say what the battle log doesn\'t show';
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
 const logit = (p) => { p = clamp(p, 1e-6, 1 - 1e-6); return Math.log(p / (1 - p)); };
 const logistic = (x) => 1 / (1 + Math.exp(-x));
@@ -1660,7 +1660,7 @@ function detailsFor(r, until) {
     const list = (A[field] || []).filter((x) => x.at <= until).sort((p, q) => p.at.localeCompare(q.at));
     const said = {};
     for (const x of list) {
-      const side = speaksFor(x.uid, r.playerA, x.at) ? 'A' : speaksFor(x.uid, r.playerB, x.at) ? 'B' : x.uid === adminUid() ? 'admin' : null;
+      const side = x.uid === adminUid() ? 'admin' : speaksFor(x.uid, r.playerA, x.at) ? 'A' : speaksFor(x.uid, r.playerB, x.at) ? 'B' : null;
       if (!side || said[side]) continue;
       let v = x.value;
       if (field === 'firstCrown') v = v === 'me' ? side : v === 'opp' ? (side === 'A' ? 'B' : side === 'B' ? 'A' : null) : side === 'admin' && (v === 'A' || v === 'B') ? v : v === 'unsure' ? 'unsure' : null;
@@ -1689,6 +1689,13 @@ function withAgreed(r, until) {
 const answerUntil = (r) => new Date(ms(r.finalAt) + ANSWER_MS).toISOString();
 // Could an answer still fill a gap in r? (overtime unknown, or first crown unknown with crowns on both sides)
 const askable = (r) => r.overtime == null || (r.firstCrown == null && Math.min(r.crownsA, r.crownsB) >= 1);
+// the gaps in r that the admin could still answer (an admin "not sure" closes one)
+function openGaps(r, t) {
+  const d = detailsFor(r, t), gaps = [];
+  if (r.overtime == null && !(d.overtime && (d.overtime.agreed != null || d.overtime.admin === 'unsure'))) gaps.push('overtime');
+  if (r.firstCrown == null && Math.min(r.crownsA, r.crownsB) >= 1 && !(d.firstCrown && (d.firstCrown.agreed != null || d.firstCrown.admin === 'unsure'))) gaps.push('firstCrown');
+  return gaps;
+}
 // The tiebreaker at the end of overtime drains every standing tower by the same amount until one falls, so
 // when every standing tower on both sides has lost HP and the smallest loss is identical on both sides, that
 // loss is the drain: the game went the full overtime. Returns the drain, or null.
@@ -1892,7 +1899,7 @@ function judge(b) {
   const settle = (it, format, key, from) => {
     const rs = legs.map((l) => legTest(l, format, b.placedAt)(it)), r = rs.includes(false) ? false : rs.includes(null) ? null : true;
     if (r === null) {
-      const open = from.filter((x) => askable(x) && Date.now() < ms(answerUntil(x)));
+      const open = from.filter((x) => Date.now() < ms(answerUntil(x)) && openGaps(x, answerUntil(x)).length);
       if (open.length) return { status: 'pending', payout: 0, why: DETAIL_WAIT, waitOn: open.map((x) => x.key), matchKey: undefined };
       return { ...voidIt('A detail this bet needed wasn\'t recorded'), matchKey: key };
     }
@@ -2178,52 +2185,47 @@ function resultLine(r) {
   if (r.dealtA != null) bits.push(`damage ${fmtN(r.dealtA)} / ${fmtN(r.dealtB)}`);
   return `${esc(nameOf(r.playerA))} <b class="num">${r.crownsA}–${r.crownsB}</b> ${esc(nameOf(r.playerB))}${tb} · <span class="small muted">${esc(bits.join(' · '))}</span>`;
 }
-// One-tap questions about my own recent games: what the battle log can't show. Asked for my games from the last
-// 48 hours (each answer sharpens the overtime odds), bets that are waiting on the answer first.
-function myQuestions() {
-  if (!me.uid) return [];
+// The admin's one-tap questions: what the battle log can't show (overtime, first tower) for games from the last
+// 48 hours, bets that are waiting on the answer first. Each answer settles those bets and sharpens the odds.
+function adminQuestions() {
+  if (!me.admin) return [];
   const R = resultData(), now = Date.now(), t = nowIso();
   const waiting = new Set(ledger().filter((b) => b.status === 'pending' && b.waitOn).flatMap((b) => b.waitOn));
   const qs = [];
   for (const r of R.final) {
     if (!askable(r) || now >= ms(answerUntil(r))) continue;
-    if (!speaksFor(me.uid, r.playerA, t) && !speaksFor(me.uid, r.playerB, t)) continue;
-    const d = detailsFor(r, t), saidIt = (field) => ((R.answers[r.key] || {})[field] || []).some((x) => x.uid === me.uid);
-    for (const field of DETAIL_FIELDS) {
-      const gap = field === 'overtime' ? r.overtime == null : r.firstCrown == null && Math.min(r.crownsA, r.crownsB) >= 1;
-      if (gap && !saidIt(field) && !(d[field] && d[field].agreed != null)) qs.push({ r, field, waiting: waiting.has(r.key) });
-    }
+    for (const field of openGaps(r, t)) qs.push({ r, field, waiting: waiting.has(r.key) });
   }
-  return qs.sort((p, q) => q.waiting - p.waiting || String(q.r.date).localeCompare(String(p.r.date))).slice(0, 4);
+  return qs.sort((p, q) => q.waiting - p.waiting || String(q.r.date).localeCompare(String(p.r.date)));
+}
+// one question, as a row of buttons
+function questionRow(q) {
+  const k = esc(q.r.key), btn = (v, label, cls = '') => `<button class="btn tiny${cls}" type="button" data-dq="${k}" data-df="${q.field}" data-dv="${v}">${label}</button>`;
+  return `<div class="confirm-row"><span>${resultLine(q.r)} <span class="small muted">${fmtDate(q.r.date)}</span>${q.waiting ? ' <span class="pill warn">A bet is waiting on this</span>' : ''}<br><b>${q.field === 'overtime' ? 'Did it go to overtime?' : 'Who took the first tower?'}</b></span>
+    <span class="row">${q.field === 'overtime' ? btn('yes', 'Yes', ' gold') + btn('no', 'No', ' gold') : btn('A', esc(nameOf(q.r.playerA)), ' gold') + btn('B', esc(nameOf(q.r.playerB)), ' gold')}${btn('unsure', 'Not sure')}</span></div>`;
+}
+async function answerQuestion(q) {
+  const value = { yes: true, no: false }[q.dv] ?? q.dv;
+  if (!me.admin || !DETAIL_FIELDS.includes(q.df) || ![true, false, 'A', 'B', 'unsure'].includes(value)) return;
+  try {
+    await put(`acts/${me.uid}/items`, 'd_' + safeSeg(q.dq) + '_' + q.df, { type: 'detail', ref: q.dq, field: q.df, value, at: nowIso() });
+    toast(value === 'unsure' ? 'Noted. Bets that needed it are refunded.' : 'Saved. Bets on it settle now.');
+  } catch { /* toast shown */ }
 }
 function renderConfirmBox(joining) {
   const box = $('#confirmBox');
   const mine = joining || !me.uid ? [] : resultData().pending.filter((r) => r.waitingFor.includes(me.uid) && (() => { const c = myConfirm(r.key); return !c || c.hash !== r.hash || c.loggedAt !== r.loggedAt; })());
-  const qs = joining || !me.uid ? [] : myQuestions();
+  const qs = joining || !me.uid ? [] : adminQuestions().filter((q) => q.waiting);
   box.hidden = !mine.length && !qs.length;
   if (box.hidden) return;
-  const ask = (q) => {
-    const k = esc(q.r.key), btn = (v, label, cls = '') => `<button class="btn tiny${cls}" type="button" data-dq="${k}" data-df="${q.field}" data-dv="${v}">${label}</button>`;
-    return `<div class="confirm-row"><span>${resultLine(q.r)} <span class="small muted">${fmtDate(q.r.date)}</span>${q.waiting ? ' <span class="pill warn">A bet is waiting on this</span>' : ''}<br><b>${q.field === 'overtime' ? 'Did it go to overtime?' : 'Who took the first tower?'}</b></span>
-      <span class="row">${q.field === 'overtime' ? btn('yes', 'Yes', ' gold') + btn('no', 'No', ' gold') : btn('me', 'Me', ' gold') + btn('opp', 'Them', ' gold')}${btn('unsure', 'Not sure')}</span></div>`;
-  };
   box.innerHTML = (mine.length ? `<h3>Is this right?</h3><p class="note">A result only counts once the other player confirms it.</p>${mine.map((r) => `
     <div class="confirm-row"><span>${esc(accountName(r.loggedBy))} logged ${resultLine(r)}</span>
     <span class="row"><button class="btn gold tiny" type="button" data-confirm="${esc(r.key)}">Confirm</button><button class="btn tiny warn" type="button" data-dispute="${esc(r.key)}">Dispute</button></span></div>`).join('')}` : '')
-    + (qs.length ? `<h3>Quick question</h3><p class="note">The battle log doesn't show these. One tap each: it sharpens the odds, and once both of you agree, bets on it settle.</p>${qs.map(ask).join('')}` : '');
+    + (qs.length ? `<h3>Bets waiting on you</h3><p class="note">The battle log doesn't show these. One tap each settles the bets (and sharpens the odds). More games to fill in are on the Admin tab.</p>${qs.map(questionRow).join('')}` : '');
 }
 $('#confirmBox').addEventListener('click', async (e) => {
   const q = e.target.dataset;
-  if (q.dq) {
-    const value = { yes: true, no: false }[q.dv] ?? q.dv;
-    if (!DETAIL_FIELDS.includes(q.df) || ![true, false, 'me', 'opp', 'unsure'].includes(value)) return;
-    try {
-      await put(`acts/${me.uid}/items`, 'd_' + safeSeg(q.dq) + '_' + q.df, { type: 'detail', ref: q.dq, field: q.df, value, at: nowIso() });
-      const r = resultData().final.find((x) => x.key === q.dq), d = r && detailsFor(r, nowIso())[q.df];
-      toast(value === 'unsure' ? 'No worries.' : d && d.agreed != null ? 'Thanks. You both agree, so that\'s settled.' : d && d.disputed ? 'Thanks. You two disagree, so the admin will decide.' : 'Thanks. Once the other player agrees, it counts.');
-    } catch { /* toast shown */ }
-    return;
-  }
+  if (q.dq) { await answerQuestion(q); return; }
   const key = e.target.dataset.confirm || e.target.dataset.dispute; if (!key) return;
   const r = resultData().pending.find((x) => x.key === key); if (!r) return;
   const verdict = e.target.dataset.confirm ? 'ok' : 'dispute', copy = pickResult(r);
@@ -2244,7 +2246,7 @@ function renderFixtures() {
       : f.primary ? (fromLog(f) ? '<span class="pill">Locked · settles from the battle log</span>' : '<span class="pill">Betting locked</span>') : now > f.windowEnds + LOCK_GRACE ? '<span class="pill lost">Never locked: bets refunded</span>' : '<span class="pill">Betting closed</span>';
     const nBets = ledger().filter((b) => b.fx === f.key).length;
     const hint = open && canLock(f) && !f.primary ? '<div class="small">Tap Lock as the draft starts. If nobody in the match locks it before betting closes, every bet on it is refunded.</div>'
-      : f.primary && !pend && fromLog(f) ? '<div class="small">Just play. It settles by itself once the game is in the battle log (the admin can tap Check for new results). If a bet needs overtime or the first tower, you\'ll both get a one-tap question.</div>' : '';
+      : f.primary && !pend && fromLog(f) ? '<div class="small">Just play. It settles by itself once the game is in the battle log (the admin can tap Check for new results). If a bet needs overtime or the first tower, the admin answers a quick yes/no.</div>' : '';
     return `<div class="fx-row"><div><b>${esc(nameOf(f.a))}</b> v <b>${esc(nameOf(f.b))}</b> ${status}<div class="small muted">Opened ${ago(now - Date.parse(f.at))} · ${nBets} bet${nBets === 1 ? '' : 's'}</div>${hint}</div>
       <div class="row">${open ? `<button class="btn tiny" type="button" data-fxbet="${esc(f.key)}">Bet on this</button>` : ''}
       ${open && canLock(f) && !f.primary ? `<button class="btn tiny warn" type="button" data-fxlock="${esc(f.key)}">Lock: draft starting</button>` : ''}
@@ -3228,20 +3230,13 @@ async function renderAdmin() {
   }).join('')
     : '<p class="note">No requests waiting.</p>';
   const pend = resultData().pending;
-  // details bets are waiting on (overtime, first crown): what each player said, and the admin's say
-  const waitKeys = new Set(ledger().filter((b) => b.status === 'pending' && b.waitOn).flatMap((b) => b.waitOn));
-  const ans = (v, field, r) => (v == null ? 'hasn\'t said' : v === 'unsure' ? 'not sure' : field === 'overtime' ? (v ? 'yes' : 'no') : esc(nameOf(v === 'A' ? r.playerA : r.playerB)));
-  const details = resultData().final.filter((r) => waitKeys.has(r.key)).flatMap((r) => DETAIL_FIELDS.map((field) => ({ r, field, d: detailsFor(r, nowIso())[field] || {} }))
-    .filter(({ r, field, d }) => d.agreed == null && (field === 'overtime' ? r.overtime == null : r.firstCrown == null && Math.min(r.crownsA, r.crownsB) >= 1)));
-  const detailRow = ({ r, field, d }) => {
-    const k = esc(r.key), btn = (v, label) => `<button class="btn tiny" type="button" data-ad="${k}" data-af="${field}" data-av="${v}">${label}</button>`;
-    return `<div class="confirm-row"><span>${resultLine(r)} <span class="small muted">${fmtDate(r.date)}</span><br><b>${field === 'overtime' ? 'Overtime?' : 'First tower?'}</b>
-      <span class="small">${esc(nameOf(r.playerA))}: ${ans(d.a, field, r)} · ${esc(nameOf(r.playerB))}: ${ans(d.b, field, r)}</span>${d.disputed ? ' <span class="pill warn">They disagree</span>' : ''}</span>
-      <span class="row">${field === 'overtime' ? btn('yes', 'Yes') + btn('no', 'No') : btn('A', esc(nameOf(r.playerA))) + btn('B', esc(nameOf(r.playerB)))}</span></div>`;
-  };
+  // what the battle log can't show for recent games: the admin fills it in (bets waiting on it first, then the
+  // newest dozen games played in the last 48 hours; the rest only help the odds a little)
+  const allQs = adminQuestions(), recent = allQs.filter((q) => !q.waiting && Date.now() - ms(q.r.date) < ANSWER_MS);
+  const details = allQs.filter((q) => q.waiting).concat(recent.slice(0, 12)), moreQs = recent.length - Math.min(recent.length, 12);
   $('#adminResults').innerHTML = (pend.length ? pend.map((r) => `<div class="confirm-row"><span>${esc(accountName(r.loggedBy))} logged ${resultLine(r)} ${resultStatus({ ...r, pending: true })}</span>
     <span class="row"><button class="btn gold tiny" type="button" data-aconfirm="${esc(r.key)}">Confirm as admin</button><button class="btn tiny warn" type="button" data-areject="${esc(r.key)}">Delete</button></span></div>`).join('') : '')
-    + (details.length ? `<p class="note">Bets are waiting on these details. The players get a one-tap question; you can decide here if they disagree or don't answer.</p>${details.map(detailRow).join('')}` : '')
+    + (details.length ? `<p class="note">Details the battle log can't show, for games from the last 48 hours. One tap each: bets waiting on one settle straight away, and every answer sharpens the overtime odds. Unanswered ones refund their bets after 48 hours.</p>${details.map(questionRow).join('')}${moreQs ? `<p class="note">${moreQs} older game${moreQs === 1 ? '' : 's'} could use an answer too; they show here as you fill these in.</p>` : ''}` : '')
     || '<p class="note">Nothing waiting.</p>';
   const uids = Object.values(byPlayer).concat(requests.map((c) => c.id));
   // Only people who have made an account, unless the admin asks to see everyone
@@ -3311,11 +3306,7 @@ $('#p-admin').addEventListener('click', async (e) => {
       const r = resultData().pending.find((x) => x.key === t.areject); if (!r) return;
       await deleteResult(r); toast('Result deleted.');
     }
-    if (t.ad && DETAIL_FIELDS.includes(t.af) && ['yes', 'no', 'A', 'B'].includes(t.av)) {
-      const value = { yes: true, no: false }[t.av] ?? t.av;
-      await put(`acts/${me.uid}/items`, 'd_' + safeSeg(t.ad) + '_' + t.af, { type: 'detail', ref: t.ad, field: t.af, value, at: nowIso() });
-      toast('Decided. Bets on it settle now.');
-    }
+    if (t.dq) await answerQuestion(t);
     if (t.coins) openCoins(t.coins);
     if (t.more) { squadMore = squadMore === t.more ? null : t.more; renaming = null; confirmRelease = null; confirmRemove = null; renderAdmin(); }
     if (t.rename) { renaming = t.rename; renderAdmin(); }

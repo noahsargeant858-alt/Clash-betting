@@ -217,10 +217,12 @@ normal time or sudden death). Three things fill the gap:
   by the same amount, so when every standing tower on both sides has lost HP and the smallest loss is identical on
   both sides, the game went the full overtime. New imports get `overtime: true, tiebreaker: true` (the page shows
   level crowns, won on the tiebreaker). Checked against hand logs: 5 of 5 agree, none contradict.
-- **One-tap answers** (acts items `{type: 'detail', ref, field: 'overtime'|'firstCrown', value, at}`, immutable,
-  dated now): the two players of a game are asked about their own games from the last 48 hours. When both agree
-  (or the admin decides) the detail is filled in. Bets that need a missing detail wait up to 48 hours after the
-  result for it, then are refunded.
+- **One-tap answers from the admin** (acts items `{type: 'detail', ref, field: 'overtime'|'firstCrown', value, at}`,
+  immutable, dated now): the admin is asked (Admin tab, and at the top of the page when a bet is waiting) about
+  games from the last 48 hours, and the admin's answer fills the detail in, including for the admin's own games.
+  Players aren't asked (two players' matching answers would still count, but the page no longer asks them).
+  Bets that need a missing detail wait up to 48 hours after the result, then are refunded; an admin "Not sure"
+  refunds them at once.
 - **Odds model v2** (from `OT_MODEL_FROM` in the page): learns overtime from certain evidence, the fingerprint,
   agreed answers (single answers count half), and back-to-back timing (battle times are when games end: a rematch
   gap up to 285 s suggests normal time, 286-344 s sudden death), with a 45% starting guess. Bets placed before

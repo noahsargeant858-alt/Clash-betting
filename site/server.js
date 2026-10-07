@@ -59,7 +59,7 @@ function resolveConfig(opts) {
     maxAccounts: num(pick('maxAccounts', 'MAX_ACCOUNTS', 200), 200),
     skewSeconds: num(pick('skewSeconds', 'TIME_SKEW_SECONDS', 120), 120),
     battlesUrl: pick('battlesUrl', 'BATTLES_URL', BATTLES_URL),
-    importIntervalMin: num(pick('importIntervalMin', 'IMPORT_INTERVAL_MIN', 20), 20),
+    importIntervalMin: num(pick('importIntervalMin', 'IMPORT_INTERVAL_MIN', 5), 5), // cheap: an unchanged feed is a 304
     publicDir: opts.publicDir || path.join(__dirname, 'public'),
     seedFile: opts.seedFile || path.join(__dirname, 'seed', 'seed.json'),
     repoRoot: opts.repoRoot || path.join(__dirname, '..'),

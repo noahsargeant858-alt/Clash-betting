@@ -43,7 +43,7 @@ Everyone starts with the starting coins in Settings (1,000).
 * **Locked-out friend:** Admin tab → **Website accounts** → **Reset password** (you get a one-time temporary password to send them), or just make them a new invite link for the same player after switching their old account off.
 * **Switch someone off:** the same table has **Switch off** (signs them out everywhere and stops them signing in).
 * **Change your own admin password:** change `ADMIN_PASSWORD` in Render (Environment tab) and let the service restart. The variable is applied every time the server starts.
-* **Official Clash results** arrive on their own: the server looks at the battle feed (refreshed hourly by the GitHub Action) every 20 minutes and adds new games.
+* **Official Clash results** arrive on their own: the server looks at the battle feed (refreshed hourly by the GitHub Action) every 5 minutes and adds new games. A restart (any deploy) also checks straight away.
   The old claude.ai routine that did this is no longer needed.
 * **Backups:** Render keeps daily snapshots of the disk on paid plans. For an extra copy off Render, see the optional encrypted backup below.
 * **If friends often see "Too many attempts":** the server works out each visitor's address from Render's proxy by itself (`TRUST_PROXY` is `auto`), so this should not happen. If it does, tell me what the page said and roughly how many of you were on the same wifi.
@@ -59,7 +59,7 @@ Everyone starts with the starting coins in Settings (1,000).
 | `ADMIN_PASSWORD` | your password (always applied at start) |
 | `SIGNUP_CODE` | group code for creating accounts; leave empty to allow anyone with the link (not recommended) |
 | `PUBLIC_URL` | optional: the address to put in invite links, e.g. `https://clashbets.onrender.com` (otherwise taken from the request) |
-| `IMPORT_INTERVAL_MIN` | how often to look for new battles (default 20; `0` turns it off) |
+| `IMPORT_INTERVAL_MIN` | how often to look for new battles (default 5; `0` turns it off) |
 | `INVITE_DAYS` | how long a personal link stays valid (default 14) |
 | `TRUST_PROXY` | `auto` on Render (default in production). Use a number only if you put your own proxy in front |
 

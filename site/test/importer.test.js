@@ -373,7 +373,7 @@ test('the timer: one run soon after boot, then every IMPORT_INTERVAL_MIN; 0 mean
 test('the default feed address is the battle-data branch of the repo', () => {
   const { resolveConfig } = require('../server');
   assert.strictEqual(resolveConfig({ env: {} }).battlesUrl, 'https://raw.githubusercontent.com/noahsargeant858-alt/Clash-betting/battle-data/battles.json');
-  assert.strictEqual(resolveConfig({ env: {} }).importIntervalMin, 20);
-  assert.strictEqual(resolveConfig({ env: { BATTLES_URL: 'http://x/y', IMPORT_INTERVAL_MIN: '5' } }).importIntervalMin, 5);
+  assert.strictEqual(resolveConfig({ env: {} }).importIntervalMin, 5);
+  assert.strictEqual(resolveConfig({ env: { BATTLES_URL: 'http://x/y', IMPORT_INTERVAL_MIN: '15' } }).importIntervalMin, 15);
   assert.strictEqual(resolveConfig({ env: { IMPORT_INTERVAL_MIN: '0' } }).importIntervalMin, 0);
 });

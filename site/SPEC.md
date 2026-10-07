@@ -39,7 +39,7 @@ site/
 | `COOKIE_SECURE` | auto (https) | force the Secure flag |
 | `SESSION_DAYS` | 90 | session lifetime |
 | `BATTLES_URL` | `https://raw.githubusercontent.com/noahsargeant858-alt/Clash-betting/battle-data/battles.json` | official battles feed |
-| `IMPORT_INTERVAL_MIN` | 20 | how often to look for new battles (0 = off) |
+| `IMPORT_INTERVAL_MIN` | 5 | how often to look for new battles (0 = off) |
 | `SNAPSHOT_REPO`, `SNAPSHOT_BRANCH`, `SNAPSHOT_TOKEN`, `SNAPSHOT_KEY` | none | optional backup for hosts whose disk is wiped on restart: encrypted (AES-256-GCM with `SNAPSHOT_KEY`) copy of both data files, pushed to a branch via the GitHub contents API, restored at boot if `DATA_DIR` is empty |
 
 ## Data model

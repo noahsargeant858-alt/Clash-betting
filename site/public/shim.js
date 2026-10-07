@@ -615,7 +615,7 @@ body { padding-bottom: 72px; }
         h('p', { class: 'note' }, 'Everyone who can sign in to this site. Reset a password if someone is locked out; the new one is shown once. Switching an account off signs it out and stops it signing in, and you can switch it back on.'),
         accMsg, tempBox, accWrap),
       h('section', { class: 'panel stack' }, h('h2', {}, 'Official results'),
-        h('p', { class: 'note' }, 'Games played in Clash arrive by themselves: GitHub fetches the battle logs (roughly hourly, sometimes later) and this site checks for them every 20 minutes. If a bet is waiting on a game that has just finished, check now.'),
+        h('p', { class: 'note' }, 'Games played in Clash arrive by themselves: GitHub fetches the battle logs (roughly hourly, sometimes later) and this site checks for them every 5 minutes. If a bet is waiting on a game that has just finished, check now.'),
         h('div', { class: 'row' }, impBtn), impMsg),
       h('section', { class: 'panel stack' }, h('h2', {}, 'Group link'),
         h('p', { class: 'note' }, 'One link for the group chat. It opens Create account with the group code already filled in, so your mates only pick a username and password, then tap their name and you approve them under Player link requests. Anyone who gets hold of it can make an account, so keep it in the chat. Changing SIGNUP_CODE on Render makes old group links stop working.'),

@@ -235,3 +235,8 @@ A locked single-game fixture with no confirmed result for it settles on the firs
 players that ended after betting closed (and before the fixture expired). Each official game settles one fixture
 at most. A confirmed log for the fixture still comes first; an unconfirmed one waits behind the official game.
 Fixtures that had expired before `AUTO_SETTLE_FROM` keep what they had.
+
+A fixture nobody locked by the end of its betting window (plus the minute's grace) is called off: its bets are
+refunded, it leaves the live list (it shows as "Called off" for 10 minutes), and the same two can open a new one
+straight away. Players get no Log button on a fixture that settles from the battle log; logging the game from the
+Log tab anyway says so once, then files it for the history only.

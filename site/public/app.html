@@ -1910,7 +1910,7 @@ function judge(b) {
   if (b.frozen && (b.bettor === b.a || b.bettor === b.b) && speaksFor(b.lockedBy, b.bettor, f.at)) return voidIt('Your own match bet needs your opponent or the admin to lock the fixture');
   if (!priceOk(b, s)) return voidIt('Price check failed');
   // no lock made inside the window: nothing proves when bets were placed, so they're refunded
-  if (!f.primary) return Date.now() > f.windowEnds + LOCK_GRACE ? voidIt('Betting wasn\'t locked before the game') : { status: 'open', payout: 0, matchKey: undefined };
+  if (!f.primary) return Date.now() > f.windowEnds + LOCK_GRACE ? voidIt('Called off: nobody locked it before the game') : { status: 'open', payout: 0, matchKey: undefined };
   const legs = b.legs || [{ market: b.market, selection: b.selection }];
   // A detail the battle log can't show (overtime, first crown) can still come from the players' one-tap answers:
   // bets that need one wait up to ANSWER_MS after the result, then are refunded
@@ -2064,8 +2064,13 @@ const seriesStarted = (f) => { const st = seriesState()[f.key]; return !!st && (
 // Betting is open from when a fixture opens (a minute's leeway for clocks) until its window ends or it locks
 const isOpen = (f) => Date.now() >= Date.parse(f.at) - LOCK_GRACE && Date.now() < f.closesAt && Date.now() < f.expiresAt
   && (f.format ? !seriesStarted(f) : !resultForFixture(f) && !pendingForFixture(f));
+// Nobody locked it inside its betting window, so it can't settle and its bets are refunded. It's called off: it
+// stays on the board a few minutes so people see why, and never stops the same two opening a new one.
+const neverLocked = (f) => !f.primary && Date.now() > f.windowEnds + LOCK_GRACE;
+const CALLED_OFF_SHOWN = 10 * 60000;
 // single-game fixtures (the Odds tab); series live on the Tournament tab
-const liveFixtures = () => fixtureData().list.filter((f) => !f.format && !resultForFixture(f) && Date.now() < f.expiresAt);
+const liveFixtures = () => fixtureData().list.filter((f) => !f.format && !resultForFixture(f) && Date.now() < f.expiresAt && !neverLocked(f));
+const calledOff = () => fixtureData().list.filter((f) => !f.format && neverLocked(f) && !resultForFixture(f) && Date.now() < f.windowEnds + LOCK_GRACE + CALLED_OFF_SHOWN);
 const openFixtureFor = (a, b) => fixtureData().list.find((f) => !f.format && ((f.a === a && f.b === b) || (f.a === b && f.b === a)) && isOpen(f)) || null;
 const liveSeries = () => fixtureData().list.filter((f) => f.format && (() => { const st = seriesState()[f.key]; return !['final', 'void'].includes(st.status) || Date.now() < f.expiresAt; })());
 const openSeriesFor = (a, b, format) => fixtureData().list.find((f) => f.format === format && ((f.a === a && f.b === b) || (f.a === b && f.b === a)) && isOpen(f)) || null;
@@ -2256,19 +2261,40 @@ $('#confirmBox').addEventListener('click', async (e) => {
 // ======================================================================
 //  Fixtures
 // ======================================================================
+// What a fixture is waiting for, in a line anyone can follow
+function fixtureHint(f, pend, open) {
+  const now = Date.now(), who = `${esc(nameOf(f.a))} or ${esc(nameOf(f.b))}`;
+  if (pend) {
+    const by = pend.waitingFor.length ? pend.waitingFor.map((u) => esc(accountName(u))).join(' or ') : 'the admin';
+    return `${esc(accountName(pend.loggedBy))} logged it. It counts once ${by} confirms it${f.primary && fromLog(f) ? ', or once the game is in the battle log' : ''}.`;
+  }
+  if (open && !f.primary) return canLock(f)
+    ? 'Tap Lock as the draft starts. Opened it by mistake? Just don\'t lock it: when betting closes it\'s called off and every bet on it is refunded.'
+    : `${who} locks it as the draft starts. If nobody does, it's called off and every bet on it is refunded.`;
+  if (!f.primary) return 'Betting\'s closed. If nobody locked it in time, it\'s called off in a moment and bets are refunded.';
+  const by = `Not played by ${fmtDate(f.expiresAt)}? Bets are refunded.`;
+  if (!fromLog(f)) return `Locked. Log the result once it's played. ${by}`;
+  const cov = coverage(f.a, f.b);
+  const read = !cov ? '' : ms(cov) < f.closesAt
+    ? ` The battle log was last read ${ago(now - ms(cov))}, before this game, so it settles at the next update${me.admin ? ' (or tap Check for new results on the Admin tab)' : ''}.`
+    : ` Nothing between them in the battle log yet (last read ${ago(now - ms(cov))}).`;
+  return `Just play: it settles by itself once the game is in the battle log.${read} ${by}`;
+}
 function renderFixtures() {
-  const pid = myPlayer(), list = liveFixtures(), now = Date.now();
-  $('#fixtureList').innerHTML = list.length ? list.map((f) => {
+  const pid = myPlayer(), list = liveFixtures(), off = calledOff(), now = Date.now();
+  $('#fixtureList').innerHTML = list.length || off.length ? list.map((f) => {
     const pend = pendingForFixture(f), open = isOpen(f);
     const status = pend ? '<span class="pill warn">Result waiting</span>' : open ? `<span class="pill open">Betting open · closes in ${left(f.closesAt - now)}</span>`
-      : f.primary ? (fromLog(f) ? '<span class="pill">Locked · settles from the battle log</span>' : '<span class="pill">Betting locked</span>') : now > f.windowEnds + LOCK_GRACE ? '<span class="pill lost">Never locked: bets refunded</span>' : '<span class="pill">Betting closed</span>';
+      : f.primary ? (fromLog(f) ? '<span class="pill">Locked · settles from the battle log</span>' : '<span class="pill">Betting locked</span>') : '<span class="pill">Betting closed</span>';
     const nBets = ledger().filter((b) => b.fx === f.key).length;
-    const hint = open && canLock(f) && !f.primary ? '<div class="small">Tap Lock as the draft starts. If nobody in the match locks it before betting closes, every bet on it is refunded.</div>'
-      : f.primary && !pend && fromLog(f) ? '<div class="small">Just play. It settles by itself once the game is in the battle log (the admin can tap Check for new results). If a bet needs overtime or the first tower, the admin answers a quick yes/no.</div>' : '';
-    return `<div class="fx-row"><div><b>${esc(nameOf(f.a))}</b> v <b>${esc(nameOf(f.b))}</b> ${status}<div class="small muted">Opened ${ago(now - Date.parse(f.at))} · ${nBets} bet${nBets === 1 ? '' : 's'}</div>${hint}</div>
+    return `<div class="fx-row"><div><b>${esc(nameOf(f.a))}</b> v <b>${esc(nameOf(f.b))}</b> ${status}<div class="small muted">Opened ${ago(now - Date.parse(f.at))} · ${nBets} bet${nBets === 1 ? '' : 's'}</div><div class="small">${fixtureHint(f, pend, open)}</div></div>
       <div class="row">${open ? `<button class="btn tiny" type="button" data-fxbet="${esc(f.key)}">Bet on this</button>` : ''}
       ${open && canLock(f) && !f.primary ? `<button class="btn tiny warn" type="button" data-fxlock="${esc(f.key)}">Lock: draft starting</button>` : ''}
-      ${!pend && (pid || me.admin) && !readOnly && (me.admin || !fromLog(f)) ? `<button class="btn tiny" type="button" data-fxlog="${esc(f.key)}">${fromLog(f) ? 'Log by hand' : 'Log result'}</button>` : ''}</div></div>`;
+      ${!pend && f.primary && (pid || me.admin) && !readOnly && (me.admin || !fromLog(f)) ? `<button class="btn tiny" type="button" data-fxlog="${esc(f.key)}">${fromLog(f) ? 'Log by hand' : 'Log result'}</button>` : ''}</div></div>`;
+  }).join('') + off.map((f) => {
+    const nBets = ledger().filter((b) => b.fx === f.key).length;
+    return `<div class="fx-row muted"><div><b>${esc(nameOf(f.a))}</b> v <b>${esc(nameOf(f.b))}</b> <span class="pill lost">Called off: nobody locked it</span>
+      <div class="small">${nBets ? `${nBets} bet${nBets === 1 ? '' : 's'} refunded. ` : ''}Open a new one when you're about to play. This clears in ${Math.max(1, Math.ceil((f.windowEnds + LOCK_GRACE + CALLED_OFF_SHOWN - now) / 60000))} min.</div></div></div>`;
   }).join('') : '<p class="note">No fixtures open. When you\'re about to play, open one so everyone can bet before the draft starts.</p>';
   const form = $('#fixtureForm');
   form.hidden = readOnly || !(pid || me.admin);
@@ -2614,7 +2640,7 @@ $('#seriesForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const a = me.admin ? $('#newSrA').value : myPlayer(), b = $('#newSrB').value;
   if (!a || !b || a === b) return toast('Pick two different players.', true);
-  if (fixtureData().list.some((f) => f.format && ((f.a === a && f.b === b) || (f.a === b && f.b === a)) && Date.now() < f.expiresAt && !['final', 'void'].includes(seriesState()[f.key].status)))
+  if (fixtureData().list.some((f) => f.format && ((f.a === a && f.b === b) || (f.a === b && f.b === a)) && Date.now() < f.expiresAt && !neverLocked(f) && !['final', 'void'].includes(seriesState()[f.key].status)))
     return toast('Those two already have a series on.', true);
   const noFeed = [a, b].find((x) => !hasFeed(x));
   if (noFeed) return toast(`A series settles from the official battle log, and ${nameOf(noFeed)} isn't on it yet (no player tag). Ask the admin to add it.`, true);
@@ -3006,7 +3032,12 @@ $('#matchForm').addEventListener('submit', async (e) => {
   const sig = `${m.playerA}|${m.playerB}|${m.crownsA}|${m.crownsB}`;
   if (!editing && submitWarned !== sig) {
     const liveFx = !f && liveFixtures().find((x) => samePair(m, x.a, x.b) && !pendingForFixture(x) && Date.parse(x.at) <= Date.parse(m.date));
-    if (liveFx) { submitWarned = sig; return toast(`${nameOf(liveFx.a)} v ${nameOf(liveFx.b)} has an open fixture. Pick it above so the bets settle. If this was a different game, press Log again.`, true); }
+    if (liveFx) {
+      submitWarned = sig;
+      return toast(me.admin || !fromLog(liveFx)
+        ? `${nameOf(liveFx.a)} v ${nameOf(liveFx.b)} has an open fixture. Pick it above so the bets settle. If this was a different game, press Log again.`
+        : `No need: ${nameOf(liveFx.a)} v ${nameOf(liveFx.b)} settles by itself from the battle log. To log it anyway (history only, the other player confirms), press Log again.`, true);
+    }
     const theirs = resultData().pending.find((r) => samePair(r, m.playerA, m.playerB) && r.loggedBy !== me.uid && Math.abs(Date.parse(r.date) - Date.parse(m.date)) < 3600000);
     if (theirs) { submitWarned = sig; return toast(`${accountName(theirs.loggedBy)} already logged ${nameOf(m.playerA)} v ${nameOf(m.playerB)}. Confirm theirs at the top instead. If this was another game, press Log again.`, true); }
   }

@@ -450,7 +450,16 @@ const PRIORS = {
 // 45%, not 30%. Bets placed before OT_MODEL_FROM keep being checked against v1, the model they were priced by.
 const PRIORS_V2 = { ...PRIORS, overtime: 0.45 };
 const OT_MODEL_FROM = '2026-10-07T12:00:00.000Z';
-const OT_MODEL_GRACE = 3 * 3600e3; // a page left open from before the switch still showed v1 prices for a while
+const OT_MODEL_GRACE = 3 * 3600e3; // a page left open from before a switch still showed the old prices for a while
+// Model v3 (from MODEL_V3_FROM): a walk-forward benchmark on 161 official games (each predicted from earlier games
+// only) found v2 overconfident: its 80-90% favourites won 68%, and backing every underdog returned +29%. Head-to-head
+// records over a handful of games are mostly noise, so in v3 they count for much less (32 imaginary games instead
+// of 4) and each player's own record a little less (12 instead of 6). Tuned on the first half of the season and
+// judged on the second: log loss 0.672 against v2's 0.701 (a coin flip scores 0.703), 80% favourites then won 79%.
+const PRIORS_V3 = { ...PRIORS_V2, h2hStrength: 32, winStrength: 12 };
+const MODEL_V3_FROM = '2026-10-07T16:45:00.000Z';
+// when each model version took over (v1 before the first)
+const MODEL_SWITCHES = [[2, OT_MODEL_FROM], [3, MODEL_V3_FROM]];
 // Battle times are when games end, so a rematch's gap is setup (about 45-160 s) plus the game: a gap up to
 // 285 s mostly means normal time, 286-344 s mostly sudden-death overtime; longer can't be told from a break.
 const GAP_NORMAL = 285, GAP_SUDDEN = 344, P_OT_SHORT_GAP = 0.2, P_OT_MID_GAP = 0.75;
@@ -564,10 +573,10 @@ function globalModel(matches, pri = PRIORS) {
 }
 
 // Damage dealt by a player: their own numbers + what the opponent lets through, then head-to-head
-function damageModel(attack, defendConceded, h2hVals, g) {
-  const vals = attack.concat(defendConceded), k = PRIORS.dealtStrength;
+function damageModel(attack, defendConceded, h2hVals, g, pri = PRIORS) {
+  const vals = attack.concat(defendConceded), k = pri.dealtStrength;
   let mu = (vals.reduce((t, x) => t + x, 0) + g.dealtMean * k) / (vals.length + k);
-  mu = (h2hVals.reduce((t, x) => t + x, 0) + mu * PRIORS.h2hStrength) / (h2hVals.length + PRIORS.h2hStrength);
+  mu = (h2hVals.reduce((t, x) => t + x, 0) + mu * pri.h2hStrength) / (h2hVals.length + pri.h2hStrength);
   const ss = vals.reduce((t, x) => t + (x - mu) ** 2, 0);
   const sd = Math.max(400, Math.sqrt((ss + g.dealtSd ** 2 * k) / (vals.length + k)));
   return { mu, sd };
@@ -578,30 +587,30 @@ function model(a, b, matches, pri = PRIORS) {
   const sa = summarise(a, matches), sb = summarise(b, matches);
   const hm = matches.filter((m) => (m.playerA === a && m.playerB === b) || (m.playerA === b && m.playerB === a));
   const h = summarise(a, hm);
-  let pWin = log5(smooth(sa.wins, sa.decisive, 0.5, PRIORS.winStrength), smooth(sb.wins, sb.decisive, 0.5, PRIORS.winStrength));
-  pWin = smooth(h.wins, h.decisive, pWin, PRIORS.h2hStrength);
-  const pDraw = smooth(sa.draws + sb.draws, sa.games + sb.games, g.drawRate, PRIORS.drawStrength);
+  let pWin = log5(smooth(sa.wins, sa.decisive, 0.5, pri.winStrength), smooth(sb.wins, sb.decisive, 0.5, pri.winStrength));
+  pWin = smooth(h.wins, h.decisive, pWin, pri.h2hStrength);
+  const pDraw = smooth(sa.draws + sb.draws, sa.games + sb.games, g.drawRate, pri.drawStrength);
   const pA = (1 - pDraw) * pWin, pB = (1 - pDraw) * (1 - pWin);
-  const cA = dirichlet(addCounts(sa.winCrowns, sb.lossCrowns), g.winnerCrowns, PRIORS.playerCrownStrength);
-  const cB = dirichlet(addCounts(sb.winCrowns, sa.lossCrowns), g.winnerCrowns, PRIORS.playerCrownStrength);
+  const cA = dirichlet(addCounts(sa.winCrowns, sb.lossCrowns), g.winnerCrowns, pri.playerCrownStrength);
+  const cB = dirichlet(addCounts(sb.winCrowns, sa.lossCrowns), g.winnerCrowns, pri.playerCrownStrength);
   const scores = [];
   for (const [w, pw] of Object.entries(cA)) for (const [l, pl] of Object.entries(g.loserCrowns[w])) scores.push({ winner: 'A', a: +w, b: +l, p: pA * pw * pl });
   for (const [w, pw] of Object.entries(cB)) for (const [l, pl] of Object.entries(g.loserCrowns[w])) scores.push({ winner: 'B', a: +l, b: +w, p: pB * pw * pl });
   for (const [c, pc] of Object.entries(g.drawCrowns)) scores.push({ winner: 'D', a: +c, b: +c, p: pDraw * pc });
 
-  const oa = smooth(sa.ot, sa.otKnown, g.overtime, PRIORS.playerOtStrength), ob = smooth(sb.ot, sb.otKnown, g.overtime, PRIORS.playerOtStrength);
-  const pOT = smooth(h.ot, h.otKnown, (oa + ob) / 2, PRIORS.h2hStrength);
-  const pDmgA = smooth(h.dmg, h.dmgKnown, smooth(sa.dmg + sb.dmgConceded, sa.dmgKnown + sb.dmgConcededKnown, g.dmg1000, PRIORS.playerDmgStrength), PRIORS.h2hStrength);
-  const pDmgB = smooth(h.dmgConceded, h.dmgConcededKnown, smooth(sb.dmg + sa.dmgConceded, sb.dmgKnown + sa.dmgConcededKnown, g.dmg1000, PRIORS.playerDmgStrength), PRIORS.h2hStrength);
+  const oa = smooth(sa.ot, sa.otKnown, g.overtime, pri.playerOtStrength), ob = smooth(sb.ot, sb.otKnown, g.overtime, pri.playerOtStrength);
+  const pOT = smooth(h.ot, h.otKnown, (oa + ob) / 2, pri.h2hStrength);
+  const pDmgA = smooth(h.dmg, h.dmgKnown, smooth(sa.dmg + sb.dmgConceded, sa.dmgKnown + sb.dmgConcededKnown, g.dmg1000, pri.playerDmgStrength), pri.h2hStrength);
+  const pDmgB = smooth(h.dmgConceded, h.dmgConcededKnown, smooth(sb.dmg + sa.dmgConceded, sb.dmgKnown + sa.dmgConcededKnown, g.dmg1000, pri.playerDmgStrength), pri.h2hStrength);
   // King Tower activated for X: how often X's king wakes up + how often the opponent wakes kings up
-  const pKingA = smooth(h.king, h.kingKnown, smooth(sa.king + sb.kingCaused, sa.kingKnown + sb.kingCausedKnown, g.king, PRIORS.playerKingStrength), PRIORS.h2hStrength);
-  const pKingB = smooth(h.kingCaused, h.kingCausedKnown, smooth(sb.king + sa.kingCaused, sb.kingKnown + sa.kingCausedKnown, g.king, PRIORS.playerKingStrength), PRIORS.h2hStrength);
-  const fa = smooth(sa.first, sa.firstKnown, 0.5, PRIORS.firstCrownStrength), fb = smooth(sb.first, sb.firstKnown, 0.5, PRIORS.firstCrownStrength);
-  const qFirst = smooth(h.first, h.firstKnown, logistic(logit(log5(fa, fb)) + PRIORS.firstCrownWinLink * logit(pWin)), PRIORS.h2hStrength);
+  const pKingA = smooth(h.king, h.kingKnown, smooth(sa.king + sb.kingCaused, sa.kingKnown + sb.kingCausedKnown, g.king, pri.playerKingStrength), pri.h2hStrength);
+  const pKingB = smooth(h.kingCaused, h.kingCausedKnown, smooth(sb.king + sa.kingCaused, sb.kingKnown + sa.kingCausedKnown, g.king, pri.playerKingStrength), pri.h2hStrength);
+  const fa = smooth(sa.first, sa.firstKnown, 0.5, pri.firstCrownStrength), fb = smooth(sb.first, sb.firstKnown, 0.5, pri.firstCrownStrength);
+  const qFirst = smooth(h.first, h.firstKnown, logistic(logit(log5(fa, fb)) + pri.firstCrownWinLink * logit(pWin)), pri.h2hStrength);
   const sum = (fn) => scores.filter(fn).reduce((t, s) => t + s.p, 0);
   const pNoCrowns = sum((s) => s.a === 0 && s.b === 0);
   const pComeback = sum((s) => s.winner !== 'D' && (s.winner === 'A' ? s.b : s.a) >= 1) * g.comeback;
-  const dealtA = damageModel(sa.dealt, sb.conceded, h.dealt, g), dealtB = damageModel(sb.dealt, sa.conceded, h.conceded, g);
+  const dealtA = damageModel(sa.dealt, sb.conceded, h.dealt, g, pri), dealtB = damageModel(sb.dealt, sa.conceded, h.conceded, g, pri);
   return { pA, pB, pDraw, pWin, scores, pOT, pDmgA, pDmgB, pKingA, pKingB, qFirst, pNoCrowns, pComeback, dealtA, dealtB,
     comebackRate: g.comeback, sample: { a: sa.games, b: sb.games, h2h: h.games }, h2h: { a: h.wins, b: h.losses, d: h.draws } };
 }
@@ -1776,7 +1785,7 @@ function histKey(cut, s) {
 }
 const resetBooks = () => { CACHE_SIG = null; };
 // which model priced the odds at `cutoff` (or the one asked for)
-const modelVer = (cutoff, force) => force || (cutoff >= OT_MODEL_FROM ? 2 : 1);
+const modelVer = (cutoff, force) => force || MODEL_SWITCHES.reduce((v, [n, from]) => (cutoff >= from ? n : v), 1);
 function bookAt(a, b, cutoff, s, force) {
   syncCaches();
   const R = resultData(), v = modelVer(cutoff, force);
@@ -1785,7 +1794,7 @@ function bookAt(a, b, cutoff, s, force) {
   if (!BOOK_CACHE.has(k)) {
     if (BOOK_CACHE.size > 600) BOOK_CACHE.delete(BOOK_CACHE.keys().next().value);
     const inForce = R.versions.filter((r) => r.finalAt <= cutoff && !(r.until && r.until <= cutoff));
-    const m = v === 2 ? model(a, b, enrichForOdds(inForce, cutoff), PRIORS_V2) : model(a, b, inForce);
+    const m = v >= 2 ? model(a, b, enrichForOdds(inForce, cutoff), v === 3 ? PRIORS_V3 : PRIORS_V2) : model(a, b, inForce);
     BOOK_CACHE.set(k, { m, J: jointModel(m, { princess: s.princessHp, king: s.kingHp }) });
   }
   return BOOK_CACHE.get(k);
@@ -1810,7 +1819,8 @@ function priceOk(b, s) {
   const tries = [];
   for (const cut of [b.placedAt, earlier]) {
     tries.push([cut, 0]);
-    if (cut >= OT_MODEL_FROM && ms(cut) < ms(OT_MODEL_FROM) + OT_MODEL_GRACE) tries.push([cut, 1]);
+    // just after a switch, a page left open may still have shown the previous model's prices
+    for (const [n, from] of MODEL_SWITCHES) if (cut >= from && ms(cut) < ms(from) + OT_MODEL_GRACE) tries.push([cut, n - 1]);
   }
   const ok = tries.some(([cut, force]) => {
     const { m, J } = bookAt(b.a, b.b, cut, s, force);

@@ -7,9 +7,13 @@
 //   - a fixture or lock can't be rewritten or deleted after the fact
 //   - a lock can only freeze bets that really exist in their owners' bet lists (no inventing bets for someone else)
 //   - a bet list only ever grows: placed bets can't be edited or taken back, and each new bet is dated now (the admin can fix mistakes)
+//   - a one-tap answer about a game (did it go to overtime, who took the first tower) is dated now and can't be changed
 
-const IMMUTABLE = new Set(['fixture', 'lock', 'seal']);
-const NOT_DELETABLE = new Set(['fixture', 'lock', 'seal', 'confirm']);
+const IMMUTABLE = new Set(['fixture', 'lock', 'seal', 'detail']);
+const NOT_DELETABLE = new Set(['fixture', 'lock', 'seal', 'confirm', 'detail']);
+// a one-tap answer about what the battle log can't show (bets can settle on two players agreeing)
+const DETAIL_FIELDS = new Set(['overtime', 'firstCrown']);
+const DETAIL_VALUES = [true, false, 'me', 'opp', 'A', 'B', 'unsure'];
 const MAX_LOCK_BETS = 400;
 
 const canon = (t) => typeof t === 'string' && t.length === 24 && Number.isFinite(Date.parse(t)) && new Date(Date.parse(t)).toISOString() === t;
@@ -38,13 +42,16 @@ function check({ op, segs, cur, next, now, skewMs, getDoc, isAdmin }) {
   // ----- events in a person's own folder
   if (segs[0] === 'acts' && segs.length === 4 && segs[2] === 'items') {
     if (op === 'delete') {
-      return !isAdmin && cur && NOT_DELETABLE.has(cur.type) ? 'Fixtures, locks and confirmations can\'t be deleted.' : null;
+      return !isAdmin && cur && NOT_DELETABLE.has(cur.type) ? 'Fixtures, locks, confirmations and answers can\'t be deleted.' : null;
     }
     const type = next.type;
     if (IMMUTABLE.has(type) && cur) return same(cur, next) ? null : `A ${type} can't be changed once it's made.`;
     if (cur && IMMUTABLE.has(cur.type)) return `A ${cur.type} can't be turned into something else.`;
-    if (type === 'fixture' || type === 'lock' || type === 'seal' || type === 'confirm') {
+    if (type === 'fixture' || type === 'lock' || type === 'seal' || type === 'confirm' || type === 'detail') {
       if (!inTime(next.at)) return CLOCK;
+    }
+    if (type === 'detail') {
+      if (typeof next.ref !== 'string' || next.ref.length > 300 || !DETAIL_FIELDS.has(next.field) || !DETAIL_VALUES.includes(next.value)) return 'That answer isn\'t one the page asks for.';
     }
     if (type === 'match') {
       const was = cur && cur.loggedAt;

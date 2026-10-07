@@ -39,25 +39,47 @@ const taken = (t) => P_HP - t.left + (P_HP - t.right) + (K_HP - t.king);
 const lowest = (t) => Math.min(...[t.left, t.right, t.king].filter((h) => h > 0), Infinity);
 const otPossible = (a, b) => Math.abs(a - b) === 1 || (Math.max(a, b) === 3 && Math.min(a, b) <= 1);
 
+// The tiebreaker at the end of overtime drains every standing tower by the same amount until one falls.
+// So when every standing tower on both sides has lost HP, and the smallest loss is exactly the same on
+// both sides, that smallest loss is the drain and the game went the full overtime. Returns the drain, or
+// null. (A tower nobody touched keeps full HP, so a side with any untouched tower rules it out.)
+function tiebreakDrain(tA, tB) {
+  const losses = (t) => [[t.left, P_HP], [t.king, K_HP], [t.right, P_HP]].filter(([hp]) => hp > 0).map(([hp, max]) => max - hp);
+  const a = losses(tA), b = losses(tB);
+  if (!a.length || !b.length) return null;
+  const x = Math.min(...a), y = Math.min(...b);
+  return x > 0 && x === y ? x : null;
+}
+const standing = (t) => [t.left, t.king, t.right].filter((hp) => hp > 0).length;
+
 // One official battle -> a result, filling in everything the game's rules prove
 function fromBattle(b, playerOf, finalAt) {
   const A = b.team, B = b.opponent;
   const tA = towersOf(A), tB = towersOf(B), cA = A.crowns, cB = B.crowns;
   let winner = cA > cB ? 'A' : cB > cA ? 'B' : null;
   if (!winner) { const lA = lowest(tA), lB = lowest(tB); winner = lA > lB ? 'A' : lB > lA ? 'B' : 'draw'; } // tiebreaker: healthiest weakest tower
-  const overtime = cA === cB ? true : !otPossible(cA, cB) ? false : null;
+  // a one-crown win with the drain's fingerprint was decided by the tiebreaker (crowns were level)
+  const drain = Math.abs(cA - cB) === 1 ? tiebreakDrain(tA, tB) : null;
+  const tiebreaker = drain != null;
+  const overtime = cA === cB || tiebreaker ? true : !otPossible(cA, cB) ? false : null;
   const dealtA = taken(tB), dealtB = taken(tA);
-  const dmg = (dealt, crowns, other) => {
-    if (dealt < 1000) return false;
+  // damage dealt before the drain: the drain hit each of the other side's standing towers, plus the one it knocked over
+  const preDrain = (dealt, side) => (tiebreaker ? dealt - drain * (standing(side === 'A' ? tB : tA) + (winner === side ? 1 : 0)) : dealt);
+  const dmg = (dealt, crowns, other, side) => {
+    if (dealt < 1000 || preDrain(dealt, side) < 1000) return false; // not even 1,000 before the tiebreaker, so not before overtime either
     if (overtime === false) return true;
-    if (overtime === true && Math.min(crowns, other) >= 1) return true; // crowns held when regulation ended
+    // the loser's crowns always came in regulation, and with overtime the winner was level then: so when both
+    // scored, both had a crown (over 1,000 damage) before overtime, whether or not there was overtime
+    if (Math.min(crowns, other) >= 1) return true;
     return null;
   };
   return {
     playerA: playerOf[normTag(A.tag)], playerB: playerOf[normTag(B.tag)], crownsA: cA, crownsB: cB, winner, overtime,
-    dmgA: dmg(dealtA, cA, cB), dmgB: dmg(dealtB, cB, cA),
+    ...(tiebreaker ? { tiebreaker: true } : {}),
+    dmgA: dmg(dealtA, cA, cB, 'A'), dmgB: dmg(dealtB, cB, cA, 'B'),
     kingA: cB >= 1 || tA.king < K_HP, kingB: cA >= 1 || tB.king < K_HP, // losing a tower or taking damage wakes the King
-    firstCrown: cA + cB === 0 ? 'none' : cB === 0 ? 'A' : cA === 0 ? 'B' : null,
+    // a tiebreaker's crown isn't a crown taken in play: level at 0-0 means nobody took one, level higher is unknown
+    firstCrown: tiebreaker ? (Math.min(cA, cB) === 0 ? 'none' : null) : cA + cB === 0 ? 'none' : cB === 0 ? 'A' : cA === 0 ? 'B' : null,
     towersA: tA, towersB: tB, dealtA, dealtB,
     cardsA: (A.cards || []).map((c) => c.name), cardsB: (B.cards || []).map((c) => c.name),
     elixirLeakedA: A.elixirLeaked ?? null, elixirLeakedB: B.elixirLeaked ?? null,
@@ -130,7 +152,9 @@ function pairUp(handLogs, docs, isTaken = () => false) {
   for (const c of tb) {
     if (usedM.has(c.m.key) || usedR.has(c.id)) continue;
     usedM.add(c.m.key); usedR.set(c.id, c.m.key);
-    c.r.overtime = true; c.r.tiebreaker = true; if (c.m.notes) c.r.notes = c.m.notes;
+    c.r.overtime = true; c.r.tiebreaker = true;
+    c.r.firstCrown = Math.min(c.r.crownsA, c.r.crownsB) === 0 ? 'none' : null;
+    absorb(c.r, c.m, c.flip);
     merged.push({ key: c.m.key, into: c.id, how: `tiebreaker, logged ${Math.round(c.gap / 60e3)} min after` });
   }
   for (const m of handLogs) {
@@ -147,4 +171,4 @@ function pairUp(handLogs, docs, isTaken = () => false) {
   return { merged, duplicates, mislabeled, unmatched };
 }
 
-module.exports = { normTag, iso, docId, playerMap, uniqueBattles, officialResults, pairUp };
+module.exports = { normTag, iso, docId, playerMap, uniqueBattles, officialResults, pairUp, tiebreakDrain };

@@ -436,6 +436,19 @@ const PRIORS = {
   dealtMean: 3500, dealtSd: 2200, dealtStrength: 6,
   firstCrownStrength: 6, firstCrownWinLink: 0.6,
 };
+// Model v2 (from OT_MODEL_FROM): the battle log rarely says whether a game went to overtime (a 1-0 can end in
+// normal time or in sudden death), so v2 learns overtime from more than the score: the tiebreaker's fingerprint
+// in tower HP, the players' own one-tap answers, and how long a back-to-back game took. Its starting guess is
+// 45%, not 30%. Bets placed before OT_MODEL_FROM keep being checked against v1, the model they were priced by.
+const PRIORS_V2 = { ...PRIORS, overtime: 0.45 };
+const OT_MODEL_FROM = '2026-10-07T12:00:00.000Z';
+const OT_MODEL_GRACE = 3 * 3600e3; // a page left open from before the switch still showed v1 prices for a while
+// Battle times are when games end, so a rematch's gap is setup (about 45-160 s) plus the game: a gap up to
+// 285 s mostly means normal time, 286-344 s mostly sudden-death overtime; longer can't be told from a break.
+const GAP_NORMAL = 285, GAP_SUDDEN = 344, P_OT_SHORT_GAP = 0.2, P_OT_MID_GAP = 0.75;
+const DETAIL_FIELDS = ['overtime', 'firstCrown'];
+const ANSWER_MS = 48 * 3600e3; // how long after a result bets wait for the players to fill in a missing detail
+const DETAIL_WAIT = 'Waiting for the players to say what the battle log doesn\'t show';
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
 const logit = (p) => { p = clamp(p, 1e-6, 1 - 1e-6); return Math.log(p / (1 - p)); };
 const logistic = (x) => 1 / (1 + Math.exp(-x));
@@ -462,6 +475,8 @@ function orient(m, id) {
     id: m.id, opp: m['player' + opp], myCrowns: m['crowns' + mine], oppCrowns: m['crowns' + opp],
     result: m.winner === 'draw' ? 'D' : m.winner === mine ? 'W' : 'L',
     overtime: m.overtime ?? null,
+    // how much this game tells the odds about overtime: certain (1, 0/1), a single answer (0.5), or a likely gap (1, 0.2/0.75)
+    otW: m.otW ?? (m.overtime != null ? 1 : 0), otP: m.otP ?? (m.overtime ? 1 : 0),
     firstCrown: m.firstCrown == null ? null : m.firstCrown === 'none' ? 'none' : m.firstCrown === mine ? 'me' : 'opp',
     dmgMe: m['dmg' + mine] ?? null, dmgOpp: m['dmg' + opp] ?? null,
     // losing any tower wakes your King, whatever was logged
@@ -491,7 +506,7 @@ function summarise(id, matches) {
     if (o.result === 'W') { s.wins++; s.winCrowns[o.myCrowns] = (s.winCrowns[o.myCrowns] || 0) + 1; if (o.myCrowns === 3) s.threeCrowns++; if (o.firstCrown === 'opp') s.comebacks++; }
     else if (o.result === 'L') { s.losses++; s.lossCrowns[o.oppCrowns] = (s.lossCrowns[o.oppCrowns] || 0) + 1; }
     else s.draws++;
-    if (o.overtime != null) { s.otKnown++; if (o.overtime) s.ot++; }
+    if (o.otW) { s.otKnown += o.otW; s.ot += o.otW * o.otP; }
     if (o.dmgMe != null) { s.dmgKnown++; if (o.dmgMe) s.dmg++; }
     if (o.dmgOpp != null) { s.dmgConcededKnown++; if (o.dmgOpp) s.dmgConceded++; }
     if (o.firstCrown === 'me' || o.firstCrown === 'opp') { s.firstKnown++; if (o.firstCrown === 'me') s.first++; }
@@ -505,7 +520,7 @@ function summarise(id, matches) {
   return s;
 }
 
-function globalModel(matches) {
+function globalModel(matches, pri = PRIORS) {
   const wc = {}, lc = { 0: {}, 1: {}, 2: {}, 3: {} }, dc = {};
   let draws = 0, otK = 0, ot = 0, dK = 0, d = 0, kK = 0, k = 0, cbK = 0, cb = 0; const dealt = [];
   for (const m of matches) {
@@ -515,7 +530,7 @@ function globalModel(matches) {
       wc[w] = (wc[w] || 0) + 1; if (lc[w]) lc[w][l] = (lc[w][l] || 0) + 1;
       if (l >= 1 && (m.firstCrown === 'A' || m.firstCrown === 'B')) { cbK++; if (m.firstCrown !== m.winner) cb++; }
     }
-    if (m.overtime != null) { otK++; if (m.overtime) ot++; }
+    const w = m.otW ?? (m.overtime != null ? 1 : 0); if (w) { otK += w; ot += w * (m.otP ?? (m.overtime ? 1 : 0)); }
     for (const side of ['A', 'B']) {
       if (m['dmg' + side] != null) { dK++; if (m['dmg' + side]) d++; }
       if (m['king' + side] != null) { kK++; if (m['king' + side]) k++; }
@@ -529,7 +544,7 @@ function globalModel(matches) {
     winnerCrowns: dirichlet(wc, PRIORS.winnerCrowns, PRIORS.crownStrength),
     loserCrowns: Object.fromEntries(Object.entries(PRIORS.loserCrowns).map(([w, pr]) => [w, dirichlet(lc[w], pr, PRIORS.loserStrength)])),
     drawCrowns: dirichlet(dc, PRIORS.drawCrowns, PRIORS.crownStrength),
-    overtime: smooth(ot, otK, PRIORS.overtime, PRIORS.otStrength),
+    overtime: smooth(ot, otK, pri.overtime, PRIORS.otStrength),
     dmg1000: smooth(d, dK, PRIORS.dmg1000, PRIORS.dmgStrength),
     king: smooth(k, kK, PRIORS.king, PRIORS.kingStrength),
     comeback: smooth(cb, cbK, PRIORS.comeback, PRIORS.comebackStrength),
@@ -547,8 +562,8 @@ function damageModel(attack, defendConceded, h2hVals, g) {
   return { mu, sd };
 }
 
-function model(a, b, matches) {
-  const g = globalModel(matches);
+function model(a, b, matches, pri = PRIORS) {
+  const g = globalModel(matches, pri);
   const sa = summarise(a, matches), sb = summarise(b, matches);
   const hm = matches.filter((m) => (m.playerA === a && m.playerB === b) || (m.playerA === b && m.playerB === a));
   const h = summarise(a, hm);
@@ -1196,13 +1211,13 @@ const cachePut = (k, v) => { if (SIM_CACHE.size >= 16) SIM_CACHE.delete(SIM_CACH
 // Simulated games (or series) for a pair, as things stood at `cutoff`. The pair is always played
 // out in the same order, with dice that depend only on who's playing and the format, so the
 // price is the same whichever way round you look at it and no unrelated result can re-roll it.
-function simBook(a, b, cutoff, s, format) {
+function simBook(a, b, cutoff, s, format, force) {
   syncCaches();
-  const [x, y] = a < b ? [a, b] : [b, a];
-  const key = [x, y, bookIndex(cutoff), format || 'game', s.princessHp, s.kingHp].join('|');
+  const [x, y] = a < b ? [a, b] : [b, a], v = modelVer(cutoff, force);
+  const key = [x, y, bookIndex(cutoff), v, format || 'game', s.princessHp, s.kingHp].join('|');
   let base = SIM_CACHE.get(key);
   if (!base) {
-    const { J } = bookAt(x, y, cutoff, s), res = versionsAt(cutoff);
+    const { J } = bookAt(x, y, cutoff, s, v), res = versionsAt(cutoff);
     const dm = deckModel(x, y, res), lA = leakModel(x, res), lB = leakModel(y, res);
     const rand = seeded(hash32([x, y, format || 'game'].join('|')));
     const cum = []; let total = 0; for (const st of J.states) { total += st.p; cum.push(total); }
@@ -1545,6 +1560,13 @@ const resultData = memo(() => {
     if (c.verdict === 'ok' && !(validResult(c.copy) && hashOf(c.copy) === c.hash && canon(c.loggedAt) && c.at >= c.loggedAt)) continue;
     confirms.push(c);
   }
+  // one-tap answers about what the battle log can't show; who they speak for is worked out per result
+  const answers = {};
+  for (const [uid, items] of Object.entries(store.acts)) for (const x of items) {
+    if (x.type !== 'detail' || typeof x.ref !== 'string' || !DETAIL_FIELDS.includes(x.field) || !canon(x.at) || x.at > soon) continue;
+    if (![true, false, 'me', 'opp', 'A', 'B', 'unsure'].includes(x.value)) continue;
+    ((answers[x.ref] ||= {})[x.field] ||= []).push({ uid, value: x.value, at: x.at });
+  }
   // the player a logger speaks for, and the accounts of the other player, who must confirm
   const sides = (uid, r, t) => {
     const mine = speaksFor(uid, r.playerA, t) ? r.playerA : speaksFor(uid, r.playerB, t) ? r.playerB : null;
@@ -1605,14 +1627,105 @@ const resultData = memo(() => {
   // person's word, so it never enters the odds (nobody could pad them with made-up results).
   const versions = all.filter((r) => !dupeKeys.has(r.key) && !r.bookOnly);
   // the moments the set of results in force changes, so the odds at any time can be cached
-  const marks = [...new Set(versions.flatMap((r) => [r.finalAt, r.until]).filter(Boolean))].sort();
+  const answerTimes = Object.values(answers).flatMap((f) => Object.values(f).flat().map((x) => x.at));
+  const marks = [...new Set(versions.flatMap((r) => [r.finalAt, r.until]).concat(answerTimes).filter(Boolean))].sort();
   // a fingerprint of the odds history, so cached prices survive anything that doesn't change it
-  const sig = hash32(JSON.stringify([versions.map((r) => [r.key, r.finalAt, r.until, hashOf(r), r.elixirLeakedA, r.elixirLeakedB, r.cardsA, r.cardsB]), store.settings.history || []])).toString(36);
+  const sig = hash32(JSON.stringify([versions.map((r) => [r.key, r.finalAt, r.until, hashOf(r), r.elixirLeakedA, r.elixirLeakedB, r.cardsA, r.cardsB]), store.settings.history || [], answers])).toString(36);
   // the official battle-log records, fixture tags ignored (a series counts every official game)
   const official = current.filter((r) => r.source === 'api');
-  return { final: current.filter((r) => !dupe(r)), pending: pending.filter((r) => !dupe(r)).sort(byDate), duplicates, versions, settles, marks, sig, official };
+  return { final: current.filter((r) => !dupe(r)), pending: pending.filter((r) => !dupe(r)).sort(byDate), duplicates, versions, settles, marks, sig, official, answers };
 });
 const finalResults = () => resultData().final;
+// What the two players (or the admin) said about a detail of result r, counting only answers made by `until`.
+// The players' own accounts speak for their side; the admin's word settles it. Values come back as the
+// result stores them: overtime true/false, first crown 'A'/'B'.
+function detailsFor(r, until) {
+  const A = resultData().answers[r.key], out = {};
+  if (!A) return out;
+  for (const field of DETAIL_FIELDS) {
+    const list = (A[field] || []).filter((x) => x.at <= until).sort((p, q) => p.at.localeCompare(q.at));
+    const said = {};
+    for (const x of list) {
+      const side = speaksFor(x.uid, r.playerA, x.at) ? 'A' : speaksFor(x.uid, r.playerB, x.at) ? 'B' : x.uid === adminUid() ? 'admin' : null;
+      if (!side || said[side]) continue;
+      let v = x.value;
+      if (field === 'firstCrown') v = v === 'me' ? side : v === 'opp' ? (side === 'A' ? 'B' : side === 'B' ? 'A' : null) : side === 'admin' && (v === 'A' || v === 'B') ? v : v === 'unsure' ? 'unsure' : null;
+      else if (typeof v !== 'boolean' && v !== 'unsure') v = null;
+      if (v != null) said[side] = { v, at: x.at };
+    }
+    const known = (s) => s && s.v !== 'unsure';
+    const o = { a: said.A ? said.A.v : null, b: said.B ? said.B.v : null, admin: said.admin ? said.admin.v : null };
+    if (known(said.admin)) Object.assign(o, { agreed: said.admin.v, at: said.admin.at });
+    else if (known(said.A) && known(said.B)) { if (said.A.v === said.B.v) Object.assign(o, { agreed: said.A.v, at: later(said.A.at, said.B.at) }); else o.disputed = true; }
+    else if (known(said.A) || known(said.B)) { const s1 = known(said.A) ? said.A : said.B; Object.assign(o, { single: s1.v, at: s1.at }); }
+    out[field] = o;
+  }
+  return out;
+}
+// A result with the details the players agreed on by `until` filled in where the battle log left a gap
+function withAgreed(r, until) {
+  const d = detailsFor(r, until), out = { ...r };
+  if (out.overtime == null && d.overtime && d.overtime.agreed != null) {
+    out.overtime = d.overtime.agreed;
+    if (out.overtime === false) for (const s of ['A', 'B']) if (out['dmg' + s] == null && out['dealt' + s] != null) out['dmg' + s] = out['dealt' + s] >= 1000;
+  }
+  if (out.firstCrown == null && d.firstCrown && d.firstCrown.agreed != null) out.firstCrown = d.firstCrown.agreed;
+  return out;
+}
+const answerUntil = (r) => new Date(ms(r.finalAt) + ANSWER_MS).toISOString();
+// Could an answer still fill a gap in r? (overtime unknown, or first crown unknown with crowns on both sides)
+const askable = (r) => r.overtime == null || (r.firstCrown == null && Math.min(r.crownsA, r.crownsB) >= 1);
+// The tiebreaker at the end of overtime drains every standing tower by the same amount until one falls, so
+// when every standing tower on both sides has lost HP and the smallest loss is identical on both sides, that
+// loss is the drain: the game went the full overtime. Returns the drain, or null.
+function tbDrain(r) {
+  const hp = r.hp || { princess: 3052, king: 4824 };
+  const loss = (t) => (t ? [[t.left, hp.princess], [t.king, hp.king], [t.right, hp.princess]].filter(([h]) => h > 0).map(([h, mx]) => mx - h) : []);
+  const a = loss(r.towersA), b = loss(r.towersB);
+  if (!a.length || !b.length) return null;
+  const x = Math.min(...a), y = Math.min(...b);
+  return x > 0 && x === y ? x : null;
+}
+// Model v2's view of the results in force at `cutoff`: everything the score, the towers, the players' answers
+// (made by then) and back-to-back timing can say about overtime, first crowns and damage before overtime.
+// Only the odds see this; bets settle on the results as stored plus agreed answers (withAgreed).
+function enrichForOdds(list, cutoff) {
+  const prevEnd = new Map(), last = {};
+  for (const r of list.filter((x) => x.source === 'api').sort((x, y) => String(x.date).localeCompare(String(y.date)))) {
+    const p = [last[r.playerA], last[r.playerB]].filter(Boolean).sort().pop();
+    if (p) prevEnd.set(r.key, p);
+    last[r.playerA] = last[r.playerB] = r.date;
+  }
+  return list.map((r) => {
+    const m = { ...r }, rawA = r.crownsA, rawB = r.crownsB, lo = Math.min(rawA, rawB);
+    const oneUp = Math.abs(rawA - rawB) === 1 && (r.winner === 'A' || r.winner === 'B');
+    const drain = !r.tiebreaker && m.overtime == null && oneUp ? tbDrain(r) : null;
+    if (drain != null) { m.crownsA = m.crownsB = lo; m.overtime = true; m.firstCrown = lo === 0 ? 'none' : null; m.tiebreaker = true; }
+    const d = detailsFor(r, cutoff);
+    if (m.overtime == null && d.overtime) {
+      if (d.overtime.agreed != null) m.overtime = d.overtime.agreed;
+      else if (d.overtime.single != null) { m.otW = 0.5; m.otP = d.overtime.single ? 1 : 0; }
+    }
+    if (m.firstCrown == null && d.firstCrown && d.firstCrown.agreed != null) m.firstCrown = d.firstCrown.agreed;
+    if (m.overtime == null && m.otW == null && r.source === 'api' && oneUp && Math.max(rawA, rawB) === 1 && prevEnd.has(r.key)) {
+      const gap = (ms(r.date) - ms(prevEnd.get(r.key))) / 1000;
+      if (gap > 0 && gap <= GAP_NORMAL) { m.otW = 1; m.otP = P_OT_SHORT_GAP; }
+      else if (gap > GAP_NORMAL && gap <= GAP_SUDDEN) { m.otW = 1; m.otP = P_OT_MID_GAP; }
+    }
+    // 1,000+ before overtime: under 1,000 in all (or before the tiebreaker's drain) is a no; when both scored,
+    // both had a crown in normal time (the loser's crowns always come then); with no overtime it's the total
+    for (const s of ['A', 'B']) {
+      if (m['dmg' + s] != null || m['dealt' + s] == null) continue;
+      const dealt = m['dealt' + s], other = s === 'A' ? r.towersB : r.towersA;
+      const standing = other ? [other.left, other.king, other.right].filter((h) => h > 0).length : 0;
+      const before = drain != null ? dealt - drain * (standing + (r.winner === s ? 1 : 0)) : dealt;
+      if (dealt < 1000 || before < 1000) m['dmg' + s] = false;
+      else if (lo >= 1) m['dmg' + s] = true;
+      else if (m.overtime === false) m['dmg' + s] = true;
+    }
+    return m;
+  });
+}
 const resultForFixture = (f) => { const r = resultData().settles[f.key]; return r && r.final ? r : null; };
 const pendingForFixture = (f) => { const r = resultData().settles[f.key]; return r && !r.final ? r : null; };
 
@@ -1625,18 +1738,25 @@ function syncCaches() { const sg = resultData().sig; if (sg !== CACHE_SIG) { BOO
 function histKey(cut, s) {
   const k0 = bookIndex(cut) + '|' + JSON.stringify(s);
   let k = HIST_KEYS.get(k0);
-  if (!k) { k = hash32(JSON.stringify([versionsAt(cut).map((r) => [r.key, r.finalAt, r.until, hashOf(r), r.elixirLeakedA, r.elixirLeakedB, r.cardsA, r.cardsB]), s])).toString(36); HIST_KEYS.set(k0, k); }
+  if (!k) {
+    const said = Object.entries(resultData().answers).flatMap(([ref, f]) => Object.entries(f).flatMap(([field, xs]) => xs.filter((x) => x.at <= cut).map((x) => [ref, field, x.uid, x.value, x.at])));
+    k = hash32(JSON.stringify([versionsAt(cut).map((r) => [r.key, r.finalAt, r.until, hashOf(r), r.elixirLeakedA, r.elixirLeakedB, r.cardsA, r.cardsB]), s, cut >= OT_MODEL_FROM ? said : 0])).toString(36);
+    HIST_KEYS.set(k0, k);
+  }
   return k;
 }
 const resetBooks = () => { CACHE_SIG = null; };
-function bookAt(a, b, cutoff, s) {
+// which model priced the odds at `cutoff` (or the one asked for)
+const modelVer = (cutoff, force) => force || (cutoff >= OT_MODEL_FROM ? 2 : 1);
+function bookAt(a, b, cutoff, s, force) {
   syncCaches();
-  const R = resultData();
+  const R = resultData(), v = modelVer(cutoff, force);
   let lo = 0, hi = R.marks.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (R.marks[mid] <= cutoff) lo = mid + 1; else hi = mid; }
-  const k = [a, b, lo, s.margin, s.builderMargin, s.princessHp, s.kingHp].join('|');
+  const k = [a, b, lo, v, s.margin, s.builderMargin, s.princessHp, s.kingHp].join('|');
   if (!BOOK_CACHE.has(k)) {
     if (BOOK_CACHE.size > 600) BOOK_CACHE.delete(BOOK_CACHE.keys().next().value);
-    const m = model(a, b, R.versions.filter((r) => r.finalAt <= cutoff && !(r.until && r.until <= cutoff)));
+    const inForce = R.versions.filter((r) => r.finalAt <= cutoff && !(r.until && r.until <= cutoff));
+    const m = v === 2 ? model(a, b, enrichForOdds(inForce, cutoff), PRIORS_V2) : model(a, b, inForce);
     BOOK_CACHE.set(k, { m, J: jointModel(m, { princess: s.princessHp, king: s.kingHp }) });
   }
   return BOOK_CACHE.get(k);
@@ -1658,8 +1778,13 @@ function priceOk(b, s) {
   const earlier = new Date(ms(b.placedAt) - 3 * 60000).toISOString();
   const memoKey = betKey(b.uid, b.fx, b.id) + JSON.stringify([CORE.map((k) => b[k] ?? null), f ? [f.a, f.b, f.at, f.format] : null, histKey(b.placedAt, s), histKey(earlier, s)]);
   if (PRICE_MEMO.has(memoKey)) return PRICE_MEMO.get(memoKey);
-  const ok = [b.placedAt, earlier].some((cut) => {
-    const { m, J } = bookAt(b.a, b.b, cut, s);
+  const tries = [];
+  for (const cut of [b.placedAt, earlier]) {
+    tries.push([cut, 0]);
+    if (cut >= OT_MODEL_FROM && ms(cut) < ms(OT_MODEL_FROM) + OT_MODEL_GRACE) tries.push([cut, 1]);
+  }
+  const ok = tries.some(([cut, force]) => {
+    const { m, J } = bookAt(b.a, b.b, cut, s, force);
     if (legs.some((l) => l.market.startsWith('dealt') && CLASSIC.has(l.market) && !['over:', 'under:'].map((d) => d + dealtLine(m, l.market.slice(5))).includes(l.selection))) return false;
     if (!sim) {
       const q = jointProb(J, legs);
@@ -1668,7 +1793,7 @@ function priceOk(b, s) {
       return b.odds - 1 <= (fair - 1) * 1.05 + 1e-9;
     }
     // simulated markets: the board's own limits (no near-certainties, no wild long shots)
-    const q = simProb(simBook(b.a, b.b, cut, s, format), legs, format, b.placedAt);
+    const q = simProb(simBook(b.a, b.b, cut, s, format, force), legs, format, b.placedAt);
     if (q > 0.985 || q < (b.legs ? 0.002 : 0.004)) return false;
     const fair = b.legs ? price(q, s.builderMargin, 1).decimal : price(q, s.margin).decimal;
     return b.odds - 1 <= (fair - 1) * 1.05 + 1e-9;
@@ -1748,21 +1873,27 @@ function judge(b) {
   // no lock made inside the window: nothing proves when bets were placed, so they're refunded
   if (!f.primary) return Date.now() > f.windowEnds + LOCK_GRACE ? voidIt('Betting wasn\'t locked before the game') : { status: 'open', payout: 0, matchKey: undefined };
   const legs = b.legs || [{ market: b.market, selection: b.selection }];
-  const settle = (it, format, key) => {
+  // A detail the battle log can't show (overtime, first crown) can still come from the players' one-tap answers:
+  // bets that need one wait up to ANSWER_MS after the result, then are refunded
+  const settle = (it, format, key, from) => {
     const rs = legs.map((l) => legTest(l, format, b.placedAt)(it)), r = rs.includes(false) ? false : rs.includes(null) ? null : true;
-    if (r === null) return { ...voidIt('A detail this bet needed wasn\'t recorded'), matchKey: key };
+    if (r === null) {
+      const open = from.filter((x) => askable(x) && Date.now() < ms(answerUntil(x)));
+      if (open.length) return { status: 'pending', payout: 0, why: DETAIL_WAIT, waitOn: open.map((x) => x.key), matchKey: undefined };
+      return { ...voidIt('A detail this bet needed wasn\'t recorded'), matchKey: key };
+    }
     return r ? { status: 'won', payout: Math.round(b.stake * b.odds), matchKey: key } : { status: 'lost', payout: 0, matchKey: key };
   };
   if (f.format) {
     const st = seriesState()[f.key];
-    if (st.status === 'final') return settle(seriesOf(st.games.map((r) => gameFrom(r, b.a)), st.N), f.format, 'series:' + f.key);
+    if (st.status === 'final') return settle(seriesOf(st.games.map((r) => gameFrom(withAgreed(r, answerUntil(r)), b.a)), st.N), f.format, 'series:' + f.key, st.games);
     if (st.status === 'void') return voidIt('The series wasn\'t finished in time');
     if (st.status === 'provisional') return { status: 'pending', payout: 0, why: 'Series over. Waiting for the official battle log to confirm it', matchKey: undefined };
     if (st.status === 'live') return { status: 'pending', payout: 0, why: `Series in progress: ${st.S.winsA}–${st.S.winsB}`, matchKey: undefined };
     return { status: Date.now() > f.closesAt ? 'locked' : 'open', payout: 0, matchKey: undefined };
   }
   const fin = resultForFixture(f);
-  if (fin) return settle(gameFrom(fin, b.a), null, fin.key);
+  if (fin) return settle(gameFrom(withAgreed(fin, answerUntil(fin)), b.a), null, fin.key, [fin]);
   if (pendingForFixture(f)) return { status: 'pending', payout: 0, why: 'Result waiting for confirmation', matchKey: undefined };
   if (Date.now() > f.expiresAt) return voidIt('Not played in time');
   return { status: Date.now() > f.closesAt ? 'locked' : 'open', payout: 0, matchKey: undefined };
@@ -2030,16 +2161,52 @@ function resultLine(r) {
   if (r.dealtA != null) bits.push(`damage ${fmtN(r.dealtA)} / ${fmtN(r.dealtB)}`);
   return `${esc(nameOf(r.playerA))} <b class="num">${r.crownsA}–${r.crownsB}</b> ${esc(nameOf(r.playerB))}${tb} · <span class="small muted">${esc(bits.join(' · '))}</span>`;
 }
+// One-tap questions about my own recent games: what the battle log can't show. Asked for my games from the last
+// 48 hours (each answer sharpens the overtime odds), bets that are waiting on the answer first.
+function myQuestions() {
+  if (!me.uid) return [];
+  const R = resultData(), now = Date.now(), t = nowIso();
+  const waiting = new Set(ledger().filter((b) => b.status === 'pending' && b.waitOn).flatMap((b) => b.waitOn));
+  const qs = [];
+  for (const r of R.final) {
+    if (!askable(r) || now >= ms(answerUntil(r))) continue;
+    if (!speaksFor(me.uid, r.playerA, t) && !speaksFor(me.uid, r.playerB, t)) continue;
+    const d = detailsFor(r, t), saidIt = (field) => ((R.answers[r.key] || {})[field] || []).some((x) => x.uid === me.uid);
+    for (const field of DETAIL_FIELDS) {
+      const gap = field === 'overtime' ? r.overtime == null : r.firstCrown == null && Math.min(r.crownsA, r.crownsB) >= 1;
+      if (gap && !saidIt(field) && !(d[field] && d[field].agreed != null)) qs.push({ r, field, waiting: waiting.has(r.key) });
+    }
+  }
+  return qs.sort((p, q) => q.waiting - p.waiting || String(q.r.date).localeCompare(String(p.r.date))).slice(0, 4);
+}
 function renderConfirmBox(joining) {
   const box = $('#confirmBox');
   const mine = joining || !me.uid ? [] : resultData().pending.filter((r) => r.waitingFor.includes(me.uid) && (() => { const c = myConfirm(r.key); return !c || c.hash !== r.hash || c.loggedAt !== r.loggedAt; })());
-  box.hidden = !mine.length;
-  if (!mine.length) return;
-  box.innerHTML = `<h3>Is this right?</h3><p class="note">A result only counts once the other player confirms it.</p>${mine.map((r) => `
+  const qs = joining || !me.uid ? [] : myQuestions();
+  box.hidden = !mine.length && !qs.length;
+  if (box.hidden) return;
+  const ask = (q) => {
+    const k = esc(q.r.key), btn = (v, label, cls = '') => `<button class="btn tiny${cls}" type="button" data-dq="${k}" data-df="${q.field}" data-dv="${v}">${label}</button>`;
+    return `<div class="confirm-row"><span>${resultLine(q.r)} <span class="small muted">${fmtDate(q.r.date)}</span>${q.waiting ? ' <span class="pill warn">A bet is waiting on this</span>' : ''}<br><b>${q.field === 'overtime' ? 'Did it go to overtime?' : 'Who took the first tower?'}</b></span>
+      <span class="row">${q.field === 'overtime' ? btn('yes', 'Yes', ' gold') + btn('no', 'No', ' gold') : btn('me', 'Me', ' gold') + btn('opp', 'Them', ' gold')}${btn('unsure', 'Not sure')}</span></div>`;
+  };
+  box.innerHTML = (mine.length ? `<h3>Is this right?</h3><p class="note">A result only counts once the other player confirms it.</p>${mine.map((r) => `
     <div class="confirm-row"><span>${esc(accountName(r.loggedBy))} logged ${resultLine(r)}</span>
-    <span class="row"><button class="btn gold tiny" type="button" data-confirm="${esc(r.key)}">Confirm</button><button class="btn tiny warn" type="button" data-dispute="${esc(r.key)}">Dispute</button></span></div>`).join('')}`;
+    <span class="row"><button class="btn gold tiny" type="button" data-confirm="${esc(r.key)}">Confirm</button><button class="btn tiny warn" type="button" data-dispute="${esc(r.key)}">Dispute</button></span></div>`).join('')}` : '')
+    + (qs.length ? `<h3>Quick question</h3><p class="note">The battle log doesn't show these. One tap each: it sharpens the odds, and once both of you agree, bets on it settle.</p>${qs.map(ask).join('')}` : '');
 }
 $('#confirmBox').addEventListener('click', async (e) => {
+  const q = e.target.dataset;
+  if (q.dq) {
+    const value = { yes: true, no: false }[q.dv] ?? q.dv;
+    if (!DETAIL_FIELDS.includes(q.df) || ![true, false, 'me', 'opp', 'unsure'].includes(value)) return;
+    try {
+      await put(`acts/${me.uid}/items`, 'd_' + safeSeg(q.dq) + '_' + q.df, { type: 'detail', ref: q.dq, field: q.df, value, at: nowIso() });
+      const r = resultData().final.find((x) => x.key === q.dq), d = r && detailsFor(r, nowIso())[q.df];
+      toast(value === 'unsure' ? 'No worries.' : d && d.agreed != null ? 'Thanks. You both agree, so that\'s settled.' : d && d.disputed ? 'Thanks. You two disagree, so the admin will decide.' : 'Thanks. Once the other player agrees, it counts.');
+    } catch { /* toast shown */ }
+    return;
+  }
   const key = e.target.dataset.confirm || e.target.dataset.dispute; if (!key) return;
   const r = resultData().pending.find((x) => x.key === key); if (!r) return;
   const verdict = e.target.dataset.confirm ? 'ok' : 'dispute', copy = pickResult(r);
@@ -2877,7 +3044,7 @@ function resultStatus(r) {
 const canChange = (r) => !readOnly && (me.admin ? true : r.pending && r.loggedBy === me.uid && !!r.docId);
 function renderHistory() {
   const R = resultData(), all = [...R.final, ...R.pending.map((p) => ({ ...p, pending: true })), ...R.duplicates.map((d) => ({ ...d, dup: true, pending: !d.byAdmin && !d.confirmedBy }))]
-    .sort((x, y) => String(y.date).localeCompare(String(x.date)));
+    .map((m) => withAgreed(m, answerUntil(m))).sort((x, y) => String(y.date).localeCompare(String(x.date)));
   $('#history').innerHTML = all.length ? `<table><thead><tr><th>When</th><th>Result</th><th>Status</th><th class="c">OT</th><th class="c">1k before OT</th><th class="c">King woke</th><th class="c">Damage</th><th>First tower</th><th>Logged by</th><th></th></tr></thead><tbody>${all.map((m) => `
     <tr><td class="small">${fmtDate(m.date)}${missing(m) ? '<br><span class="pill warn">missing info</span>' : ''}${me.admin && isDuplicate(m, all) ? '<br><span class="pill lost">Possible duplicate</span>' : ''}</td>
     <td><span class="${m.winner === 'A' ? 'wa' : ''}">${esc(nameOf(m.playerA))}</span> <b class="num">${m.crownsA}–${m.crownsB}</b> <span class="${m.winner === 'B' ? 'wb' : ''}">${esc(nameOf(m.playerB))}</span>
@@ -3043,9 +3210,21 @@ async function renderAdmin() {
   }).join('')
     : '<p class="note">No requests waiting.</p>';
   const pend = resultData().pending;
-  $('#adminResults').innerHTML = pend.length ? pend.map((r) => `<div class="confirm-row"><span>${esc(accountName(r.loggedBy))} logged ${resultLine(r)} ${resultStatus({ ...r, pending: true })}</span>
-    <span class="row"><button class="btn gold tiny" type="button" data-aconfirm="${esc(r.key)}">Confirm as admin</button><button class="btn tiny warn" type="button" data-areject="${esc(r.key)}">Delete</button></span></div>`).join('')
-    : '<p class="note">Nothing waiting.</p>';
+  // details bets are waiting on (overtime, first crown): what each player said, and the admin's say
+  const waitKeys = new Set(ledger().filter((b) => b.status === 'pending' && b.waitOn).flatMap((b) => b.waitOn));
+  const ans = (v, field, r) => (v == null ? 'hasn\'t said' : v === 'unsure' ? 'not sure' : field === 'overtime' ? (v ? 'yes' : 'no') : esc(nameOf(v === 'A' ? r.playerA : r.playerB)));
+  const details = resultData().final.filter((r) => waitKeys.has(r.key)).flatMap((r) => DETAIL_FIELDS.map((field) => ({ r, field, d: detailsFor(r, nowIso())[field] || {} }))
+    .filter(({ r, field, d }) => d.agreed == null && (field === 'overtime' ? r.overtime == null : r.firstCrown == null && Math.min(r.crownsA, r.crownsB) >= 1)));
+  const detailRow = ({ r, field, d }) => {
+    const k = esc(r.key), btn = (v, label) => `<button class="btn tiny" type="button" data-ad="${k}" data-af="${field}" data-av="${v}">${label}</button>`;
+    return `<div class="confirm-row"><span>${resultLine(r)} <span class="small muted">${fmtDate(r.date)}</span><br><b>${field === 'overtime' ? 'Overtime?' : 'First tower?'}</b>
+      <span class="small">${esc(nameOf(r.playerA))}: ${ans(d.a, field, r)} · ${esc(nameOf(r.playerB))}: ${ans(d.b, field, r)}</span>${d.disputed ? ' <span class="pill warn">They disagree</span>' : ''}</span>
+      <span class="row">${field === 'overtime' ? btn('yes', 'Yes') + btn('no', 'No') : btn('A', esc(nameOf(r.playerA))) + btn('B', esc(nameOf(r.playerB)))}</span></div>`;
+  };
+  $('#adminResults').innerHTML = (pend.length ? pend.map((r) => `<div class="confirm-row"><span>${esc(accountName(r.loggedBy))} logged ${resultLine(r)} ${resultStatus({ ...r, pending: true })}</span>
+    <span class="row"><button class="btn gold tiny" type="button" data-aconfirm="${esc(r.key)}">Confirm as admin</button><button class="btn tiny warn" type="button" data-areject="${esc(r.key)}">Delete</button></span></div>`).join('') : '')
+    + (details.length ? `<p class="note">Bets are waiting on these details. The players get a one-tap question; you can decide here if they disagree or don't answer.</p>${details.map(detailRow).join('')}` : '')
+    || '<p class="note">Nothing waiting.</p>';
   const uids = Object.values(byPlayer).concat(requests.map((c) => c.id));
   // Only people who have made an account, unless the admin asks to see everyone
   const linked = store.players.filter((p) => byPlayer[p.id]), hiddenN = store.players.length - linked.length;
@@ -3113,6 +3292,11 @@ $('#p-admin').addEventListener('click', async (e) => {
     if (t.areject) {
       const r = resultData().pending.find((x) => x.key === t.areject); if (!r) return;
       await deleteResult(r); toast('Result deleted.');
+    }
+    if (t.ad && DETAIL_FIELDS.includes(t.af) && ['yes', 'no', 'A', 'B'].includes(t.av)) {
+      const value = { yes: true, no: false }[t.av] ?? t.av;
+      await put(`acts/${me.uid}/items`, 'd_' + safeSeg(t.ad) + '_' + t.af, { type: 'detail', ref: t.ad, field: t.af, value, at: nowIso() });
+      toast('Decided. Bets on it settle now.');
     }
     if (t.coins) openCoins(t.coins);
     if (t.more) { squadMore = squadMore === t.more ? null : t.more; renaming = null; confirmRelease = null; confirmRemove = null; renderAdmin(); }

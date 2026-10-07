@@ -206,3 +206,22 @@ it to `aborted`, which the page shows as a toast; `invalid_argument` is avoided 
 - Fixtures, locks and seals are immutable once written; fixtures, locks, seals and confirmations can't be deleted (except by the admin).
 - A lock can only freeze bets that exist, identically, in their owners' bet lists, all on the lock's own fixture (at most 400).
 - A bet list is append-only: no editing, removing or duplicating ids, each new bet dated now, no deleting the list. The admin may void or fix a list.
+
+## Overtime and other details the battle log can't show
+
+The official battle log has no match length and no crown order, so "did it go to overtime", "who took the first
+tower" and "1,000+ damage before overtime" are often unknown (118 of 148 games so far ended 1-0, which can be
+normal time or sudden death). Three things fill the gap:
+
+- **Tiebreaker fingerprint** (`scripts/lib/battles.js`, `tiebreakDrain`): the tiebreaker drains every standing tower
+  by the same amount, so when every standing tower on both sides has lost HP and the smallest loss is identical on
+  both sides, the game went the full overtime. New imports get `overtime: true, tiebreaker: true` (the page shows
+  level crowns, won on the tiebreaker). Checked against hand logs: 5 of 5 agree, none contradict.
+- **One-tap answers** (acts items `{type: 'detail', ref, field: 'overtime'|'firstCrown', value, at}`, immutable,
+  dated now): the two players of a game are asked about their own games from the last 48 hours. When both agree
+  (or the admin decides) the detail is filled in. Bets that need a missing detail wait up to 48 hours after the
+  result for it, then are refunded.
+- **Odds model v2** (from `OT_MODEL_FROM` in the page): learns overtime from certain evidence, the fingerprint,
+  agreed answers (single answers count half), and back-to-back timing (battle times are when games end: a rematch
+  gap up to 285 s suggests normal time, 286-344 s sudden death), with a 45% starting guess. Bets placed before
+  `OT_MODEL_FROM` keep being checked against v1; an old page left open is accepted for 3 hours after the switch.

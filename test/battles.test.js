@@ -110,3 +110,54 @@ test('daily import: records how far the official log is complete for each player
   assert.deepStrictEqual(JSON.parse(fs.readFileSync(w.file_path, 'utf8')), { ranAt: '2026-10-05T08:54:00.000Z', through: { ann: '2026-10-05T07:23:00.000Z', bob: '2026-10-05T07:23:01.000Z' } });
   fs.rmSync(W, { recursive: true, force: true });
 });
+
+test('a tiebreaker leaves the same drain on both sides: overtime, level crowns, no first crown in play', () => {
+  // full overtime, then every standing tower drained by 765 until Bob's weakest princess fell
+  const tb = battle('20261006T120000.000Z', side('#AAA', 1, 4824 - 765, [3052 - 765, 3052 - 1500]), side('#BBB', 0, 4824 - 765, [3052 - 765]));
+  const [r] = lib.officialResults([tb], playerOf);
+  assert.strictEqual(lib.tiebreakDrain(r.towersA, r.towersB), 765);
+  assert.strictEqual(r.tiebreaker, true);
+  assert.strictEqual(r.overtime, true);
+  assert.strictEqual(r.firstCrown, 'none', 'level at 0-0 when time ran out: nobody took a crown in play');
+  // before the drain Ann had dealt 765 to each of Bob's two standing towers plus the one that fell: under 1,000 → no
+  // Ann dealt 765 to each of Bob's two standing towers plus the 3,052 princess that fell: 2,287 of it before the
+  // drain (so maybe in normal time, maybe in overtime: unknown). Bob dealt 3,030, only 735 before the drain: a no.
+  assert.strictEqual(r.dealtA, 765 * 2 + 3052);
+  assert.strictEqual(r.dmgA, null);
+  assert.strictEqual(r.dealtB, 765 + 765 + 1500);
+  assert.strictEqual(r.dmgB, false);
+});
+
+test('no tiebreaker when a side has an untouched tower, or the smallest losses differ', () => {
+  const untouched = battle('20261006T120000.000Z', side('#AAA', 1, 4824, [2000, 1000]), side('#BBB', 0, 4000, [2800]));
+  const differ = battle('20261006T121000.000Z', side('#AAA', 1, 4824 - 700, [3052 - 700]), side('#BBB', 0, 4824 - 701, [3052 - 900]));
+  for (const b of [untouched, differ]) {
+    const [r] = lib.officialResults([b], playerOf);
+    assert.strictEqual(r.tiebreaker, undefined);
+    assert.strictEqual(r.overtime, null, 'a 1-0 without the fingerprint stays unknown');
+    assert.strictEqual(r.firstCrown, 'A');
+  }
+});
+
+test('1,000+ before overtime: when both scored it is a yes for both, whether or not there was overtime', () => {
+  const [r] = lib.officialResults([battle('20261006T120000.000Z', side('#AAA', 2, 4824, [3052, 1200]), side('#BBB', 1, 4824, [3052]))], playerOf);
+  assert.strictEqual(r.overtime, null, '2-1 could be normal time or sudden death');
+  assert.strictEqual(r.dmgA, true);
+  assert.strictEqual(r.dmgB, true);
+  assert.strictEqual(r.firstCrown, null);
+  const [q] = lib.officialResults([battle('20261006T121000.000Z', side('#AAA', 1, 4824, [3052, 3052]), side('#BBB', 0, 4824, [3052 - 400]))], playerOf);
+  assert.strictEqual(q.dmgB, false, 'Bob dealt only 400 in the whole game');
+  assert.strictEqual(q.dmgA, null, 'Ann over 1,000 but the 1-0 may have come in overtime');
+});
+
+test('a hand-logged tiebreaker merges with level crowns: no first crown at 0-0, and the person\'s details are kept', () => {
+  const docs = Object.fromEntries(lib.officialResults([
+    battle('20261006T120000.000Z', side('#AAA', 1, 4824, [3052, 3052]), side('#BBB', 0, 4824, [3052])),
+  ], playerOf).map((r) => [lib.docId(r.battleKey), r]));
+  const hand = [{ key: 'h1', playerA: 'ann', playerB: 'bob', crownsA: 0, crownsB: 0, winner: 'A', overtime: true, dmgA: false, dmgB: true, date: '2026-10-06T12:00:00.000Z', loggedAt: '2026-10-06T12:01:00.000Z' }];
+  const p = lib.pairUp(hand, docs);
+  assert.strictEqual(p.merged.length, 1);
+  const r = Object.values(docs)[0];
+  // Ann's 1,000-before-overtime comes from the person; Bob's is already known from the towers (he dealt nothing), and the log can't overrule that
+  assert.deepStrictEqual([r.tiebreaker, r.overtime, r.firstCrown, r.dmgA, r.dmgB], [true, true, 'none', false, false]);
+});

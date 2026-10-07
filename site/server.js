@@ -14,6 +14,7 @@ const { Persist, GithubSnapshot } = require('./lib/persist');
 const H = require('./lib/http');
 const pages = require('./lib/pages');
 const { createImporter } = require('./lib/importer');
+const { createLiveFeed } = require('./lib/livefeed');
 
 const { HttpError } = H;
 const COOKIE = 'cb_session';
@@ -59,6 +60,10 @@ function resolveConfig(opts) {
     maxAccounts: num(pick('maxAccounts', 'MAX_ACCOUNTS', 200), 200),
     skewSeconds: num(pick('skewSeconds', 'TIME_SKEW_SECONDS', 120), 120),
     battlesUrl: pick('battlesUrl', 'BATTLES_URL', BATTLES_URL),
+    // the Clash API key (the same one the GitHub sync uses): with it the site reads battle logs live
+    crApiToken: String(pick('crApiToken', 'CR_API_TOKEN', '')).trim(),
+    crApiBase: String(pick('crApiBase', 'CR_API_BASE', 'https://proxy.royaleapi.dev/v1')).replace(/\/+$/, ''),
+    liveEverySec: num(pick('liveEverySec', 'LIVE_EVERY_SEC', 120), 120),
     importIntervalMin: num(pick('importIntervalMin', 'IMPORT_INTERVAL_MIN', 5), 5), // cheap: an unchanged feed is a 304
     publicDir: opts.publicDir || path.join(__dirname, 'public'),
     seedFile: opts.seedFile || path.join(__dirname, 'seed', 'seed.json'),
@@ -137,7 +142,9 @@ async function startServer(opts = {}) {
   if (fresh) persist.markDirty('db');
   persist.flush();
 
-  const importer = createImporter({ store, repoRoot: cfg.repoRoot, battlesUrl: cfg.battlesUrl, intervalMin: cfg.importIntervalMin, log });
+  const live = createLiveFeed({ token: cfg.crApiToken, base: cfg.crApiBase, repoRoot: cfg.repoRoot, dataDir: cfg.dataDir, log });
+  const importer = createImporter({ store, repoRoot: cfg.repoRoot, battlesUrl: cfg.battlesUrl, intervalMin: cfg.importIntervalMin, log, live, liveEverySec: cfg.liveEverySec });
+  if (live) log(`[live] reading battle logs from the Clash API every ${Math.max(30, cfg.liveEverySec)} s`);
   const statics = new H.StaticFiles(cfg.publicDir);
   const purgeTimer = setInterval(() => auth.purge(), 10 * 60e3);
   purgeTimer.unref();
@@ -373,7 +380,7 @@ async function startServer(opts = {}) {
 
   async function importNow(ctx) {
     needAdmin(ctx);
-    try { json(ctx, { summary: (await importer.runImport()).summary }); } catch (e) { throw new HttpError(500, `The import failed: ${e.message}`); }
+    try { json(ctx, { summary: (await importer.runImport()).summary, ...importer.status() }); } catch (e) { throw new HttpError(500, `The import failed: ${e.message}`); }
   }
 
   // ---------- database endpoints ----------
@@ -462,6 +469,7 @@ async function startServer(opts = {}) {
     'GET /api/admin/invites': listInvites,
     'GET /api/admin/group-link': groupLink,
     'POST /api/admin/import-now': importNow,
+    'GET /api/admin/import-status': (ctx) => { needAdmin(ctx); json(ctx, importer.status()); },
     'GET /api/db/list': dbList,
     'GET /api/db/doc': dbDoc,
     'POST /api/db/write': dbWrite,

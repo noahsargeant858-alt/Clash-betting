@@ -128,7 +128,7 @@ test('only the admin can do the importer\'s manual run; others get nothing', asy
   assert.strictEqual((await user.client.post('/api/admin/import-now')).status, 403);
   const r = await w.admin.post('/api/admin/import-now');
   assert.strictEqual(r.status, 200);
-  assert.deepStrictEqual(Object.keys(r.json), ['summary']);
+  assert.deepStrictEqual(Object.keys(r.json), ['summary', 'live', 'lastRunAt']);
   assert.match(r.json.summary, /BATTLES_URL/);
 });
 

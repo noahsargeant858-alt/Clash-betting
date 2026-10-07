@@ -44,6 +44,11 @@ Everyone starts with the starting coins in Settings (1,000).
 * **Switch someone off:** the same table has **Switch off** (signs them out everywhere and stops them signing in).
 * **Change your own admin password:** change `ADMIN_PASSWORD` in Render (Environment tab) and let the service restart. The variable is applied every time the server starts.
 * **Official Clash results** arrive on their own: the server looks at the battle feed (refreshed hourly by the GitHub Action) every 5 minutes and adds new games. A restart (any deploy) also checks straight away.
+* **Results within a couple of minutes (live mode):** GitHub's hourly job often runs late. Give the site your Clash API key and it reads
+  everyone's battle log itself every 2 minutes (GitHub's copy stays as a backup). In Render: **clashbets → Environment → Add Environment
+  Variable**, key `CR_API_TOKEN`, value = your Clash API key (the same one saved as the GitHub secret; if you don't have it any more, make a
+  new key at <https://developer.clashroyale.com> with allowed IP **45.79.218.79**, the RoyaleAPI proxy). Save; the site restarts. The Admin
+  tab's **Official results** box then says "Live from Clash: on" with the time of the last read.
   The old claude.ai routine that did this is no longer needed.
 * **Backups:** Render keeps daily snapshots of the disk on paid plans. For an extra copy off Render, see the optional encrypted backup below.
 * **If friends often see "Too many attempts":** the server works out each visitor's address from Render's proxy by itself (`TRUST_PROXY` is `auto`), so this should not happen. If it does, tell me what the page said and roughly how many of you were on the same wifi.
@@ -60,6 +65,8 @@ Everyone starts with the starting coins in Settings (1,000).
 | `SIGNUP_CODE` | group code for creating accounts; leave empty to allow anyone with the link (not recommended) |
 | `PUBLIC_URL` | optional: the address to put in invite links, e.g. `https://clashbets.onrender.com` (otherwise taken from the request) |
 | `IMPORT_INTERVAL_MIN` | how often to look for new battles (default 5; `0` turns it off) |
+| `CR_API_TOKEN` | your Clash API key: turns on live mode (reads battle logs straight from Clash) |
+| `LIVE_EVERY_SEC` | in live mode, how often to read the battle logs (default 120, at least 30) |
 | `INVITE_DAYS` | how long a personal link stays valid (default 14) |
 | `TRUST_PROXY` | `auto` on Render (default in production). Use a number only if you put your own proxy in front |
 

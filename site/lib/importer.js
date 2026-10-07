@@ -35,8 +35,11 @@ function cleanHandLog(x) {
   };
 }
 
-function createImporter({ store, repoRoot, battlesUrl, intervalMin, log = () => {}, fetchImpl }) {
+// live: an optional live feed (site/lib/livefeed.js). With it, each run also reads the battle logs straight from
+// the Clash API, every liveEverySec seconds instead of every intervalMin minutes, and the GitHub copy is a backup.
+function createImporter({ store, repoRoot, battlesUrl, intervalMin, log = () => {}, fetchImpl, live = null, liveEverySec = 120 }) {
   let etag = null, running = null, timer = null, bootTimer = null;
+  let lastFeed = null, lastLiveSig = null, lastRunAt = 0, lastLiveError = null;
   const doFetch = fetchImpl || ((...a) => fetch(...a));
 
   async function readLimited(res) {
@@ -117,28 +120,49 @@ function createImporter({ store, repoRoot, battlesUrl, intervalMin, log = () => 
     return { applied, skipped };
   }
 
-  async function doImport() {
-    if (!battlesUrl) return { summary: 'No battles feed is set up (BATTLES_URL).', newResults: 0, checks: 0, skipped: 0, applied: 0 };
-    const now = new Date();
-    const nowIso = now.toISOString(), since = new Date(now.getTime() - 7 * DAY).toISOString();
-
-    const res = await doFetch(battlesUrl, { headers: { Accept: 'application/json', 'User-Agent': 'clashbets-site', ...(etag ? { 'If-None-Match': etag } : {}) }, signal: AbortSignal.timeout(30000) });
-    if (res.status === 304) return { summary: 'The battles feed has not changed; nothing to do.', newResults: 0, checks: 0, skipped: 0, applied: 0, unchanged: true };
+  // the GitHub copy of the feed: its text, whether it changed since the last run, and its ETag
+  async function githubFeed() {
+    const res = await doFetch(battlesUrl, { headers: { Accept: 'application/json', 'User-Agent': 'clashbets-site', ...(etag && lastFeed ? { 'If-None-Match': etag } : {}) }, signal: AbortSignal.timeout(30000) });
+    if (res.status === 304 && lastFeed) return { text: lastFeed, changed: false, tag: etag };
     if (!res.ok) throw new Error(`The battles feed answered HTTP ${res.status}.`);
     const text = await readLimited(res);
     if (text.trimStart()[0] !== '{') throw new Error('The battles feed was not in the expected shape.'); // the script below does the real parsing, in its own process
-    const newTag = res.headers.get('etag');
+    return { text, changed: text !== lastFeed, tag: res.headers.get('etag') };
+  }
+
+  async function doImport() {
+    if (!battlesUrl && !live) return { summary: 'No battles feed is set up (BATTLES_URL).', newResults: 0, checks: 0, skipped: 0, applied: 0 };
+    const now = new Date();
+    const nowIso = now.toISOString(), since = new Date(now.getTime() - 7 * DAY).toISOString();
+
+    // with the live feed on, a GitHub hiccup doesn't stop a run, and a Clash hiccup falls back to GitHub
+    let gh = { text: lastFeed || '{"battles":[]}', changed: false, tag: etag }, liveData = null;
+    if (battlesUrl) {
+      try { gh = await githubFeed(); } catch (e) { if (!live) throw e; log(`[import] GitHub copy unavailable: ${e.message}`); }
+    }
+    if (live) {
+      try { liveData = await live.pull(); lastLiveError = null; } catch (e) { lastLiveError = e.message; if (!battlesUrl) throw e; log(`[import] live: ${e.message}`); }
+    }
+    const liveSig = liveData ? liveData.battles.map((b) => b.key).sort().join() : null;
+    // nothing new from either: skip the work (live mode still refreshes how far the logs are read every 30 minutes)
+    const stale = !!live && Date.now() - lastRunAt > 30 * 60e3;
+    if (lastRunAt && !gh.changed && liveSig === lastLiveSig && !stale) {
+      return { summary: live ? 'No new games in the battle logs.' : 'The battles feed has not changed; nothing to do.', newResults: 0, checks: 0, skipped: 0, applied: 0, unchanged: true };
+    }
+    const text = gh.text, newTag = gh.tag;
 
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clashbets-import-'));
     try {
       put(dir, 'battles.json', text);
+      if (liveData) put(dir, 'live.json', { battles: liveData.battles, checked: liveData.checked });
       put(dir, 'squad.json', fs.readFileSync(path.join(repoRoot, 'squad.json'), 'utf8'));
       put(dir, 'window.json', { since, now: nowIso });
       stageDocs(dir, since);
       const out = await runScript(dir);
       const lines = out.split('\n').map((l) => l.replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ').trim().slice(0, 300)).filter(Boolean);
       const { applied, skipped } = applyBatches(dir, lines);
-      if (!skipped && newTag) etag = newTag; // a skipped write is retried next time rather than waved through as "unchanged"
+      // a skipped write is retried next time rather than waved through as "unchanged"
+      if (!skipped) { if (newTag) etag = newTag; lastFeed = text; lastLiveSig = liveSig; lastRunAt = Date.now(); }
       const newResults = lines.filter((l) => l.startsWith('New:')).length;
       const notes = lines.filter((l) => /^(CHECK|SKIPPED)/.test(l));
       const summary = `${lines.join('\n')}\nApplied ${applied} write${applied === 1 ? '' : 's'}${skipped ? `, skipped ${skipped}` : ''}.`;
@@ -163,15 +187,18 @@ function createImporter({ store, repoRoot, battlesUrl, intervalMin, log = () => 
   const tick = () => runImport().catch((e) => log(`[import] failed: ${e.message}`));
 
   function start() {
-    if (!(intervalMin > 0) || !battlesUrl) return;
+    if (!(intervalMin > 0) || (!battlesUrl && !live)) return;
     bootTimer = setTimeout(tick, 10000);
-    timer = setInterval(tick, intervalMin * 60e3);
+    timer = setInterval(tick, live ? Math.max(30, liveEverySec) * 1000 : intervalMin * 60e3);
     bootTimer.unref(); timer.unref();
   }
 
   function stop() { clearTimeout(bootTimer); clearInterval(timer); bootTimer = timer = null; }
 
-  return { runImport, start, stop };
+  // for the admin panel: is the live feed on, and how did its last read go
+  const status = () => ({ live: live ? { on: true, everySec: Math.max(30, liveEverySec), ...live.status(), error: lastLiveError || live.status().error } : { on: false }, lastRunAt: lastRunAt ? new Date(lastRunAt).toISOString() : null });
+
+  return { runImport, start, stop, status };
 }
 
 module.exports = { createImporter, cleanHandLog };

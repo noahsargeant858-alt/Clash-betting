@@ -22,7 +22,7 @@ if (!TOKEN) {
   process.exit(1);
 }
 
-const normTag = (t) => '#' + String(t).trim().toUpperCase().replace(/^#/, '').replace(/O/g, '0');
+const { normTag, friendlies, mergeBattles } = require('./lib/feed');
 const squad = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'squad.json'), 'utf8')).filter((p) => p.tag);
 
 async function get(p) {
@@ -36,64 +36,32 @@ async function get(p) {
   return res.json();
 }
 
-// One battle shows up in both players' logs, and the two copies' times can
-// differ by a second. Same two players within 10 seconds with the score
-// mirrored = the same battle; keep the first copy.
-const when = (t) => Date.parse(t.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2}).*$/, '$1-$2-$3T$4:$5:$6Z'));
-function sameBattle(x, y) {
-  const pair = (b) => [b.team.tag, b.opponent.tag].sort().join();
-  if (pair(x) !== pair(y) || Math.abs(when(x.battleTime) - when(y.battleTime)) > 10000) return false;
-  const [ya, yb] = x.team.tag === y.team.tag ? [y.team, y.opponent] : [y.opponent, y.team];
-  return x.team.crowns === ya.crowns && x.opponent.crowns === yb.crowns;
-}
-function dedupe(list) {
-  const out = [];
-  for (const b of list.sort((x, y) => x.battleTime.localeCompare(y.battleTime))) if (!out.some((o) => sameBattle(o, b))) out.push(b);
-  return out;
-}
-
-// Everything the site can use from one side of a battle
-const side = (s) => ({
-  tag: s.tag,
-  name: s.name,
-  crowns: s.crowns,
-  kingTowerHitPoints: s.kingTowerHitPoints ?? null,
-  princessTowersHitPoints: s.princessTowersHitPoints ?? null,
-  elixirLeaked: s.elixirLeaked ?? null,
-  cards: (s.cards || []).map((c) => ({ name: c.name, level: c.level, maxLevel: c.maxLevel, evolutionLevel: c.evolutionLevel ?? null })),
-});
-
 (async () => {
   const prev = PREV && fs.existsSync(PREV) ? JSON.parse(fs.readFileSync(PREV, 'utf8')) : { players: {}, battles: [] };
-  const battles = new Map((prev.battles || []).map((b) => [b.key, b]));
+  const fresh = [];
   const players = { ...(prev.players || {}) };
   // when each player's log was last read in full: anything they played before then is in this file
   const checked = { ...(prev.checked || {}) };
-  let added = 0, failed = 0;
+  let failed = 0;
 
   for (const p of squad) {
     const tag = normTag(p.tag), enc = encodeURIComponent(tag);
     try {
       const [profile, log] = await Promise.all([get(`/players/${enc}`), get(`/players/${enc}/battlelog`)]);
       players[tag] = { name: profile.name, trophies: profile.trophies, bestTrophies: profile.bestTrophies, expLevel: profile.expLevel };
-      let mine = 0;
-      for (const b of log) {
-        if (!b.team || !b.opponent || b.team.length !== 1 || b.opponent.length !== 1) continue; // 1v1 only
-        if (!/friendly|clanmate/i.test(b.type || '')) continue; // friendly battles only
-        const key = `${b.battleTime}|${[b.team[0].tag, b.opponent[0].tag].sort().join('|')}`;
-        if (battles.has(key)) continue;
-        battles.set(key, { key, battleTime: b.battleTime, type: b.type, gameMode: b.gameMode || null, team: side(b.team[0]), opponent: side(b.opponent[0]) });
-        added++; mine++;
-      }
+      const mine = friendlies(log);
+      fresh.push(...mine);
       checked[tag] = new Date().toISOString();
-      console.log(`${p.name} (${tag}): ${log.length} battles in log, ${mine} new friendlies`);
+      console.log(`${p.name} (${tag}): ${log.length} battles in log, ${mine.length} friendlies`);
     } catch (e) {
       failed++;
       console.error(`${p.name} (${tag}): ${e.message}`);
     }
   }
 
-  const list = dedupe([...battles.values()]).sort((x, y) => y.battleTime.localeCompare(x.battleTime)).slice(0, MAX_BATTLES);
+  const known = new Set((prev.battles || []).map((b) => b.key));
+  const added = new Set(fresh.filter((b) => !known.has(b.key)).map((b) => b.key)).size;
+  const list = mergeBattles([prev.battles || [], fresh], MAX_BATTLES);
   const next = { players, battles: list, checked };
   const before = JSON.stringify({ players: prev.players || {}, battles: prev.battles || [], checked: prev.checked || {} });
   if (JSON.stringify(next) !== before) {

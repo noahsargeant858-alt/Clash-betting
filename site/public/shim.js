@@ -602,7 +602,17 @@ body { padding-bottom: 72px; }
     const tempBox = h('div'), accWrap = h('div', { class: 'scroll' });
     const freshBox = h('div'), invList = h('div', { class: 'stack' });
     const groupBox = h('div'), groupMsg = h('p', { class: 'cbx-msg', role: 'status' });
-    const impMsg = h('p', { class: 'cbx-msg', role: 'status' });
+    const impMsg = h('p', { class: 'cbx-msg', role: 'status' }), liveNote = h('p', { class: 'note' });
+    // where results come from: live from Clash (when the API key is set on Render) or the GitHub copy
+    function showLive(st) {
+      const L = st && st.live;
+      if (L && L.on) {
+        const when = L.at ? new Date(L.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'not yet';
+        liveNote.textContent = L.error ? `Live from Clash is on, but the last read had a problem: ${L.error}. GitHub's copy is the backup meanwhile.`
+          : `Live from Clash: on. The site reads everyone's battle log every ${Math.round(L.everySec / 60) || 1} minute${L.everySec >= 120 ? 's' : ''} (last read ${when}), so a game shows up a minute or two after it ends. Tap below to read now.`;
+      } else liveNote.textContent = 'Games arrive from GitHub\'s copy of the battle logs (roughly hourly, sometimes later), checked every 5 minutes. For results within a couple of minutes, add CR_API_TOKEN (your Clash API key) under Environment on Render.';
+    }
+    request('GET', '/api/admin/import-status').then(showLive).catch(() => showLive(null));
     const impBtn = h('button', { type: 'button', class: 'btn gold', onclick: importNow }, 'Check for new results now');
     const pickSel = h('select', { 'aria-label': 'Player to invite' });
     const makeBtn = h('button', { type: 'button', class: 'btn gold', onclick: createInvite }, 'Create invite link');
@@ -615,8 +625,7 @@ body { padding-bottom: 72px; }
         h('p', { class: 'note' }, 'Everyone who can sign in to this site. Reset a password if someone is locked out; the new one is shown once. Switching an account off signs it out and stops it signing in, and you can switch it back on.'),
         accMsg, tempBox, accWrap),
       h('section', { class: 'panel stack' }, h('h2', {}, 'Official results'),
-        h('p', { class: 'note' }, 'Games played in Clash arrive by themselves: GitHub fetches the battle logs (roughly hourly, sometimes later) and this site checks for them every 5 minutes. If a bet is waiting on a game that has just finished, check now.'),
-        h('div', { class: 'row' }, impBtn), impMsg),
+        liveNote, h('div', { class: 'row' }, impBtn), impMsg),
       h('section', { class: 'panel stack' }, h('h2', {}, 'Group link'),
         h('p', { class: 'note' }, 'One link for the group chat. It opens Create account with the group code already filled in, so your mates only pick a username and password, then tap their name and you approve them under Player link requests. Anyone who gets hold of it can make an account, so keep it in the chat. Changing SIGNUP_CODE on Render makes old group links stop working.'),
         groupMsg, groupBox),
@@ -737,8 +746,9 @@ body { padding-bottom: 72px; }
       impBtn.disabled = true; say(impMsg, '', 'Checking…');
       try {
         const r = await request('POST', '/api/admin/import-now', {});
-        const lines = String(r.summary || '').split('\n').filter((l) => /official results|^New:|^CHECK|^SKIPPED/.test(l));
+        const lines = String(r.summary || '').split('\n').filter((l) => /official results|^New:|^CHECK|^SKIPPED|No new games|not changed/.test(l));
         say(impMsg, 'good', lines.slice(0, 8).join(' · ') || 'Done.');
+        showLive(r);
       } catch (e) { say(impMsg, 'bad', e.message); }
       impBtn.disabled = false;
     }

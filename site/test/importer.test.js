@@ -114,7 +114,7 @@ test('the second run asks with If-None-Match, gets 304 and does nothing', async 
   assert.strictEqual(w.feed.st.requests[0].ua, 'clashbets-site');
   assert.strictEqual(w.app.store.seq, seq);
   // a changed feed is read again, and results already on the site are not touched or duplicated
-  w.feed.set(w.feed.st.body);
+  w.feed.set({ ...(typeof w.feed.st.body === 'string' ? JSON.parse(w.feed.st.body) : w.feed.st.body), updatedAt: '2026-10-07T10:00:00.000Z' });
   const third = await w.admin.post('/api/admin/import-now');
   assert.match(third.json.summary, /2 official results in the window, 0 new/);
   assert.strictEqual(w.app.store.list('matches').length, 2);

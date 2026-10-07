@@ -40,6 +40,7 @@ site/
 | `SESSION_DAYS` | 90 | session lifetime |
 | `BATTLES_URL` | `https://raw.githubusercontent.com/noahsargeant858-alt/Clash-betting/battle-data/battles.json` | official battles feed |
 | `IMPORT_INTERVAL_MIN` | 5 | how often to look for new battles (0 = off) |
+| `CR_API_TOKEN` | empty | Clash API key: live mode reads each squad member's battle log through `CR_API_BASE` (default the RoyaleAPI proxy) every `LIVE_EVERY_SEC` (120) s, merges it with the GitHub copy and imports only when there's a new game; kept in `DATA_DIR/live-battles.json` |
 | `SNAPSHOT_REPO`, `SNAPSHOT_BRANCH`, `SNAPSHOT_TOKEN`, `SNAPSHOT_KEY` | none | optional backup for hosts whose disk is wiped on restart: encrypted (AES-256-GCM with `SNAPSHOT_KEY`) copy of both data files, pushed to a branch via the GitHub contents API, restored at boot if `DATA_DIR` is empty |
 
 ## Data model

@@ -9,6 +9,7 @@
 //
 // <work-dir> holds:
 //   battles.json, squad.json            from GitHub
+//   live.json                            (website only, if any) battles it just pulled from the Clash API
 //   db/players/<id>.json                 the site's players
 //   db/matches/<id>.json                 the site's results dated within the window
 //   db/links/<playerId>.json             (if any) which account speaks for which player
@@ -21,6 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 const lib = require('./lib/battles');
+const { mergeBattles } = require('./lib/feed');
 
 const W = process.argv[2];
 if (!W) { console.error('usage: node scripts/daily-import.js <work-dir>'); process.exit(1); }
@@ -29,6 +31,14 @@ const readDir = (d) => (fs.existsSync(path.join(W, d)) ? fs.readdirSync(path.joi
   .map((f) => ({ id: f.slice(0, -5), ...JSON.parse(fs.readFileSync(path.join(W, d, f), 'utf8')) }));
 
 const { since, now } = read('window.json');
+// The battles: the GitHub copy, plus what the website pulled live from the Clash API just now (if it did)
+const feed = (() => {
+  const gh = read('battles.json');
+  if (!fs.existsSync(path.join(W, 'live.json'))) return gh;
+  const live = read('live.json'), checked = { ...(gh.checked || {}) };
+  for (const [tag, at] of Object.entries(live.checked || {})) if (typeof at === 'string' && !(checked[tag] >= at)) checked[tag] = at;
+  return { ...gh, battles: mergeBattles([gh.battles || [], live.battles || []]), checked };
+})();
 const versions = fs.existsSync(path.join(W, 'versions.json')) ? read('versions.json') : {};
 const players = readDir('db/players');
 const playerOf = lib.playerMap(read('squad.json'), players);
@@ -40,7 +50,7 @@ const existingIds = new Set(existing.map((m) => m.id));
 // Results the admin deleted on the site stay deleted and are never touched.
 const deletedIds = new Set(existing.filter((m) => typeof m.deletedAt === 'string').map((m) => m.id));
 const official = {};
-for (const r of lib.officialResults(read('battles.json').battles || [], playerOf, now)) {
+for (const r of lib.officialResults(feed.battles || [], playerOf, now)) {
   const id = lib.docId(r.battleKey);
   if (r.date >= since && !deletedIds.has(id)) official[id] = r;
 }
@@ -116,7 +126,7 @@ for (const x of pairs.unmatched) log.push(`Kept hand log ${x.key} "${x.label}": 
 
 // How far the official log is known to be complete for each player, so a series can settle
 // once its deciding game is covered (a game nobody logged by hand can't be skipped)
-const checked = read('battles.json').checked || {}, through = {};
+const checked = feed.checked || {}, through = {};
 for (const [tag, at] of Object.entries(checked)) { const pid = playerOf[lib.normTag(tag)]; if (pid && canon(at) && at <= now) through[pid] = at; }
 let coverageWrite = null; // goes in its own last batch, so it can never hold up the results
 if (Object.keys(through).length) {

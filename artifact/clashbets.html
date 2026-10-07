@@ -447,7 +447,10 @@ const OT_MODEL_GRACE = 3 * 3600e3; // a page left open from before the switch st
 // 285 s mostly means normal time, 286-344 s mostly sudden-death overtime; longer can't be told from a break.
 const GAP_NORMAL = 285, GAP_SUDDEN = 344, P_OT_SHORT_GAP = 0.2, P_OT_MID_GAP = 0.75;
 const DETAIL_FIELDS = ['overtime', 'firstCrown'];
-const ANSWER_MS = 48 * 3600e3; // how long after a result bets wait for the players to fill in a missing detail
+const ANSWER_MS = 48 * 3600e3;
+// From here on a single-game fixture nobody logged settles on the official battle log (see resultData);
+// fixtures that had already expired by then keep what they had
+const AUTO_SETTLE_FROM = '2026-10-07T13:45:00.000Z'; // how long after a result bets wait for the players to fill in a missing detail
 const DETAIL_WAIT = 'Waiting for the players to say what the battle log doesn\'t show';
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
 const logit = (p) => { p = clamp(p, 1e-6, 1 - 1e-6); return Math.log(p / (1 - p)); };
@@ -1620,6 +1623,17 @@ const resultData = memo(() => {
   const rank = (r) => (r.final ? 0 : r.claim ? 2 : 1);
   const settles = {};
   for (const r of [...current, ...pending].filter(claims).sort((p, q) => rank(p) - rank(q) || p.loggedAt.localeCompare(q.loggedAt) || p.key.localeCompare(q.key))) settles[r.fx] ||= r;
+  // A locked single-game fixture without a confirmed result for it settles on the official battle log: the first
+  // official game between its two players that ended after betting closed, before the fixture expired. An
+  // unconfirmed log for it waits behind the official game. Each official game settles one fixture at most.
+  const usedApi = new Set(Object.values(settles).filter((r) => r.final && r.source === 'api').map((r) => r.key));
+  const autoFx = Object.values(F).filter((f) => !f.format && f.primary && f.expiresAt > ms(AUTO_SETTLE_FROM) && !(settles[f.key] && settles[f.key].final))
+    .sort((p, q) => p.closesAt - q.closesAt || p.key.localeCompare(q.key));
+  for (const f of autoFx) {
+    const g = current.filter((r) => r.final && r.source === 'api' && !usedApi.has(r.key) && (!r.fx || r.fx === f.key) && samePair(r, f.a, f.b)
+      && ms(r.date) > f.closesAt && ms(r.date) <= f.expiresAt).sort(byDate)[0];
+    if (g) { settles[f.key] = g; usedApi.add(g.key); }
+  }
   const dupe = (r) => claims(r) && settles[r.fx] !== r;
   const duplicates = [...current, ...pending].filter(dupe);
   const dupeKeys = new Set(duplicates.map((r) => r.key));

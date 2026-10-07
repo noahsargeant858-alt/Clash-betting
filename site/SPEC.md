@@ -225,3 +225,10 @@ normal time or sudden death). Three things fill the gap:
   agreed answers (single answers count half), and back-to-back timing (battle times are when games end: a rematch
   gap up to 285 s suggests normal time, 286-344 s sudden death), with a 45% starting guess. Bets placed before
   `OT_MODEL_FROM` keep being checked against v1; an old page left open is accepted for 3 hours after the switch.
+
+## Single games settle on the official battle log
+
+A locked single-game fixture with no confirmed result for it settles on the first official game between its two
+players that ended after betting closed (and before the fixture expired). Each official game settles one fixture
+at most. A confirmed log for the fixture still comes first; an unconfirmed one waits behind the official game.
+Fixtures that had expired before `AUTO_SETTLE_FROM` keep what they had.

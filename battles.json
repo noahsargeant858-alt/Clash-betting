@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-10-09T16:23:14.900Z",
+ "updatedAt": "2026-10-09T21:06:32.170Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
@@ -27,7 +27,7 @@
   },
   "#8GQQ9YC2": {
    "name": "EPIC McMoosh",
-   "trophies": 13004,
+   "trophies": 13000,
    "bestTrophies": 13004,
    "expLevel": 59
   },
@@ -63,6 +63,136 @@
   }
  },
  "battles": [
+  {
+   "key": "20261009T172440.000Z|#8GQQ9YC2|#ULG0PY8UP",
+   "battleTime": "20261009T172440.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#8GQQ9YC2",
+    "name": "EPIC McMoosh",
+    "crowns": 1,
+    "kingTowerHitPoints": 3775,
+    "princessTowersHitPoints": [
+     2003,
+     360
+    ],
+    "elixirLeaked": 3.29,
+    "cards": [
+     {
+      "name": "Baby Dragon",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblins",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "X-Bow",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Princess",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Golem",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Elite Barbarians",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Poison",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#ULG0PY8UP",
+    "name": "triqqi",
+    "crowns": 0,
+    "kingTowerHitPoints": 3775,
+    "princessTowersHitPoints": [
+     1919
+    ],
+    "elixirLeaked": 6.54,
+    "cards": [
+     {
+      "name": "Executioner",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Skeletons",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Lava Hound",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Wizard",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Prince",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Delivery",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Hut",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Freeze",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261009T115203.000Z|#80JRVYRQC|#89R88C82Y",
    "battleTime": "20261009T115203.000Z",
@@ -26604,15 +26734,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-10-09T16:23:10.063Z",
-  "#ULG0PY8UP": "2026-10-09T16:23:10.605Z",
-  "#89R88C82Y": "2026-10-09T16:23:11.141Z",
-  "#9CY0VCVJG": "2026-10-09T16:23:11.670Z",
-  "#9Q0L20PL2": "2026-10-09T16:23:12.207Z",
-  "#UJ20VUYC8": "2026-10-09T16:23:12.741Z",
-  "#80JRVYRQC": "2026-10-09T16:23:13.275Z",
-  "#QL2GJVR02": "2026-10-09T16:23:14.344Z",
-  "#890UCYCGU": "2026-10-09T16:23:14.883Z",
-  "#QQ9CVYG0": "2026-10-09T16:23:13.807Z"
+  "#8GQQ9YC2": "2026-10-09T21:06:29.204Z",
+  "#ULG0PY8UP": "2026-10-09T21:06:29.527Z",
+  "#89R88C82Y": "2026-10-09T21:06:29.842Z",
+  "#9CY0VCVJG": "2026-10-09T21:06:30.162Z",
+  "#9Q0L20PL2": "2026-10-09T21:06:30.493Z",
+  "#UJ20VUYC8": "2026-10-09T21:06:30.838Z",
+  "#80JRVYRQC": "2026-10-09T21:06:31.172Z",
+  "#QL2GJVR02": "2026-10-09T21:06:31.830Z",
+  "#890UCYCGU": "2026-10-09T21:06:32.152Z",
+  "#QQ9CVYG0": "2026-10-09T21:06:31.496Z"
  }
 }

@@ -1,9 +1,9 @@
 {
- "updatedAt": "2026-10-10T18:43:17.339Z",
+ "updatedAt": "2026-10-10T22:42:40.477Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
-   "trophies": 12648,
+   "trophies": 12588,
    "bestTrophies": 12775,
    "expLevel": 47
   },
@@ -63,6 +63,266 @@
   }
  },
  "battles": [
+  {
+   "key": "20261010T212622.000Z|#80JRVYRQC|#89R88C82Y",
+   "battleTime": "20261010T212622.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#89R88C82Y",
+    "name": "KING ZABELA",
+    "crowns": 0,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     130
+    ],
+    "elixirLeaked": 2.55,
+    "cards": [
+     {
+      "name": "Tesla",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Lightning",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Musketeer",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Mother Witch",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Dark Prince",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Golem",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Firecracker",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#80JRVYRQC",
+    "name": "rishling",
+    "crowns": 1,
+    "kingTowerHitPoints": 4696,
+    "princessTowersHitPoints": [
+     2034,
+     981
+    ],
+    "elixirLeaked": 5.12,
+    "cards": [
+     {
+      "name": "P.E.K.K.A",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Poison",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Witch",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Bandit",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Delivery",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Golem",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Hogs",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Dart Goblin",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
+  {
+   "key": "20261010T201503.000Z|#89R88C82Y|#QL2GJVR02",
+   "battleTime": "20261010T201503.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#89R88C82Y",
+    "name": "KING ZABELA",
+    "crowns": 0,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     2818
+    ],
+    "elixirLeaked": 2.28,
+    "cards": [
+     {
+      "name": "Bowler",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Minions",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Tesla",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Balloon",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Executioner",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Knight",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#QL2GJVR02",
+    "name": "Dad",
+    "crowns": 1,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     3052,
+     230
+    ],
+    "elixirLeaked": 4.62,
+    "cards": [
+     {
+      "name": "Bomber",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Dart Goblin",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Cage",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Poison",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Hog Rider",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Zappies",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Zap",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Golem",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261010T174651.000Z|#80JRVYRQC|#9CY0VCVJG",
    "battleTime": "20261010T174651.000Z",
@@ -29185,15 +29445,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-10-10T18:43:13.831Z",
-  "#ULG0PY8UP": "2026-10-10T18:43:14.192Z",
-  "#89R88C82Y": "2026-10-10T18:43:14.558Z",
-  "#9CY0VCVJG": "2026-10-10T18:43:14.910Z",
-  "#9Q0L20PL2": "2026-10-10T18:43:15.256Z",
-  "#UJ20VUYC8": "2026-10-10T18:43:15.930Z",
-  "#80JRVYRQC": "2026-10-10T18:43:16.277Z",
-  "#QL2GJVR02": "2026-10-10T18:43:16.963Z",
-  "#890UCYCGU": "2026-10-10T18:43:17.323Z",
-  "#QQ9CVYG0": "2026-10-10T18:43:16.629Z"
+  "#8GQQ9YC2": "2026-10-10T22:42:37.587Z",
+  "#ULG0PY8UP": "2026-10-10T22:42:37.907Z",
+  "#89R88C82Y": "2026-10-10T22:42:38.215Z",
+  "#9CY0VCVJG": "2026-10-10T22:42:38.532Z",
+  "#9Q0L20PL2": "2026-10-10T22:42:38.858Z",
+  "#UJ20VUYC8": "2026-10-10T22:42:39.181Z",
+  "#80JRVYRQC": "2026-10-10T22:42:39.496Z",
+  "#QL2GJVR02": "2026-10-10T22:42:40.130Z",
+  "#890UCYCGU": "2026-10-10T22:42:40.449Z",
+  "#QQ9CVYG0": "2026-10-10T22:42:39.813Z"
  }
 }

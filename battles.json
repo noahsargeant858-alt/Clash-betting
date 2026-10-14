@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-10-14T06:15:46.617Z",
+ "updatedAt": "2026-10-14T12:08:44.442Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
@@ -63,6 +63,393 @@
   }
  },
  "battles": [
+  {
+   "key": "20261014T110656.000Z|#C8Q9UCCV0|#UJ20VUYC8",
+   "battleTime": "20261014T110656.000Z",
+   "type": "friendly",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#UJ20VUYC8",
+    "name": "Calooba",
+    "crowns": 1,
+    "kingTowerHitPoints": 4440,
+    "princessTowersHitPoints": null,
+    "elixirLeaked": 2.52,
+    "cards": [
+     {
+      "name": "Void",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Bandit",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ram Rider",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Mega Minion",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Skeleton Barrel",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Baby Dragon",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Battle Healer",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#C8Q9UCCV0",
+    "name": "lanrr",
+    "crowns": 2,
+    "kingTowerHitPoints": 3634,
+    "princessTowersHitPoints": [
+     1470
+    ],
+    "elixirLeaked": 2.64,
+    "cards": [
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Mother Witch",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Battle Ram",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Minions",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Poison",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Guards",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Executioner",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Machine",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
+  {
+   "key": "20261014T110223.000Z|#C8Q9UCCV0|#UJ20VUYC8",
+   "battleTime": "20261014T110223.000Z",
+   "type": "friendly",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#UJ20VUYC8",
+    "name": "Calooba",
+    "crowns": 1,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     1632,
+     1786
+    ],
+    "elixirLeaked": 1.78,
+    "cards": [
+     {
+      "name": "Battle Healer",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Dart Goblin",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Baby Dragon",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Barbarian Barrel",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Lava Hound",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Freeze",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Tombstone",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Mother Witch",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#C8Q9UCCV0",
+    "name": "lanrr",
+    "crowns": 0,
+    "kingTowerHitPoints": 4558,
+    "princessTowersHitPoints": [
+     562
+    ],
+    "elixirLeaked": 0.23,
+    "cards": [
+     {
+      "name": "Dark Prince",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Princess",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Skeleton Dragons",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ram Rider",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Earthquake",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Spirit",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Elixir Collector",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
+  {
+   "key": "20261014T105813.000Z|#C8Q9UCCV0|#UJ20VUYC8",
+   "battleTime": "20261014T105813.000Z",
+   "type": "friendly",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#UJ20VUYC8",
+    "name": "Calooba",
+    "crowns": 1,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     2860,
+     773
+    ],
+    "elixirLeaked": 11.48,
+    "cards": [
+     {
+      "name": "Poison",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Firecracker",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Tesla",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Miner",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Graveyard",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Cannon Cart",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Inferno Dragon",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#C8Q9UCCV0",
+    "name": "lanrr",
+    "crowns": 0,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     3052
+    ],
+    "elixirLeaked": 10.98,
+    "cards": [
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Dart Goblin",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Cage",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Valkyrie",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Battle Ram",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Delivery",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Rage",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Minion Horde",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261013T225848.000Z|#890UCYCGU|#8GQQ9YC2",
    "battleTime": "20261013T225848.000Z",
@@ -39149,15 +39536,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-10-14T06:15:43.403Z",
-  "#ULG0PY8UP": "2026-10-14T06:15:43.730Z",
-  "#89R88C82Y": "2026-10-14T06:15:44.042Z",
-  "#9CY0VCVJG": "2026-10-14T06:15:44.352Z",
-  "#9Q0L20PL2": "2026-10-14T06:15:44.662Z",
-  "#UJ20VUYC8": "2026-10-14T06:15:44.983Z",
-  "#80JRVYRQC": "2026-10-14T06:15:45.619Z",
-  "#QL2GJVR02": "2026-10-14T06:15:46.257Z",
-  "#890UCYCGU": "2026-10-14T06:15:46.576Z",
-  "#QQ9CVYG0": "2026-10-14T06:15:45.927Z"
+  "#8GQQ9YC2": "2026-10-14T12:08:40.968Z",
+  "#ULG0PY8UP": "2026-10-14T12:08:41.368Z",
+  "#89R88C82Y": "2026-10-14T12:08:41.738Z",
+  "#9CY0VCVJG": "2026-10-14T12:08:42.089Z",
+  "#9Q0L20PL2": "2026-10-14T12:08:42.481Z",
+  "#UJ20VUYC8": "2026-10-14T12:08:42.912Z",
+  "#80JRVYRQC": "2026-10-14T12:08:43.287Z",
+  "#QL2GJVR02": "2026-10-14T12:08:44.031Z",
+  "#890UCYCGU": "2026-10-14T12:08:44.400Z",
+  "#QQ9CVYG0": "2026-10-14T12:08:43.661Z"
  }
 }

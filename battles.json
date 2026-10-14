@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-10-14T17:22:22.077Z",
+ "updatedAt": "2026-10-14T20:51:57.429Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
@@ -45,8 +45,8 @@
   },
   "#890UCYCGU": {
    "name": "Johnny",
-   "trophies": 11189,
-   "bestTrophies": 11216,
+   "trophies": 11274,
+   "bestTrophies": 11274,
    "expLevel": 51
   },
   "#80JRVYRQC": {
@@ -63,6 +63,266 @@
   }
  },
  "battles": [
+  {
+   "key": "20261014T180828.000Z|#890UCYCGU|#ULG0PY8UP",
+   "battleTime": "20261014T180828.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#ULG0PY8UP",
+    "name": "triqqi",
+    "crowns": 1,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     2786,
+     2301
+    ],
+    "elixirLeaked": 7.81,
+    "cards": [
+     {
+      "name": "Mini P.E.K.K.A",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Bats",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Musketeer",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Curse",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Electro Giant",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Freeze",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Skeleton Barrel",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Knight",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#890UCYCGU",
+    "name": "Johnny",
+    "crowns": 0,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     1853
+    ],
+    "elixirLeaked": 2.22,
+    "cards": [
+     {
+      "name": "P.E.K.K.A",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Phoenix",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Executioner",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Mortar",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Poison",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Guards",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Rascals",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
+  {
+   "key": "20261014T180352.000Z|#890UCYCGU|#ULG0PY8UP",
+   "battleTime": "20261014T180352.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#ULG0PY8UP",
+    "name": "triqqi",
+    "crowns": 1,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     2279,
+     2915
+    ],
+    "elixirLeaked": 5.03,
+    "cards": [
+     {
+      "name": "Freeze",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Valkyrie",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Electro Giant",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Hunter",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Night Witch",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Bomb Tower",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Firecracker",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#890UCYCGU",
+    "name": "Johnny",
+    "crowns": 0,
+    "kingTowerHitPoints": 4568,
+    "princessTowersHitPoints": [
+     2722
+    ],
+    "elixirLeaked": 4.54,
+    "cards": [
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Dark Prince",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Giant",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Electro Wizard",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Void",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Demolisher",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "P.E.K.K.A",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Bats",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261014T164600.000Z|#890UCYCGU|#ULG0PY8UP",
    "battleTime": "20261014T164600.000Z",
@@ -40955,15 +41215,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-10-14T17:22:16.983Z",
-  "#ULG0PY8UP": "2026-10-14T17:22:17.623Z",
-  "#89R88C82Y": "2026-10-14T17:22:18.240Z",
-  "#9CY0VCVJG": "2026-10-14T17:22:18.774Z",
-  "#9Q0L20PL2": "2026-10-14T17:22:19.311Z",
-  "#UJ20VUYC8": "2026-10-14T17:22:19.908Z",
-  "#80JRVYRQC": "2026-10-14T17:22:20.495Z",
-  "#QL2GJVR02": "2026-10-14T17:22:21.518Z",
-  "#890UCYCGU": "2026-10-14T17:22:22.044Z",
-  "#QQ9CVYG0": "2026-10-14T17:22:20.999Z"
+  "#8GQQ9YC2": "2026-10-14T20:51:54.019Z",
+  "#ULG0PY8UP": "2026-10-14T20:51:54.361Z",
+  "#89R88C82Y": "2026-10-14T20:51:54.723Z",
+  "#9CY0VCVJG": "2026-10-14T20:51:55.186Z",
+  "#9Q0L20PL2": "2026-10-14T20:51:55.527Z",
+  "#UJ20VUYC8": "2026-10-14T20:51:55.939Z",
+  "#80JRVYRQC": "2026-10-14T20:51:56.325Z",
+  "#QL2GJVR02": "2026-10-14T20:51:57.058Z",
+  "#890UCYCGU": "2026-10-14T20:51:57.387Z",
+  "#QQ9CVYG0": "2026-10-14T20:51:56.707Z"
  }
 }

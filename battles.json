@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-10-15T22:29:42.462Z",
+ "updatedAt": "2026-10-16T01:31:06.979Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
@@ -27,8 +27,8 @@
   },
   "#8GQQ9YC2": {
    "name": "EPIC McMoosh",
-   "trophies": 13030,
-   "bestTrophies": 13030,
+   "trophies": 13092,
+   "bestTrophies": 13092,
    "expLevel": 59
   },
   "#9CY0VCVJG": {
@@ -63,6 +63,264 @@
   }
  },
  "battles": [
+  {
+   "key": "20261015T232108.000Z|#8GQQ9YC2|#P88GR8PU",
+   "battleTime": "20261015T232108.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#8GQQ9YC2",
+    "name": "EPIC McMoosh",
+    "crowns": 2,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     3052,
+     2893
+    ],
+    "elixirLeaked": 3.41,
+    "cards": [
+     {
+      "name": "Giant",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Guards",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Musketeer",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Giant Snowball",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Dark Prince",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Archers",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Poison",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Hut",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#P88GR8PU",
+    "name": "matt",
+    "crowns": 0,
+    "kingTowerHitPoints": 3956,
+    "princessTowersHitPoints": null,
+    "elixirLeaked": 1.75,
+    "cards": [
+     {
+      "name": "X-Bow",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Gang",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Hunter",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Knight",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Wizard",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Lumberjack",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
+  {
+   "key": "20261015T231704.000Z|#8GQQ9YC2|#P88GR8PU",
+   "battleTime": "20261015T231704.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#8GQQ9YC2",
+    "name": "EPIC McMoosh",
+    "crowns": 1,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     2186,
+     1417
+    ],
+    "elixirLeaked": 9.94,
+    "cards": [
+     {
+      "name": "Executioner",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Battle Healer",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblins",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Hut",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Giant",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Giant Snowball",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Firecracker",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#P88GR8PU",
+    "name": "matt",
+    "crowns": 0,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     2829
+    ],
+    "elixirLeaked": 10.04,
+    "cards": [
+     {
+      "name": "Hunter",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Knight",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Skeleton Army",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Bomb Tower",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Poison",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Graveyard",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Wizard",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261015T205419.000Z|#80JRVYRQC|#P88GR8PU",
    "battleTime": "20261015T205419.000Z",
@@ -42764,15 +43022,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-10-15T22:29:38.903Z",
-  "#ULG0PY8UP": "2026-10-15T22:29:39.286Z",
-  "#89R88C82Y": "2026-10-15T22:29:39.657Z",
-  "#9CY0VCVJG": "2026-10-15T22:29:40.024Z",
-  "#9Q0L20PL2": "2026-10-15T22:29:40.428Z",
-  "#UJ20VUYC8": "2026-10-15T22:29:40.880Z",
-  "#80JRVYRQC": "2026-10-15T22:29:41.266Z",
-  "#QL2GJVR02": "2026-10-15T22:29:42.067Z",
-  "#890UCYCGU": "2026-10-15T22:29:42.431Z",
-  "#QQ9CVYG0": "2026-10-15T22:29:41.684Z"
+  "#8GQQ9YC2": "2026-10-16T01:31:03.252Z",
+  "#ULG0PY8UP": "2026-10-16T01:31:03.673Z",
+  "#89R88C82Y": "2026-10-16T01:31:04.083Z",
+  "#9CY0VCVJG": "2026-10-16T01:31:04.473Z",
+  "#9Q0L20PL2": "2026-10-16T01:31:04.847Z",
+  "#UJ20VUYC8": "2026-10-16T01:31:05.297Z",
+  "#80JRVYRQC": "2026-10-16T01:31:05.700Z",
+  "#QL2GJVR02": "2026-10-16T01:31:06.480Z",
+  "#890UCYCGU": "2026-10-16T01:31:06.936Z",
+  "#QQ9CVYG0": "2026-10-16T01:31:06.088Z"
  }
 }

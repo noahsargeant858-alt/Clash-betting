@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-10-19T04:56:40.643Z",
+ "updatedAt": "2026-10-19T10:58:21.977Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
@@ -63,6 +63,133 @@
   }
  },
  "battles": [
+  {
+   "key": "20261019T101920.000Z|#8GQQ9YC2|#9CY0VCVJG",
+   "battleTime": "20261019T101920.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#8GQQ9YC2",
+    "name": "EPIC McMoosh",
+    "crowns": 3,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     2415
+    ],
+    "elixirLeaked": 3.09,
+    "cards": [
+     {
+      "name": "Bowler",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Giant Snowball",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Miner",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Magic Archer",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Graveyard",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Freeze",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Flying Machine",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Heal Spirit",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#9CY0VCVJG",
+    "name": "DarkMario008",
+    "crowns": 1,
+    "kingTowerHitPoints": 0,
+    "princessTowersHitPoints": null,
+    "elixirLeaked": 5.83,
+    "cards": [
+     {
+      "name": "Elixir Collector",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Zap",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Battle Healer",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Witch",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Electro Giant",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Lightning",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Dart Goblin",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Skeleton Barrel",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261018T205710.000Z|#9CY0VCVJG|#ULG0PY8UP",
    "battleTime": "20261018T205710.000Z",
@@ -49737,15 +49864,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-10-19T04:56:30.191Z",
-  "#ULG0PY8UP": "2026-10-19T04:56:30.654Z",
-  "#89R88C82Y": "2026-10-19T04:56:33.159Z",
-  "#9CY0VCVJG": "2026-10-19T04:56:33.533Z",
-  "#9Q0L20PL2": "2026-10-19T04:56:33.987Z",
-  "#UJ20VUYC8": "2026-10-19T04:56:38.913Z",
-  "#80JRVYRQC": "2026-10-19T04:56:39.369Z",
-  "#QL2GJVR02": "2026-10-19T04:56:40.225Z",
-  "#890UCYCGU": "2026-10-19T04:56:40.593Z",
-  "#QQ9CVYG0": "2026-10-19T04:56:39.869Z"
+  "#8GQQ9YC2": "2026-10-19T10:58:17.691Z",
+  "#ULG0PY8UP": "2026-10-19T10:58:18.074Z",
+  "#89R88C82Y": "2026-10-19T10:58:18.480Z",
+  "#9CY0VCVJG": "2026-10-19T10:58:18.873Z",
+  "#9Q0L20PL2": "2026-10-19T10:58:19.685Z",
+  "#UJ20VUYC8": "2026-10-19T10:58:20.119Z",
+  "#80JRVYRQC": "2026-10-19T10:58:20.547Z",
+  "#QL2GJVR02": "2026-10-19T10:58:21.544Z",
+  "#890UCYCGU": "2026-10-19T10:58:21.923Z",
+  "#QQ9CVYG0": "2026-10-19T10:58:21.140Z"
  }
 }

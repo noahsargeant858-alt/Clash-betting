@@ -1,9 +1,9 @@
 {
- "updatedAt": "2026-10-23T18:30:28.977Z",
+ "updatedAt": "2026-10-23T22:23:45.347Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
-   "trophies": 12558,
+   "trophies": 12559,
    "bestTrophies": 12775,
    "expLevel": 47
   },
@@ -64,14 +64,331 @@
  },
  "battles": [
   {
-   "key": "20261023T171419.000Z|#9CY0VCVJG|#ULG0PY8UP",
-   "battleTime": "20261023T171419.000Z",
+   "key": "20261023T220932.000Z|#9CY0VCVJG|#QL2GJVR02",
+   "battleTime": "20261023T220932.000Z",
    "type": "clanMate",
    "gameMode": {
     "id": 72000194,
     "name": "Draft_Competitive"
    },
    "team": {
+    "tag": "#9CY0VCVJG",
+    "name": "DarkMario008",
+    "crowns": 1,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     2366,
+     2716
+    ],
+    "elixirLeaked": 2.8,
+    "cards": [
+     {
+      "name": "Dark Prince",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "P.E.K.K.A",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Firecracker",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Spirit",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Giant",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Lightning",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Delivery",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Magic Archer",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#QL2GJVR02",
+    "name": "Dad",
+    "crowns": 0,
+    "kingTowerHitPoints": 4568,
+    "princessTowersHitPoints": [
+     776
+    ],
+    "elixirLeaked": 14.8,
+    "cards": [
+     {
+      "name": "Valkyrie",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Tesla",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Princess",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Electro Spirit",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Golem",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Witch",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
+  {
+   "key": "20261023T190550.000Z|#9CY0VCVJG|#UJ20VUYC8",
+   "battleTime": "20261023T190550.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#9CY0VCVJG",
+    "name": "DarkMario008",
+    "crowns": 3,
+    "kingTowerHitPoints": 3469,
+    "princessTowersHitPoints": [
+     348
+    ],
+    "elixirLeaked": 0,
+    "cards": [
+     {
+      "name": "Dark Prince",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Sparky",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Inferno Dragon",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Elite Barbarians",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Dart Goblin",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Delivery",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Giant",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#UJ20VUYC8",
+    "name": "Calooba",
+    "crowns": 1,
+    "kingTowerHitPoints": 0,
+    "princessTowersHitPoints": null,
+    "elixirLeaked": 1.57,
+    "cards": [
+     {
+      "name": "Goblin Machine",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Freeze",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Bandit",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Hunter",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Recruits",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Firecracker",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Hogs",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
+  {
+   "key": "20261023T171418.000Z|#9CY0VCVJG|#ULG0PY8UP",
+   "battleTime": "20261023T171418.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#ULG0PY8UP",
+    "name": "triqqi",
+    "crowns": 0,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     3052
+    ],
+    "elixirLeaked": 2.95,
+    "cards": [
+     {
+      "name": "Bandit",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Tombstone",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Musketeer",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Poison",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Bats",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Delivery",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Barrel",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Tesla",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
     "tag": "#9CY0VCVJG",
     "name": "DarkMario008",
     "crowns": 1,
@@ -131,37 +448,38 @@
       "evolutionLevel": null
      }
     ]
+   }
+  },
+  {
+   "key": "20261023T170918.000Z|#8GQQ9YC2|#ULG0PY8UP",
+   "battleTime": "20261023T170918.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
    },
-   "opponent": {
-    "tag": "#ULG0PY8UP",
-    "name": "triqqi",
-    "crowns": 0,
+   "team": {
+    "tag": "#8GQQ9YC2",
+    "name": "EPIC McMoosh",
+    "crowns": 1,
     "kingTowerHitPoints": 4824,
-    "princessTowersHitPoints": [
-     3052
-    ],
-    "elixirLeaked": 2.95,
+    "princessTowersHitPoints": null,
+    "elixirLeaked": 9.41,
     "cards": [
      {
-      "name": "Bandit",
-      "level": 3,
-      "maxLevel": 8,
+      "name": "Knight",
+      "level": 11,
+      "maxLevel": 16,
       "evolutionLevel": null
      },
      {
-      "name": "Tombstone",
-      "level": 9,
-      "maxLevel": 14,
+      "name": "Giant Snowball",
+      "level": 11,
+      "maxLevel": 16,
       "evolutionLevel": null
      },
      {
-      "name": "Musketeer",
-      "level": 9,
-      "maxLevel": 14,
-      "evolutionLevel": null
-     },
-     {
-      "name": "Poison",
+      "name": "Executioner",
       "level": 6,
       "maxLevel": 11,
       "evolutionLevel": null
@@ -173,21 +491,87 @@
       "evolutionLevel": null
      },
      {
+      "name": "Elite Barbarians",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fire Spirit",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Elixir Golem",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#ULG0PY8UP",
+    "name": "triqqi",
+    "crowns": 2,
+    "kingTowerHitPoints": 3918,
+    "princessTowersHitPoints": [
+     2253
+    ],
+    "elixirLeaked": 4.73,
+    "cards": [
+     {
+      "name": "Dark Prince",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
       "name": "Royal Delivery",
       "level": 11,
       "maxLevel": 16,
       "evolutionLevel": null
      },
      {
-      "name": "Goblin Barrel",
-      "level": 6,
-      "maxLevel": 11,
+      "name": "Magic Archer",
+      "level": 3,
+      "maxLevel": 8,
       "evolutionLevel": null
      },
      {
-      "name": "Tesla",
+      "name": "Firecracker",
       "level": 11,
       "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Lumberjack",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Rocket",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Skeleton Barrel",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Golem",
+      "level": 6,
+      "maxLevel": 11,
       "evolutionLevel": null
      }
     ]
@@ -58790,15 +59174,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-10-23T13:37:16.993Z",
-  "#ULG0PY8UP": "2026-10-23T13:37:17.395Z",
-  "#89R88C82Y": "2026-10-23T13:37:17.808Z",
-  "#9CY0VCVJG": "2026-10-23T18:30:27.045Z",
-  "#9Q0L20PL2": "2026-10-23T18:30:27.529Z",
-  "#UJ20VUYC8": "2026-10-23T18:30:27.970Z",
-  "#80JRVYRQC": "2026-10-23T13:37:19.433Z",
-  "#QL2GJVR02": "2026-10-23T18:30:28.540Z",
-  "#890UCYCGU": "2026-10-23T18:30:28.909Z",
-  "#QQ9CVYG0": "2026-10-23T13:37:19.797Z"
+  "#8GQQ9YC2": "2026-10-23T22:23:30.313Z",
+  "#ULG0PY8UP": "2026-10-23T22:23:30.665Z",
+  "#89R88C82Y": "2026-10-23T22:23:31.028Z",
+  "#9CY0VCVJG": "2026-10-23T22:23:31.441Z",
+  "#9Q0L20PL2": "2026-10-23T22:23:32.045Z",
+  "#UJ20VUYC8": "2026-10-23T22:23:33.966Z",
+  "#80JRVYRQC": "2026-10-23T22:23:34.429Z",
+  "#QL2GJVR02": "2026-10-23T22:23:44.776Z",
+  "#890UCYCGU": "2026-10-23T22:23:45.284Z",
+  "#QQ9CVYG0": "2026-10-23T22:23:34.764Z"
  }
 }

@@ -1,9 +1,9 @@
 {
- "updatedAt": "2026-10-24T01:44:05.111Z",
+ "updatedAt": "2026-10-24T07:26:00.333Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
-   "trophies": 12559,
+   "trophies": 12565,
    "bestTrophies": 12775,
    "expLevel": 47
   },
@@ -63,6 +63,133 @@
   }
  },
  "battles": [
+  {
+   "key": "20261024T031934.000Z|#80JRVYRQC|#89R88C82Y",
+   "battleTime": "20261024T031934.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#89R88C82Y",
+    "name": "KING ZABELA",
+    "crowns": 1,
+    "kingTowerHitPoints": 0,
+    "princessTowersHitPoints": null,
+    "elixirLeaked": 2.23,
+    "cards": [
+     {
+      "name": "Dart Goblin",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Hog Rider",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Dark Prince",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Delivery",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Poison",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Bomber",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Phoenix",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Inferno Tower",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#80JRVYRQC",
+    "name": "rishling",
+    "crowns": 3,
+    "kingTowerHitPoints": 4656,
+    "princessTowersHitPoints": [
+     1933
+    ],
+    "elixirLeaked": 7.9,
+    "cards": [
+     {
+      "name": "Firecracker",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Electro Giant",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Knight",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Earthquake",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Bandit",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Witch",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Cannon",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261023T235533.000Z|#890UCYCGU|#ULG0PY8UP",
    "battleTime": "20261023T235533.000Z",
@@ -59820,15 +59947,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-10-24T01:43:35.568Z",
-  "#ULG0PY8UP": "2026-10-24T01:43:35.958Z",
-  "#89R88C82Y": "2026-10-24T01:43:36.791Z",
-  "#9CY0VCVJG": "2026-10-24T01:44:01.560Z",
-  "#9Q0L20PL2": "2026-10-24T01:44:01.952Z",
-  "#UJ20VUYC8": "2026-10-24T01:44:02.376Z",
-  "#80JRVYRQC": "2026-10-24T01:44:02.927Z",
-  "#QL2GJVR02": "2026-10-24T01:44:04.213Z",
-  "#890UCYCGU": "2026-10-24T01:44:05.031Z",
-  "#QQ9CVYG0": "2026-10-24T01:44:03.678Z"
+  "#8GQQ9YC2": "2026-10-24T07:25:51.282Z",
+  "#ULG0PY8UP": "2026-10-24T07:25:52.911Z",
+  "#89R88C82Y": "2026-10-24T07:25:53.253Z",
+  "#9CY0VCVJG": "2026-10-24T07:25:53.667Z",
+  "#9Q0L20PL2": "2026-10-24T07:25:55.609Z",
+  "#UJ20VUYC8": "2026-10-24T07:25:56.133Z",
+  "#80JRVYRQC": "2026-10-24T07:25:58.460Z",
+  "#QL2GJVR02": "2026-10-24T07:25:59.930Z",
+  "#890UCYCGU": "2026-10-24T07:26:00.261Z",
+  "#QQ9CVYG0": "2026-10-24T07:25:59.469Z"
  }
 }

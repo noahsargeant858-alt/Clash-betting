@@ -1,10 +1,10 @@
 {
- "updatedAt": "2026-10-27T23:51:19.703Z",
+ "updatedAt": "2026-10-28T05:57:04.024Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
-   "trophies": 13100,
-   "bestTrophies": 13128,
+   "trophies": 13102,
+   "bestTrophies": 13130,
    "expLevel": 47
   },
   "#QL2GJVR02": {
@@ -39,7 +39,7 @@
   },
   "#UJ20VUYC8": {
    "name": "Calooba",
-   "trophies": 12104,
+   "trophies": 12075,
    "bestTrophies": 12192,
    "expLevel": 54
   },
@@ -63,6 +63,136 @@
   }
  },
  "battles": [
+  {
+   "key": "20261028T004626.000Z|#898YG0R0|#UJ20VUYC8",
+   "battleTime": "20261028T004626.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#UJ20VUYC8",
+    "name": "Calooba",
+    "crowns": 1,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     2520,
+     1712
+    ],
+    "elixirLeaked": 0.11,
+    "cards": [
+     {
+      "name": "Witch",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Bowler",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Dark Prince",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Hut",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Dart Goblin",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Giant",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#898YG0R0",
+    "name": "raffi",
+    "crowns": 0,
+    "kingTowerHitPoints": 2628,
+    "princessTowersHitPoints": [
+     2623
+    ],
+    "elixirLeaked": 1.37,
+    "cards": [
+     {
+      "name": "Electro Dragon",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Demolisher",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Valkyrie",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Recruits",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Flying Machine",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Mortar",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Freeze",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Delivery",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261027T234243.000Z|#9CY0VCVJG|#UJ20VUYC8",
    "battleTime": "20261027T234243.000Z",
@@ -68235,15 +68365,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-10-27T23:51:16.406Z",
-  "#ULG0PY8UP": "2026-10-27T23:51:16.756Z",
-  "#89R88C82Y": "2026-10-27T23:51:17.123Z",
-  "#9CY0VCVJG": "2026-10-27T23:51:17.461Z",
-  "#9Q0L20PL2": "2026-10-27T23:51:17.847Z",
-  "#UJ20VUYC8": "2026-10-27T23:51:18.273Z",
-  "#80JRVYRQC": "2026-10-27T23:51:18.631Z",
-  "#QL2GJVR02": "2026-10-27T23:51:19.316Z",
-  "#890UCYCGU": "2026-10-27T23:51:19.642Z",
-  "#QQ9CVYG0": "2026-10-27T23:51:18.991Z"
+  "#8GQQ9YC2": "2026-10-28T05:57:00.679Z",
+  "#ULG0PY8UP": "2026-10-28T05:57:01.320Z",
+  "#89R88C82Y": "2026-10-28T05:57:01.656Z",
+  "#9CY0VCVJG": "2026-10-28T05:57:01.993Z",
+  "#9Q0L20PL2": "2026-10-28T05:57:02.327Z",
+  "#UJ20VUYC8": "2026-10-28T05:57:02.663Z",
+  "#80JRVYRQC": "2026-10-28T05:57:02.996Z",
+  "#QL2GJVR02": "2026-10-28T05:57:03.639Z",
+  "#890UCYCGU": "2026-10-28T05:57:03.978Z",
+  "#QQ9CVYG0": "2026-10-28T05:57:03.317Z"
  }
 }

@@ -1,9 +1,9 @@
 {
- "updatedAt": "2026-11-03T09:44:14.354Z",
+ "updatedAt": "2026-11-03T17:55:20.266Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
-   "trophies": 13064,
+   "trophies": 13098,
    "bestTrophies": 13202,
    "expLevel": 47
   },
@@ -27,7 +27,7 @@
   },
   "#8GQQ9YC2": {
    "name": "EPIC McMoosh",
-   "trophies": 13010,
+   "trophies": 13070,
    "bestTrophies": 13094,
    "expLevel": 59
   },
@@ -63,6 +63,264 @@
   }
  },
  "battles": [
+  {
+   "key": "20261103T133606.000Z|#C8Q9UCCV0|#UJ20VUYC8",
+   "battleTime": "20261103T133606.000Z",
+   "type": "friendly",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#UJ20VUYC8",
+    "name": "Calooba",
+    "crowns": 3,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     942,
+     3052
+    ],
+    "elixirLeaked": 1.98,
+    "cards": [
+     {
+      "name": "Dart Goblin",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Rocket",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Rage",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Magic Archer",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Mega Knight",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Gang",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Valkyrie",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#C8Q9UCCV0",
+    "name": "lanrr",
+    "crowns": 0,
+    "kingTowerHitPoints": 0,
+    "princessTowersHitPoints": null,
+    "elixirLeaked": 2.72,
+    "cards": [
+     {
+      "name": "Ice Wizard",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Mother Witch",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Electro Wizard",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Elixir Golem",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Void",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Skeletons",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Prince",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
+  {
+   "key": "20261103T133311.000Z|#C8Q9UCCV0|#UJ20VUYC8",
+   "battleTime": "20261103T133311.000Z",
+   "type": "friendly",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#UJ20VUYC8",
+    "name": "Calooba",
+    "crowns": 1,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     1915,
+     1257
+    ],
+    "elixirLeaked": 2.38,
+    "cards": [
+     {
+      "name": "Sparky",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Dark Prince",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Wizard",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Spirit",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Golem",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Inferno Dragon",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#C8Q9UCCV0",
+    "name": "lanrr",
+    "crowns": 0,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     2839
+    ],
+    "elixirLeaked": 4.75,
+    "cards": [
+     {
+      "name": "Bowler",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Rascals",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Spear Goblins",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Giant Snowball",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblins",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ram Rider",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Freeze",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Skeleton Dragons",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261102T225624.000Z|#80JRVYRQC|#UJ20VUYC8",
    "battleTime": "20261102T225624.000Z",
@@ -75210,15 +75468,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-11-03T09:44:11.254Z",
-  "#ULG0PY8UP": "2026-11-03T09:44:11.584Z",
-  "#89R88C82Y": "2026-11-03T09:44:11.917Z",
-  "#9CY0VCVJG": "2026-11-03T09:44:12.236Z",
-  "#9Q0L20PL2": "2026-11-03T09:44:12.555Z",
-  "#UJ20VUYC8": "2026-11-03T09:44:12.872Z",
-  "#80JRVYRQC": "2026-11-03T09:44:13.214Z",
-  "#QL2GJVR02": "2026-11-03T09:44:13.863Z",
-  "#890UCYCGU": "2026-11-03T09:44:14.250Z",
-  "#QQ9CVYG0": "2026-11-03T09:44:13.554Z"
+  "#8GQQ9YC2": "2026-11-03T17:55:16.786Z",
+  "#ULG0PY8UP": "2026-11-03T17:55:17.144Z",
+  "#89R88C82Y": "2026-11-03T17:55:17.505Z",
+  "#9CY0VCVJG": "2026-11-03T17:55:17.887Z",
+  "#9Q0L20PL2": "2026-11-03T17:55:18.254Z",
+  "#UJ20VUYC8": "2026-11-03T17:55:18.635Z",
+  "#80JRVYRQC": "2026-11-03T17:55:18.988Z",
+  "#QL2GJVR02": "2026-11-03T17:55:19.707Z",
+  "#890UCYCGU": "2026-11-03T17:55:20.173Z",
+  "#QQ9CVYG0": "2026-11-03T17:55:19.361Z"
  }
 }

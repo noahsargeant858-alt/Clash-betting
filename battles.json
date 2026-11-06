@@ -1,9 +1,9 @@
 {
- "updatedAt": "2026-11-06T16:01:37.794Z",
+ "updatedAt": "2026-11-06T21:38:33.697Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
-   "trophies": 13071,
+   "trophies": 13044,
    "bestTrophies": 13202,
    "expLevel": 47
   },
@@ -63,6 +63,136 @@
   }
  },
  "battles": [
+  {
+   "key": "20261106T161719.000Z|#8GQQ9YC2|#9Q0L20PL2",
+   "battleTime": "20261106T161719.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#8GQQ9YC2",
+    "name": "EPIC McMoosh",
+    "crowns": 0,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     3052
+    ],
+    "elixirLeaked": 3.96,
+    "cards": [
+     {
+      "name": "Mother Witch",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Guards",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Poison",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Baby Dragon",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Giant",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Golem",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Bats",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#9Q0L20PL2",
+    "name": "SEK",
+    "crowns": 1,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     2714,
+     1456
+    ],
+    "elixirLeaked": 2.34,
+    "cards": [
+     {
+      "name": "Night Witch",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Tornado",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Skeleton Army",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Electro Dragon",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Electro Giant",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Battle Healer",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Spear Goblins",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261105T211821.000Z|#898YG0R0|#UJ20VUYC8",
    "battleTime": "20261105T211821.000Z",
@@ -76890,15 +77020,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-11-06T16:01:33.965Z",
-  "#ULG0PY8UP": "2026-11-06T16:01:34.354Z",
-  "#89R88C82Y": "2026-11-06T16:01:34.753Z",
-  "#9CY0VCVJG": "2026-11-06T16:01:35.176Z",
-  "#9Q0L20PL2": "2026-11-06T16:01:35.649Z",
-  "#UJ20VUYC8": "2026-11-06T16:01:36.109Z",
-  "#80JRVYRQC": "2026-11-06T16:01:36.522Z",
-  "#QL2GJVR02": "2026-11-06T16:01:37.250Z",
-  "#890UCYCGU": "2026-11-06T16:01:37.681Z",
-  "#QQ9CVYG0": "2026-11-06T16:01:36.889Z"
+  "#8GQQ9YC2": "2026-11-06T21:38:30.288Z",
+  "#ULG0PY8UP": "2026-11-06T21:38:30.685Z",
+  "#89R88C82Y": "2026-11-06T21:38:31.042Z",
+  "#9CY0VCVJG": "2026-11-06T21:38:31.412Z",
+  "#9Q0L20PL2": "2026-11-06T21:38:31.799Z",
+  "#UJ20VUYC8": "2026-11-06T21:38:32.186Z",
+  "#80JRVYRQC": "2026-11-06T21:38:32.515Z",
+  "#QL2GJVR02": "2026-11-06T21:38:33.218Z",
+  "#890UCYCGU": "2026-11-06T21:38:33.614Z",
+  "#QQ9CVYG0": "2026-11-06T21:38:32.857Z"
  }
 }

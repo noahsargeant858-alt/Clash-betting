@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-11-07T23:44:01.963Z",
+ "updatedAt": "2026-11-08T06:20:55.547Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
@@ -63,6 +63,133 @@
   }
  },
  "battles": [
+  {
+   "key": "20261108T012025.000Z|#80JRVYRQC|#89R88C82Y",
+   "battleTime": "20261108T012025.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#89R88C82Y",
+    "name": "KING ZABELA",
+    "crowns": 1,
+    "kingTowerHitPoints": 0,
+    "princessTowersHitPoints": null,
+    "elixirLeaked": 1.05,
+    "cards": [
+     {
+      "name": "Zap",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Dart Goblin",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Skeleton Barrel",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Miner",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Zappies",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Furnace",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Balloon",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#80JRVYRQC",
+    "name": "rishling",
+    "crowns": 3,
+    "kingTowerHitPoints": 4395,
+    "princessTowersHitPoints": [
+     1105
+    ],
+    "elixirLeaked": 3.67,
+    "cards": [
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Firecracker",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Poison",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Heal Spirit",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Rascals",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Electro Dragon",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Bomb Tower",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Elixir Golem",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261106T161719.000Z|#8GQQ9YC2|#9Q0L20PL2",
    "battleTime": "20261106T161719.000Z",
@@ -77020,15 +77147,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-11-07T23:43:58.380Z",
-  "#ULG0PY8UP": "2026-11-07T23:43:58.740Z",
-  "#89R88C82Y": "2026-11-07T23:43:59.096Z",
-  "#9CY0VCVJG": "2026-11-07T23:43:59.471Z",
-  "#9Q0L20PL2": "2026-11-07T23:43:59.845Z",
-  "#UJ20VUYC8": "2026-11-07T23:44:00.268Z",
-  "#80JRVYRQC": "2026-11-07T23:44:00.625Z",
-  "#QL2GJVR02": "2026-11-07T23:44:01.460Z",
-  "#890UCYCGU": "2026-11-07T23:44:01.900Z",
-  "#QQ9CVYG0": "2026-11-07T23:44:00.992Z"
+  "#8GQQ9YC2": "2026-11-08T06:20:51.927Z",
+  "#ULG0PY8UP": "2026-11-08T06:20:52.382Z",
+  "#89R88C82Y": "2026-11-08T06:20:52.767Z",
+  "#9CY0VCVJG": "2026-11-08T06:20:53.125Z",
+  "#9Q0L20PL2": "2026-11-08T06:20:53.483Z",
+  "#UJ20VUYC8": "2026-11-08T06:20:53.901Z",
+  "#80JRVYRQC": "2026-11-08T06:20:54.321Z",
+  "#QL2GJVR02": "2026-11-08T06:20:55.048Z",
+  "#890UCYCGU": "2026-11-08T06:20:55.491Z",
+  "#QQ9CVYG0": "2026-11-08T06:20:54.669Z"
  }
 }

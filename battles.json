@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-11-13T23:43:14.031Z",
+ "updatedAt": "2026-11-14T06:46:24.529Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
@@ -63,6 +63,133 @@
   }
  },
  "battles": [
+  {
+   "key": "20261114T043156.000Z|#9Q0L20PL2|#UYL99GYUY",
+   "battleTime": "20261114T043156.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#9Q0L20PL2",
+    "name": "SEK",
+    "crowns": 2,
+    "kingTowerHitPoints": 920,
+    "princessTowersHitPoints": [
+     3052
+    ],
+    "elixirLeaked": 22.26,
+    "cards": [
+     {
+      "name": "Wall Breakers",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Miner",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Magic Archer",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Spirit",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Delivery",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Cannon",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Wizard",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#UYL99GYUY",
+    "name": "clork",
+    "crowns": 1,
+    "kingTowerHitPoints": 4284,
+    "princessTowersHitPoints": null,
+    "elixirLeaked": 25.01,
+    "cards": [
+     {
+      "name": "Balloon",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Ghost",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Wizard",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Tombstone",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Giant Snowball",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Mini P.E.K.K.A",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Freeze",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Bats",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261113T204054.000Z|#9CY0VCVJG|#UJ20VUYC8",
    "battleTime": "20261113T204054.000Z",
@@ -82456,15 +82583,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-11-13T23:43:10.586Z",
-  "#ULG0PY8UP": "2026-11-13T23:43:10.924Z",
-  "#89R88C82Y": "2026-11-13T23:43:11.278Z",
-  "#9CY0VCVJG": "2026-11-13T23:43:11.711Z",
-  "#9Q0L20PL2": "2026-11-13T23:43:12.086Z",
-  "#UJ20VUYC8": "2026-11-13T23:43:12.547Z",
-  "#80JRVYRQC": "2026-11-13T23:43:12.884Z",
-  "#QL2GJVR02": "2026-11-13T23:43:13.535Z",
-  "#890UCYCGU": "2026-11-13T23:43:13.945Z",
-  "#QQ9CVYG0": "2026-11-13T23:43:13.218Z"
+  "#8GQQ9YC2": "2026-11-14T06:46:20.986Z",
+  "#ULG0PY8UP": "2026-11-14T06:46:21.343Z",
+  "#89R88C82Y": "2026-11-14T06:46:21.729Z",
+  "#9CY0VCVJG": "2026-11-14T06:46:22.172Z",
+  "#9Q0L20PL2": "2026-11-14T06:46:22.522Z",
+  "#UJ20VUYC8": "2026-11-14T06:46:22.942Z",
+  "#80JRVYRQC": "2026-11-14T06:46:23.299Z",
+  "#QL2GJVR02": "2026-11-14T06:46:24.010Z",
+  "#890UCYCGU": "2026-11-14T06:46:24.433Z",
+  "#QQ9CVYG0": "2026-11-14T06:46:23.645Z"
  }
 }

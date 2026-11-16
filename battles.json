@@ -1,9 +1,9 @@
 {
- "updatedAt": "2026-11-15T23:00:02.477Z",
+ "updatedAt": "2026-11-16T02:52:56.676Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
-   "trophies": 13739,
+   "trophies": 13712,
    "bestTrophies": 13765,
    "expLevel": 47
   },
@@ -39,7 +39,7 @@
   },
   "#UJ20VUYC8": {
    "name": "Calooba",
-   "trophies": 12201,
+   "trophies": 12143,
    "bestTrophies": 12326,
    "expLevel": 54
   },
@@ -63,6 +63,136 @@
   }
  },
  "battles": [
+  {
+   "key": "20261115T231612.000Z|#9CY0VCVJG|#UJ20VUYC8",
+   "battleTime": "20261115T231612.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#9CY0VCVJG",
+    "name": "DarkMario008",
+    "crowns": 1,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     2090,
+     1269
+    ],
+    "elixirLeaked": 0.1,
+    "cards": [
+     {
+      "name": "Lightning",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Lava Hound",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Electro Dragon",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Mega Minion",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Ghost",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Inferno Tower",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Skeleton Army",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Arrows",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#UJ20VUYC8",
+    "name": "Calooba",
+    "crowns": 0,
+    "kingTowerHitPoints": 4551,
+    "princessTowersHitPoints": [
+     2740
+    ],
+    "elixirLeaked": 3.85,
+    "cards": [
+     {
+      "name": "Rocket",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Hogs",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Witch",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Firecracker",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fisherman",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Hut",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Heal Spirit",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Delivery",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261115T225903.000Z|#8GQQ9YC2|#UJ20VUYC8",
    "battleTime": "20261115T225903.000Z",
@@ -84900,15 +85030,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-11-15T22:59:58.694Z",
-  "#ULG0PY8UP": "2026-11-15T22:59:59.055Z",
-  "#89R88C82Y": "2026-11-15T22:59:59.419Z",
-  "#9CY0VCVJG": "2026-11-15T22:59:59.860Z",
-  "#9Q0L20PL2": "2026-11-15T23:00:00.228Z",
-  "#UJ20VUYC8": "2026-11-15T23:00:00.674Z",
-  "#80JRVYRQC": "2026-11-15T23:00:01.107Z",
-  "#QL2GJVR02": "2026-11-15T23:00:01.998Z",
-  "#890UCYCGU": "2026-11-15T23:00:02.386Z",
-  "#QQ9CVYG0": "2026-11-15T23:00:01.480Z"
+  "#8GQQ9YC2": "2026-11-16T02:52:52.624Z",
+  "#ULG0PY8UP": "2026-11-16T02:52:53.024Z",
+  "#89R88C82Y": "2026-11-16T02:52:53.413Z",
+  "#9CY0VCVJG": "2026-11-16T02:52:53.947Z",
+  "#9Q0L20PL2": "2026-11-16T02:52:54.413Z",
+  "#UJ20VUYC8": "2026-11-16T02:52:54.899Z",
+  "#80JRVYRQC": "2026-11-16T02:52:55.353Z",
+  "#QL2GJVR02": "2026-11-16T02:52:56.203Z",
+  "#890UCYCGU": "2026-11-16T02:52:56.591Z",
+  "#QQ9CVYG0": "2026-11-16T02:52:55.739Z"
  }
 }

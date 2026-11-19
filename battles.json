@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-11-19T03:41:55.183Z",
+ "updatedAt": "2026-11-19T13:34:32.885Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
@@ -63,6 +63,136 @@
   }
  },
  "battles": [
+  {
+   "key": "20261119T123839.000Z|#890UCYCGU|#9Q0L20PL2",
+   "battleTime": "20261119T123839.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#9Q0L20PL2",
+    "name": "SEK",
+    "crowns": 1,
+    "kingTowerHitPoints": 4504,
+    "princessTowersHitPoints": [
+     2927,
+     604
+    ],
+    "elixirLeaked": 0.66,
+    "cards": [
+     {
+      "name": "Skeleton Barrel",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Wizard",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Drill",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Phoenix",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Knight",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Delivery",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Cage",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Poison",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#890UCYCGU",
+    "name": "Johnny",
+    "crowns": 0,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     3052
+    ],
+    "elixirLeaked": 1.27,
+    "cards": [
+     {
+      "name": "Skeletons",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Executioner",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Hogs",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Firecracker",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Rascals",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Goblin Hut",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261118T232840.000Z|#80JRVYRQC|#890UCYCGU",
    "battleTime": "20261118T232840.000Z",
@@ -88776,15 +88906,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-11-19T03:41:51.538Z",
-  "#ULG0PY8UP": "2026-11-19T03:41:51.876Z",
-  "#89R88C82Y": "2026-11-19T03:41:52.210Z",
-  "#9CY0VCVJG": "2026-11-19T03:41:52.522Z",
-  "#9Q0L20PL2": "2026-11-19T03:41:53.149Z",
-  "#UJ20VUYC8": "2026-11-19T03:41:53.542Z",
-  "#80JRVYRQC": "2026-11-19T03:41:53.931Z",
-  "#QL2GJVR02": "2026-11-19T03:41:54.679Z",
-  "#890UCYCGU": "2026-11-19T03:41:55.046Z",
-  "#QQ9CVYG0": "2026-11-19T03:41:54.270Z"
+  "#8GQQ9YC2": "2026-11-19T13:34:29.377Z",
+  "#ULG0PY8UP": "2026-11-19T13:34:29.730Z",
+  "#89R88C82Y": "2026-11-19T13:34:30.093Z",
+  "#9CY0VCVJG": "2026-11-19T13:34:30.489Z",
+  "#9Q0L20PL2": "2026-11-19T13:34:30.853Z",
+  "#UJ20VUYC8": "2026-11-19T13:34:31.281Z",
+  "#80JRVYRQC": "2026-11-19T13:34:31.633Z",
+  "#QL2GJVR02": "2026-11-19T13:34:32.385Z",
+  "#890UCYCGU": "2026-11-19T13:34:32.748Z",
+  "#QQ9CVYG0": "2026-11-19T13:34:32.031Z"
  }
 }

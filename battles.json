@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-11-18T22:10:51.604Z",
+ "updatedAt": "2026-11-19T03:41:55.183Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
@@ -63,6 +63,136 @@
   }
  },
  "battles": [
+  {
+   "key": "20261118T232840.000Z|#80JRVYRQC|#890UCYCGU",
+   "battleTime": "20261118T232840.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#80JRVYRQC",
+    "name": "rishling",
+    "crowns": 1,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     1141,
+     2623
+    ],
+    "elixirLeaked": 8.04,
+    "cards": [
+     {
+      "name": "Bomb Tower",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Poison",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Skeletons",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ice Golem",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Ram Rider",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Firecracker",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Arrows",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Wizard",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#890UCYCGU",
+    "name": "Johnny",
+    "crowns": 0,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     3052
+    ],
+    "elixirLeaked": 4.86,
+    "cards": [
+     {
+      "name": "Tesla",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Freeze",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Tombstone",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Prince",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Hogs",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Dart Goblin",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Executioner",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261118T202917.000Z|#80JRVYRQC|#9CY0VCVJG",
    "battleTime": "20261118T202917.000Z",
@@ -88646,15 +88776,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-11-18T22:10:47.013Z",
-  "#ULG0PY8UP": "2026-11-18T22:10:47.339Z",
-  "#89R88C82Y": "2026-11-18T22:10:47.977Z",
-  "#9CY0VCVJG": "2026-11-18T22:10:48.299Z",
-  "#9Q0L20PL2": "2026-11-18T22:10:49.691Z",
-  "#UJ20VUYC8": "2026-11-18T22:10:50.088Z",
-  "#80JRVYRQC": "2026-11-18T22:10:50.491Z",
-  "#QL2GJVR02": "2026-11-18T22:10:51.144Z",
-  "#890UCYCGU": "2026-11-18T22:10:51.511Z",
-  "#QQ9CVYG0": "2026-11-18T22:10:50.819Z"
+  "#8GQQ9YC2": "2026-11-19T03:41:51.538Z",
+  "#ULG0PY8UP": "2026-11-19T03:41:51.876Z",
+  "#89R88C82Y": "2026-11-19T03:41:52.210Z",
+  "#9CY0VCVJG": "2026-11-19T03:41:52.522Z",
+  "#9Q0L20PL2": "2026-11-19T03:41:53.149Z",
+  "#UJ20VUYC8": "2026-11-19T03:41:53.542Z",
+  "#80JRVYRQC": "2026-11-19T03:41:53.931Z",
+  "#QL2GJVR02": "2026-11-19T03:41:54.679Z",
+  "#890UCYCGU": "2026-11-19T03:41:55.046Z",
+  "#QQ9CVYG0": "2026-11-19T03:41:54.270Z"
  }
 }

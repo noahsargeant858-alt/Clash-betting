@@ -1,10 +1,10 @@
 {
- "updatedAt": "2026-11-19T13:34:32.885Z",
+ "updatedAt": "2026-11-19T22:18:45.390Z",
  "players": {
   "#89R88C82Y": {
    "name": "KING ZABELA",
-   "trophies": 13926,
-   "bestTrophies": 13948,
+   "trophies": 13887,
+   "bestTrophies": 13983,
    "expLevel": 47
   },
   "#QL2GJVR02": {
@@ -27,7 +27,7 @@
   },
   "#8GQQ9YC2": {
    "name": "EPIC McMoosh",
-   "trophies": 13169,
+   "trophies": 13138,
    "bestTrophies": 13282,
    "expLevel": 59
   },
@@ -63,6 +63,136 @@
   }
  },
  "battles": [
+  {
+   "key": "20261119T212537.000Z|#890UCYCGU|#9CY0VCVJG",
+   "battleTime": "20261119T212537.000Z",
+   "type": "clanMate",
+   "gameMode": {
+    "id": 72000194,
+    "name": "Draft_Competitive"
+   },
+   "team": {
+    "tag": "#9CY0VCVJG",
+    "name": "DarkMario008",
+    "crowns": 1,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     2244,
+     3052
+    ],
+    "elixirLeaked": 0.24,
+    "cards": [
+     {
+      "name": "Bowler",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Valkyrie",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Electro Dragon",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Cannon",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Flying Machine",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Elixir Golem",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Arrows",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Poison",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     }
+    ]
+   },
+   "opponent": {
+    "tag": "#890UCYCGU",
+    "name": "Johnny",
+    "crowns": 0,
+    "kingTowerHitPoints": 4824,
+    "princessTowersHitPoints": [
+     3052
+    ],
+    "elixirLeaked": 2.39,
+    "cards": [
+     {
+      "name": "Bomber",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Ghost",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Executioner",
+      "level": 6,
+      "maxLevel": 11,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Mini P.E.K.K.A",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Archers",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Royal Giant",
+      "level": 11,
+      "maxLevel": 16,
+      "evolutionLevel": null
+     },
+     {
+      "name": "The Log",
+      "level": 3,
+      "maxLevel": 8,
+      "evolutionLevel": null
+     },
+     {
+      "name": "Fireball",
+      "level": 9,
+      "maxLevel": 14,
+      "evolutionLevel": null
+     }
+    ]
+   }
+  },
   {
    "key": "20261119T123839.000Z|#890UCYCGU|#9Q0L20PL2",
    "battleTime": "20261119T123839.000Z",
@@ -88906,15 +89036,15 @@
   }
  ],
  "checked": {
-  "#8GQQ9YC2": "2026-11-19T13:34:29.377Z",
-  "#ULG0PY8UP": "2026-11-19T13:34:29.730Z",
-  "#89R88C82Y": "2026-11-19T13:34:30.093Z",
-  "#9CY0VCVJG": "2026-11-19T13:34:30.489Z",
-  "#9Q0L20PL2": "2026-11-19T13:34:30.853Z",
-  "#UJ20VUYC8": "2026-11-19T13:34:31.281Z",
-  "#80JRVYRQC": "2026-11-19T13:34:31.633Z",
-  "#QL2GJVR02": "2026-11-19T13:34:32.385Z",
-  "#890UCYCGU": "2026-11-19T13:34:32.748Z",
-  "#QQ9CVYG0": "2026-11-19T13:34:32.031Z"
+  "#8GQQ9YC2": "2026-11-19T22:18:39.866Z",
+  "#ULG0PY8UP": "2026-11-19T22:18:40.697Z",
+  "#89R88C82Y": "2026-11-19T22:18:41.180Z",
+  "#9CY0VCVJG": "2026-11-19T22:18:42.451Z",
+  "#9Q0L20PL2": "2026-11-19T22:18:42.946Z",
+  "#UJ20VUYC8": "2026-11-19T22:18:43.448Z",
+  "#80JRVYRQC": "2026-11-19T22:18:43.815Z",
+  "#QL2GJVR02": "2026-11-19T22:18:44.819Z",
+  "#890UCYCGU": "2026-11-19T22:18:45.290Z",
+  "#QQ9CVYG0": "2026-11-19T22:18:44.241Z"
  }
 }
